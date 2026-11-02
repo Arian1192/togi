@@ -172,9 +172,10 @@ Objetivo: la implementación SQLite del puerto EventStore en packages/daemon/src
   packages/core/src/integrity. Devuelve conflicto si la versión no coincide.
 - Una forma de ejecutar código del llamante dentro de la misma transacción del append, para las
   proyecciones del PR 7. Propón la firma.
-- readStream, readAll y verify.
+- readStream, readAll y verify. Al leer, correlation_id NULL se convierte en campo ausente:
+  hashEvent rechaza null (PR 4), así que sin esa conversión verify falla en esos eventos.
 - Tests: append y lectura, conflicto de versión, UPDATE y DELETE rechazados por los triggers,
-  verify en verde, y manipulación detectada (el test quita los triggers, cambia una fila y
+  verify en verde con eventos con y sin correlationId, y manipulación detectada (el test quita los triggers, cambia una fila y
   verify devuelve el seq roto).
 
 Fuera de alcance: blobs, cifrado, proyecciones, API.
