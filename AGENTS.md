@@ -13,3 +13,5 @@ Mapa para agentes que trabajan en este repo. Mantenerlo corto.
 - Cambios pequeños: un objetivo por PR, idealmente menos de 300 líneas.
 - No modifiques tests existentes ni la configuración de CI para que algo pase.
 - Commits en conventional commits; si los hace un agente, con el trailer `Assisted-by: <agente>/<modelo>`.
+- Comandos: pnpm typecheck, pnpm lint, pnpm test.
+- No crees ficheros de seguimiento, memoria ni notas propias (odd/, Engram u otros) en este repo: el plan vive en el PR.
