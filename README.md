@@ -1,0 +1,20 @@
+# forja
+
+Software factory con IA: un daemon headless con API que lleva cada tarea por un flujo con gates automáticos y aprobación humana (plan → construcción → verificación → revisión → merge), con agentes de código haciendo el trabajo.
+
+Estado: diseño. Aún no hay código del daemon.
+
+## Documentación
+
+- [Contexto y estado del proyecto](docs/contexto.md)
+- [ADR-001: Flujo de tareas](docs/adr/001-flujo-de-tareas.md)
+- [ADR-002: Lenguaje del daemon](docs/adr/002-lenguaje-del-daemon.md)
+- [ADR-003: Runtime del agente](docs/adr/003-runtime-del-agente.md)
+
+## Herramientas
+
+- `tools/baseline.mjs`: línea base de métricas a partir de los PRs de un repo (requiere Node ≥ 22 y `gh` autenticado).
+
+```bash
+node tools/baseline.mjs --repo Arian1192/promos --base dev --since 2026-11-02 --json baseline-dev.json
+```
