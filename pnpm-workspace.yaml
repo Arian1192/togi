@@ -1,0 +1,4 @@
+packages:
+  - "packages/*"
+# Rechaza releases de menos de 14 dias (minutos)
+minimumReleaseAge: 20160
