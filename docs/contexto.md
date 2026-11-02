@@ -182,8 +182,8 @@ Referencias de mercado: Claude Squad (TUI en Go, AGPL), Conductor (macOS, diff r
 | 1 | Limpiar `promos` (tag, quitar `factory/`, `Assisted-by` en AGENTS.md) | Pendiente (Arian) |
 | 2 | Flujo de tareas (ADR-001) | Acordado, falta aprobación formal |
 | 3 | Lenguaje del daemon y runtime del agente (ADR-002 y ADR-003) | Hecho |
-| 4 | Modelo de datos (eventos + entidades derivadas) | Siguiente |
-| 5 | Esqueleto de daemon + CLI mínima (un agente, un worktree) | Pendiente |
+| 4 | Modelo de datos (eventos + entidades derivadas) | Hecho |
+| 5 | Esqueleto de daemon + CLI mínima (un agente, un worktree) | Siguiente |
 | 6 | Gates de capas 1 y 2 + contrato del plan | Pendiente |
 | 7 | Piloto: 10 tareas reales en `promos` | Pendiente |
 | 8 | Agente revisor en modo sombra | Pendiente |
@@ -191,6 +191,7 @@ Referencias de mercado: Claude Squad (TUI en Go, AGPL), Conductor (macOS, diff r
 
 - **ADR-002, lenguaje:** TypeScript estricto sobre Node LTS (≥ 22) con pnpm; monorepo con paquetes `core` (tipos, eventos, reglas del flujo, sin infraestructura), `daemon`, `cli` y, más adelante, `web`. https://claude.ai/artifact/XzzEpqEVDdqRpTFWYxBTKT
 - **ADR-003, runtime del agente:** Claude Agent SDK de TypeScript (versión fijada) detrás de la interfaz `AgentRuntime`; Codex como segundo runtime y candidato a revisor delegado. Herramientas por estado con `allowedTools` + `dontAsk`, `settingSources` vacío y hooks de forja que bloquean tests existentes, configuración de gates, `.github/`, credenciales y ficheros fuera del plan. Uso personal con la suscripción; modo equipo con API key. https://claude.ai/artifact/TGxQ7QvH9aaKeQbbdv9yxU
+- **ADR-004, modelo de datos:** event sourcing con un stream por tarea, decider puro en `core`, SQLite con cadena de hashes y triggers append-only, trayectoria del agente en una tabla aparte, blobs cifrados por tarea y clase de dato (crypto-shredding) y actores seudónimos. Retenciones propuestas pendientes de fijar antes del modo equipo. docs/adr/004-modelo-de-datos.md
 
 ### Requisitos para el modelo de datos (paso 4)
 - Los cuatro requisitos del modo equipo (backlog): actor en cada evento, CLI solo contra la API, almacenamiento y workspace detrás de interfaces.
