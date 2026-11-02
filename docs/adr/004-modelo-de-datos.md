@@ -83,9 +83,9 @@ export type TaskSource =
       untrustedBody: BlobRef };  // entrada no fiable: nunca se mezcla con instrucciones
 
 export type TaskEvent =
-  | E<"task.created", { title: string; description: BlobRef; acceptanceCriteria: BlobRef;
+  | E<"task.created", { title: string; description: BlobRef | null; acceptanceCriteria: BlobRef | null;
                         risk: RiskLevel; repo: string; baseBranch: string; source: TaskSource }>
-  | E<"task.edited", Partial<{ title: string; description: BlobRef; acceptanceCriteria: BlobRef }>>
+  | E<"task.edited", Partial<{ title: string; description: BlobRef | null; acceptanceCriteria: BlobRef | null }>>
   | E<"task.submitted", {}>                                          // draft → planning
   | E<"task.risk_changed", { from: RiskLevel; to: RiskLevel; cause: "manual" | "diff"; paths: string[] }>
   | E<"session.started", SessionStarted>
@@ -180,6 +180,8 @@ Cuatro precisiones sobre el ADR-001:
 4. **Modo sombra.** Una decisión con `mode: "shadow"` se guarda pero no mueve la tarea. La proyección `shadow_agreement` compara, por nivel de riesgo, la decisión del revisor delegado con la vinculante y lleva la racha de coincidencias: de ahí sale el criterio de las 20 tareas seguidas.
 
 `decide` exige `reason` en todo `request_changes`, `reject` y `task.rejected`, y rechaza un `approve` en `plan_review` si el plan estima más de 300 líneas. En el modo equipo podrá imponer además que quien aprueba no sea quien creó la tarea.
+
+La descripción y el criterio de aceptación son `BlobRef | null`: el daemon no crea blob para un texto vacío y guarda `null`. Así `submit` sabe si hay criterio sin leer el blob, que el decider no puede descifrar porque `core` no tiene acceso a las claves.
 
 ## Almacenamiento
 
