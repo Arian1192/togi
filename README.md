@@ -11,6 +11,7 @@ Estado: diseño. Aún no hay código del daemon.
 - [ADR-002: Lenguaje del daemon](docs/adr/002-lenguaje-del-daemon.md)
 - [ADR-003: Runtime del agente](docs/adr/003-runtime-del-agente.md)
 - [ADR-004: Modelo de datos](docs/adr/004-modelo-de-datos.md)
+- [ADR-005: API y CLI de la rebanada 1](docs/adr/005-api-y-cli-rebanada-1.md)
 ## Herramientas
 
 - `tools/baseline.mjs`: línea base de métricas a partir de los PRs de un repo (requiere Node ≥ 22 y `gh` autenticado).
