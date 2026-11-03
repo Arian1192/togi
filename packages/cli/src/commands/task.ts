@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { CreateTask, RISK_LEVELS, SAFE_ID } from "@togi/core";
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
-import { clean } from "../format.ts";
+import { clean, say, section } from "../format.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
@@ -15,6 +15,19 @@ interface Created {
   hasCriteria: boolean;
 }
 
+interface Detail {
+  number: number;
+  title: string;
+  state: string;
+  risk: string;
+  repo: string;
+  baseBranch: string;
+  version: number;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  erased: { description: boolean; acceptanceCriteria: boolean };
+}
+
 /** Campo de la API → cómo lo nombra la persona que usa la CLI. */
 const FLAG: Record<string, string> = {
   title: "el título",
@@ -25,6 +38,7 @@ const FLAG: Record<string, string> = {
   acceptanceCriteria: "--criteria",
 };
 
+const NUMBER = /^[1-9]\d*$/;
 const str = (v: string | boolean | undefined) => (typeof v === "string" ? v : undefined);
 
 const NEW_USAGE = `Uso: togi task new "<título>" --risk <low|medium|high> --repo <owner/repo> [--base dev]
@@ -110,4 +124,40 @@ function createdLines(t: Created, out: Output): string {
   return `${lines.join("\n")}\n`;
 }
 
-export const task = { new: newTask };
+const show: Command = {
+  summary: "Muestra el detalle de una tarea.",
+  example: "togi task show 12",
+  usage: `Uso: togi task show <número> [--json]
+
+Muestra el estado, el repositorio y los textos de una tarea.
+
+Ejemplo:
+  togi task show 12
+`,
+  async run({ home, json, out, args }) {
+    const command = "togi task show --help";
+    const n = args[0];
+    if (n === undefined)
+      throw usageError("missing_option", { field: "el número de tarea", command });
+    if (args.length > 1 || !NUMBER.test(n)) {
+      throw usageError("invalid_option", { field: "el número de tarea", command });
+    }
+    const client = createClient(home);
+    const t = await client.checked<Detail>(await client.api.v1.tasks[":n"].$get({ param: { n } }), {
+      n: Number(n),
+    });
+    if (json) return `${JSON.stringify(t)}\n`;
+    const risk = say(`risk_${t.risk}`);
+    const meta = `${t.state} · riesgo ${risk} · ${t.repo} → ${t.baseBranch} · versión ${t.version}`;
+    return `${[
+      `${out.paint("accent", `#${t.number}`)}  ${clean(t.title)}`,
+      `     ${meta}`,
+      "",
+      section(say("section_description"), t.description, t.erased.description, out),
+      "",
+      section(say("section_criteria"), t.acceptanceCriteria, t.erased.acceptanceCriteria, out),
+    ].join("\n")}\n`;
+  },
+};
+
+export const task = { new: newTask, show };
