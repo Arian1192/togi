@@ -1,6 +1,6 @@
 import { CreateTask, EditTask, RejectTask, VersionConflictError } from "@togi/core";
 import type Database from "better-sqlite3";
-import type { Context, Hono } from "hono";
+import { type Context, Hono } from "hono";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { AppEnv } from "./app.ts";
 import { domainStatus, problem } from "./problem.ts";
@@ -24,8 +24,11 @@ interface TaskRow {
   stream_version: number;
 }
 
-/** Rutas de comandos del ADR-005. El actor sale siempre del token, nunca del cuerpo. */
-export function registerTaskRoutes(app: Hono<AppEnv>, db: Database.Database, handle: Handle) {
+/**
+ * Rutas de comandos del ADR-005, encadenadas para que `hc` infiera sus tipos. El actor sale
+ * siempre del token, nunca del cuerpo. Sin `handle` las rutas existen pero responden 503.
+ */
+export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
   const select = db.prepare(
     "SELECT number, title, state, risk, stream_version FROM tasks WHERE number = ?",
   );
@@ -74,9 +77,10 @@ export function registerTaskRoutes(app: Hono<AppEnv>, db: Database.Database, han
   };
 
   /** El comando perdió la carrera contra otra escritura: 409, no 500. */
-  const guard = async (run: () => Promise<Response>): Promise<Response> => {
+  const guard = async (run: (handle: Handle) => Promise<Response>): Promise<Response> => {
+    if (handle === undefined) return problem(503, "not_configured", "comandos no disponibles");
     try {
-      return await run();
+      return await run(handle);
     } catch (error) {
       if (error instanceof VersionConflictError) {
         return problem(409, "version_conflict", "otra escritura se adelantó; vuelve a leer");
@@ -88,7 +92,7 @@ export function registerTaskRoutes(app: Hono<AppEnv>, db: Database.Database, han
   const existing =
     <T>(schema: Parser<T> | null, command: (number: number, input: T) => Parameters<Handle>[1]) =>
     (c: Context<AppEnv>) =>
-      guard(async () => {
+      guard(async (handle) => {
         const param = c.req.param("n") ?? "";
         if (!NUMBER.test(param)) return problem(404, "task_not_found", "tarea inexistente");
         const version = ifMatch(c);
@@ -102,42 +106,42 @@ export function registerTaskRoutes(app: Hono<AppEnv>, db: Database.Database, han
         return respond(result, 200);
       });
 
-  app.post("/v1/tasks", (c) =>
-    guard(async () => {
-      const input = await body(c, CreateTask);
-      if (input instanceof Response) return input;
-      const result = await handle(
-        c.get("actor"),
-        { type: "create", ...input, source: { kind: "cli" } },
-        { correlationId: c.get("requestId") },
-      );
-      return respond(result, 201);
-    }),
-  );
-
-  app.patch(
-    "/v1/tasks/:n",
-    existing(EditTask, (number, input) => ({
-      type: "edit",
-      number,
-      ...(input.title === undefined ? {} : { title: input.title }),
-      ...(input.description === undefined ? {} : { description: input.description }),
-      ...(input.acceptanceCriteria === undefined
-        ? {}
-        : { acceptanceCriteria: input.acceptanceCriteria }),
-    })),
-  );
-  app.post(
-    "/v1/tasks/:n/submit",
-    existing(null, (number) => ({ type: "submit", number })),
-  );
-  app.post(
-    "/v1/tasks/:n/reject",
-    existing(RejectTask, (number, { reason }) => ({
-      type: "reject",
-      number,
-      category: reason.category,
-      text: reason.text,
-    })),
-  );
+  return new Hono<AppEnv>()
+    .post("/v1/tasks", (c) =>
+      guard(async (handle) => {
+        const input = await body(c, CreateTask);
+        if (input instanceof Response) return input;
+        const result = await handle(
+          c.get("actor"),
+          { type: "create", ...input, source: { kind: "cli" } },
+          { correlationId: c.get("requestId") },
+        );
+        return respond(result, 201);
+      }),
+    )
+    .patch(
+      "/v1/tasks/:n",
+      existing(EditTask, (number, input) => ({
+        type: "edit",
+        number,
+        ...(input.title === undefined ? {} : { title: input.title }),
+        ...(input.description === undefined ? {} : { description: input.description }),
+        ...(input.acceptanceCriteria === undefined
+          ? {}
+          : { acceptanceCriteria: input.acceptanceCriteria }),
+      })),
+    )
+    .post(
+      "/v1/tasks/:n/submit",
+      existing(null, (number) => ({ type: "submit", number })),
+    )
+    .post(
+      "/v1/tasks/:n/reject",
+      existing(RejectTask, (number, { reason }) => ({
+        type: "reject",
+        number,
+        category: reason.category,
+        text: reason.text,
+      })),
+    );
 }
