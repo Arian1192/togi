@@ -14,13 +14,22 @@ export class CliError extends Error {
   readonly context: ErrorContext;
   /** Status HTTP de la respuesta, si el error viene de la API. */
   readonly status: number | undefined;
+  /** Texto para stdout aunque el comando falle (`--json` con el log roto). */
+  readonly stdout: string | undefined;
 
-  constructor(code: string, exitCode: ExitCode, context: ErrorContext = {}, status?: number) {
+  constructor(
+    code: string,
+    exitCode: ExitCode,
+    context: ErrorContext = {},
+    status?: number,
+    stdout?: string,
+  ) {
     super(code);
     this.code = code;
     this.exitCode = exitCode;
     this.context = context;
     this.status = status;
+    this.stdout = stdout;
   }
 }
 
