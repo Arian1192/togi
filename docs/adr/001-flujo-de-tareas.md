@@ -1,4 +1,4 @@
-# ADR-001: Flujo de tareas de forja
+# ADR-001: Flujo de tareas de togi
 
 2 de noviembre de 2026 · Arian
 
@@ -6,7 +6,7 @@
 
 **Estado:** propuesto, pendiente de aprobación.
 
-Cada tarea de forja recorre siete estados con dos gates humanos: la aprobación del plan y la revisión del PR. El objetivo es imponer el flujo que siguen los equipos que usan agentes con éxito (Stripe, Spotify, Dropbox, `dotnet/runtime`): tareas pequeñas, plan aprobado antes del código, verificación independiente del agente y PRs revisables.
+Cada tarea de togi recorre siete estados con dos gates humanos: la aprobación del plan y la revisión del PR. El objetivo es imponer el flujo que siguen los equipos que usan agentes con éxito (Stripe, Spotify, Dropbox, `dotnet/runtime`): tareas pequeñas, plan aprobado antes del código, verificación independiente del agente y PRs revisables.
 
 La primera foto de la línea base de `promos` (61 PRs a `main` desde el 1 de octubre de 2026) muestra lo contrario:
 
@@ -14,11 +14,11 @@ La primera foto de la línea base de `promos` (61 PRs a `main` desde el 1 de oct
 - Tamaño mediano de 672 líneas por PR, con casos de 3.000 y 9.704.
 - Solo el 23% de los PRs en un único commit; las correcciones van dentro del propio PR.
 
-El valor de forja no es ir más rápido, sino producir cambios pequeños, verificados y revisables.
+El valor de togi no es ir más rápido, sino producir cambios pequeños, verificados y revisables.
 
 ## Decisión: los estados de una tarea
 
-Una tarea solo avanza cuando se cumple la condición de su estado. El agente actúa en dos estados, los gates de forja en uno y el humano en tres.
+Una tarea solo avanza cuando se cumple la condición de su estado. El agente actúa en dos estados, los gates de togi en uno y el humano en tres.
 
 | # | Estado | Quién actúa | Qué ocurre | Condición para avanzar |
 | --- | --- | --- | --- | --- |
@@ -26,9 +26,9 @@ Una tarea solo avanza cuando se cumple la condición de su estado. El agente act
 | 2 | `planning` | Agente | Lee el repo sin modificarlo y propone un plan: ficheros a tocar, enfoque, tests nuevos y tamaño estimado. | Plan entregado. |
 | 3 | `plan_review` | Humano (gate 1) | Aprueba, pide cambios o rechaza. Si el plan supera el límite de tamaño, se parte la tarea. | Plan aprobado. |
 | 4 | `building` | Agente | Trabaja en un workspace aislado y repite formato, tipos, lint y tests hasta que pasan. | El agente declara que ha terminado. |
-| 5 | `verifying` | Gates de forja | Repite la verificación sin fiarse del agente y comprueba el contrato del plan. | Todos los gates en verde. |
+| 5 | `verifying` | Gates de togi | Repite la verificación sin fiarse del agente y comprueba el contrato del plan. | Todos los gates en verde. |
 | 6 | `review` | Humano o revisor delegado (gate 2) | Se abre un PR hacia `dev` con el diff y la evidencia de los gates. | Aprobado. |
-| 7 | `merged` | forja | Merge a `dev`. | Estado final. |
+| 7 | `merged` | togi | Merge a `dev`. | Estado final. |
 
 Estados finales sin merge: `failed` (agotó los reintentos) y `rejected` (cancelada por el humano).
 
@@ -61,7 +61,7 @@ El camino feliz va de `draft` a `merged`; las dos vueltas atrás (pedir cambios 
 2. **Tests: añadir sí, modificar no.** El agente puede crear tests nuevos; los existentes son de solo lectura y no se pueden marcar como skip. Esto resuelve la tensión entre el principio 4 y la idea de usar agentes para reforzar la base de tests.
 3. **Límite de 300 líneas de diff por tarea.** Cifra propia, no sale de la evidencia; se ajusta con los datos del piloto. Un plan que estime más se parte en `plan_review`.
 4. **Máximo de 3 ciclos `building` → `verifying`.** Al tercer fallo la tarea pasa a `failed` y vuelve al humano: casi siempre indica una tarea mal escrita o demasiado grande.
-5. **El agente no se autoevalúa.** Su bucle interno en `building` es una ayuda; la única verificación que cuenta es la de `verifying`, ejecutada por forja en un entorno que el agente no controla.
+5. **El agente no se autoevalúa.** Su bucle interno en `building` es una ayuda; la única verificación que cuenta es la de `verifying`, ejecutada por togi en un entorno que el agente no controla.
 6. **Todo es un evento.** Cada cambio de estado, acción del agente, resultado de gate y decisión humana se registra en un log append-only. El estado de la tarea es una proyección de ese log.
 7. **Atribución.** Todo commit del agente lleva el trailer `Assisted-by: <agente>/<modelo>`.
 
@@ -89,7 +89,7 @@ El nivel de riesgo se asigna en `draft` y se recalcula en `verifying` según los
 | Sin humano en ningún gate ("dark factory") | En `dotnet/runtime`, los PRs totalmente autónomos se fusionaron el 55,1% frente al 86,2% con commits humanos; según METR, la mitad de los PRs que pasaban los tests no se habrían aceptado. Solo lo sostienen equipos con verificación muy madura. |
 | Auto-merge del riesgo bajo desde el inicio | Aún no hay datos de que los gates aguanten (principio 1). Se activa con el criterio de delegación. |
 | Tests ocultos al agente | Reduce las trampas casi a cero pero también el éxito legítimo (ImpossibleBench). Los tests de solo lectura bloquean las ediciones sin ese coste. |
-| Confiar en la verificación del propio agente | Los agentes hackean el verificador cuando la tarea es difícil; por eso `verifying` la repite forja de forma independiente. |
+| Confiar en la verificación del propio agente | Los agentes hackean el verificador cuando la tarea es difícil; por eso `verifying` la repite togi de forma independiente. |
 
 Trade-off asumido: cada tarea exige escribir un criterio de aceptación y aprobar un plan, más trabajo por tarea que el flujo actual a cambio de PRs pequeños y revisables.
 
@@ -107,6 +107,6 @@ El modelo de datos (paso 4) sale de este flujo. Como mínimo necesita:
 
 Cuestiones abiertas, resueltas el 2 de noviembre de 2026:
 
-- **Origen de las tareas.** La tarea existe una sola vez, en forja. CLI, GitHub Issues, Jira, Sentry y la conversación con el agente son adaptadores que crean una tarea en `draft` con la referencia a su origen, y forja devuelve allí el estado. Ninguna fuente se salta el gate 1, y el texto de fuentes externas se trata como entrada no fiable. MVP: CLI y GitHub Issues.
-- **Dónde vive el plan.** La fuente de verdad es forja, versionada en el log de eventos; el gate solo usa esa versión. La descripción del PR lleva una copia marcada como copia, con la versión del plan. Todo agente que lea la copia recibe la instrucción explícita de consultar el plan en forja ante cualquier duda o discrepancia.
-- **Cuando `dev` avanza.** Quien revisa no modifica la rama. forja integra `dev` en la rama de la tarea: si el merge es limpio, repite `verifying`; la aprobación se mantiene si los cambios de `dev` no tocan los ficheros de la tarea y vuelve a `review` si los tocan. Si hay conflicto, la tarea vuelve a `building`. forja serializa los merges, porque la merge queue nativa de GitHub probablemente no está disponible en un repo privado de cuenta personal (pendiente de confirmar).
+- **Origen de las tareas.** La tarea existe una sola vez, en togi. CLI, GitHub Issues, Jira, Sentry y la conversación con el agente son adaptadores que crean una tarea en `draft` con la referencia a su origen, y togi devuelve allí el estado. Ninguna fuente se salta el gate 1, y el texto de fuentes externas se trata como entrada no fiable. MVP: CLI y GitHub Issues.
+- **Dónde vive el plan.** La fuente de verdad es togi, versionada en el log de eventos; el gate solo usa esa versión. La descripción del PR lleva una copia marcada como copia, con la versión del plan. Todo agente que lea la copia recibe la instrucción explícita de consultar el plan en togi ante cualquier duda o discrepancia.
+- **Cuando `dev` avanza.** Quien revisa no modifica la rama. togi integra `dev` en la rama de la tarea: si el merge es limpio, repite `verifying`; la aprobación se mantiene si los cambios de `dev` no tocan los ficheros de la tarea y vuelve a `review` si los tocan. Si hay conflicto, la tarea vuelve a `building`. togi serializa los merges, porque la merge queue nativa de GitHub probablemente no está disponible en un repo privado de cuenta personal (pendiente de confirmar).

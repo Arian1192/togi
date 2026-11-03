@@ -163,9 +163,9 @@ Referencias de mercado: Claude Squad (TUI en Go, AGPL), Conductor (macOS, diff r
 ## 9. Estado del proyecto (actualizado el 2 de noviembre de 2026)
 
 ### Decisiones cerradas
-- **Nombre:** `forja` (repo propio, separado de cualquier repo objetivo). El binario de la CLI también se llama `forja`; si se publica en npm, con scope (`@arian1192/forja`).
+- **Nombre:** `togi` (repo propio, separado de cualquier repo objetivo). El binario de la CLI también se llama `togi`; si se publica en npm, con scope (`@arian1192/togi`). Cambio de nombre desde `forja`: docs/adr/006-cambio-de-nombre.md.
 - **Repo piloto:** `promos` (monorepo TypeScript con pnpm: `apps/api` + `apps/web`, Drizzle, CI en GitHub, PRs hacia `dev`). El prototipo `factory/` que había dentro de `promos` se retira (tag `factory-v0`) y no se usa como referencia, para diseñar sin sesgo.
-- **Línea base inicial** (61 PRs a `main` desde el 1 de octubre de 2026, script `baseline.mjs` en el repo `forja`): lead time mediano de 0,2 h (no hay revisión real), tamaño mediano de 672 líneas, 23% de PRs en un solo commit. Conclusión: el valor de forja no es ir más rápido, sino producir cambios pequeños, verificados y revisables.
+- **Línea base inicial** (61 PRs a `main` desde el 1 de octubre de 2026, script `baseline.mjs` en el repo `togi`): lead time mediano de 0,2 h (no hay revisión real), tamaño mediano de 672 líneas, 23% de PRs en un solo commit. Conclusión: el valor de togi no es ir más rápido, sino producir cambios pequeños, verificados y revisables.
 - **Atribución:** desde ahora, todo commit hecho por un agente lleva el trailer `Assisted-by: <agente>/<modelo>`.
 - **ADR-001, flujo de tareas** (acordado en conversación; pendiente de aprobación formal): https://claude.ai/artifact/FPCKFx2KZNGUadj3B2XenL
   - Estados: `draft` → `planning` → `plan_review` (gate 1) → `building` → `verifying` → `review` (gate 2) → `merged`; finales sin merge: `failed` (3 ciclos fallidos) y `rejected`.
@@ -173,8 +173,8 @@ Referencias de mercado: Claude Squad (TUI en Go, AGPL), Conductor (macOS, diff r
   - Tests: el agente puede añadir, nunca modificar ni marcar skip.
   - Gate 1 siempre humano. Gate 2 humano al inicio y delegado progresivamente por nivel de riesgo (bajo: UI, docs, Bruno; medio: lógica de API; alto: accesos, migraciones, emails, compras, siempre humano). Criterio de delegación: 20 tareas seguidas del nivel con coincidencia entre revisor delegado (en modo sombra) y humano.
   - Las tareas pueden nacer de varias fuentes (CLI, GitHub Issues, Jira, Sentry, conversación con el agente), todas como adaptadores que crean un `draft`; ninguna se salta el gate 1. MVP: CLI y GitHub Issues.
-  - El plan vive en forja (fuente de verdad); el PR lleva una copia marcada, y todo agente que la lea tiene la instrucción de consultar forja ante cualquier duda.
-  - Si `dev` avanza: forja integra `dev` en la rama; merge limpio → repite `verifying` (y `review` si los cambios tocan los ficheros de la tarea); conflicto → vuelve a `building`. El revisor nunca modifica la rama. forja serializa los merges.
+  - El plan vive en togi (fuente de verdad); el PR lleva una copia marcada, y todo agente que la lea tiene la instrucción de consultar togi ante cualquier duda.
+  - Si `dev` avanza: togi integra `dev` en la rama; merge limpio → repite `verifying` (y `review` si los cambios tocan los ficheros de la tarea); conflicto → vuelve a `building`. El revisor nunca modifica la rama. togi serializa los merges.
 
 ### Plan de implementación
 | # | Paso | Estado |
@@ -190,9 +190,10 @@ Referencias de mercado: Claude Squad (TUI en Go, AGPL), Conductor (macOS, diff r
 | 9 | Delegación progresiva del gate 2 | Pendiente |
 
 - **ADR-002, lenguaje:** TypeScript estricto sobre Node LTS (≥ 22) con pnpm; monorepo con paquetes `core` (tipos, eventos, reglas del flujo, sin infraestructura), `daemon`, `cli` y, más adelante, `web`. https://claude.ai/artifact/XzzEpqEVDdqRpTFWYxBTKT
-- **ADR-003, runtime del agente:** Claude Agent SDK de TypeScript (versión fijada) detrás de la interfaz `AgentRuntime`; Codex como segundo runtime y candidato a revisor delegado. Herramientas por estado con `allowedTools` + `dontAsk`, `settingSources` vacío y hooks de forja que bloquean tests existentes, configuración de gates, `.github/`, credenciales y ficheros fuera del plan. Uso personal con la suscripción; modo equipo con API key. https://claude.ai/artifact/TGxQ7QvH9aaKeQbbdv9yxU
+- **ADR-003, runtime del agente:** Claude Agent SDK de TypeScript (versión fijada) detrás de la interfaz `AgentRuntime`; Codex como segundo runtime y candidato a revisor delegado. Herramientas por estado con `allowedTools` + `dontAsk`, `settingSources` vacío y hooks de togi que bloquean tests existentes, configuración de gates, `.github/`, credenciales y ficheros fuera del plan. Uso personal con la suscripción; modo equipo con API key. https://claude.ai/artifact/TGxQ7QvH9aaKeQbbdv9yxU
 - **ADR-004, modelo de datos:** event sourcing con un stream por tarea, decider puro en `core`, SQLite con cadena de hashes y triggers append-only, trayectoria del agente en una tabla aparte, blobs cifrados por tarea y clase de dato (crypto-shredding) y actores seudónimos. Retenciones propuestas pendientes de fijar antes del modo equipo. docs/adr/004-modelo-de-datos.md
 - **ADR-005, API y CLI de la rebanada 1:** API HTTP en un socket Unix con token obligatorio; un endpoint por comando del decider; actor sacado del token; `If-Match`, `Idempotency-Key` y errores RFC 9457; SSE con `Last-Event-ID`. Hono, zod y better-sqlite3 13.x. El sandbox del agente es requisito antes de la rebanada 2. docs/adr/005-api-y-cli-rebanada-1.md
+- **ADR-006, cambio de nombre a togi:** el proyecto pasa de `forja` a `togi` por la revisión de marca; paquetes `@togi/*`, datos en `~/.togi`, variables `TOGI_HOME` y `TOGI_KEYCHAIN`. docs/adr/006-cambio-de-nombre.md
 
 ### Requisitos para el modelo de datos (paso 4)
 - Los cuatro requisitos del modo equipo (backlog): actor en cada evento, CLI solo contra la API, almacenamiento y workspace detrás de interfaces.
@@ -208,8 +209,8 @@ Construcción por rebanadas usables de punta a punta: (1) tareas + log de evento
   3. Almacenamiento detrás de una interfaz (SQLite ahora, Postgres en equipo).
   4. Workspace detrás de una interfaz (worktree ahora; contenedores o sandboxes cloud en equipo).
   Cuando llegue: daemon en servidor, identidad propia en GitHub (GitHub App), permisos de aprobación por nivel de riesgo y por persona, costes por persona o proyecto vía gateway LLM.
-- **Agentes especialistas.** Un especialista es una configuración versionada de un rol (planner, builder o reviewer): instrucciones, herramientas, modelo, contexto y gates extra. Las definiciones viven en forja, nunca en el repo objetivo (principio 4). Selección determinista: rol del estado + reglas de encaje (rutas, riesgo, etiquetas, origen); gana el más específico y, si no encaja ninguno, el genérico. La elección se muestra en `plan_review` y se puede cambiar. Cada especialista se evalúa contra el genérico con datos. Se construye después del piloto.
-- **Aprendizaje del sistema.** Los modelos no aprenden; mejora la configuración. Bucle: los motivos de rechazo, fallos de gates, tareas fallidas y reverts se agrupan; un agente propone cambios a instrucciones o especialistas; esa propuesta es una tarea de forja con su `plan_review` humano; la nueva versión se compara con la anterior con métricas. Sin memoria automática escrita por los agentes en las sesiones de forja. Se construye después del piloto; la captura de motivos empieza en el paso 4.
+- **Agentes especialistas.** Un especialista es una configuración versionada de un rol (planner, builder o reviewer): instrucciones, herramientas, modelo, contexto y gates extra. Las definiciones viven en togi, nunca en el repo objetivo (principio 4). Selección determinista: rol del estado + reglas de encaje (rutas, riesgo, etiquetas, origen); gana el más específico y, si no encaja ninguno, el genérico. La elección se muestra en `plan_review` y se puede cambiar. Cada especialista se evalúa contra el genérico con datos. Se construye después del piloto.
+- **Aprendizaje del sistema.** Los modelos no aprenden; mejora la configuración. Bucle: los motivos de rechazo, fallos de gates, tareas fallidas y reverts se agrupan; un agente propone cambios a instrucciones o especialistas; esa propuesta es una tarea de togi con su `plan_review` humano; la nueva versión se compara con la anterior con métricas. Sin memoria automática escrita por los agentes en las sesiones de togi. Se construye después del piloto; la captura de motivos empieza en el paso 4.
 - Adaptadores de intake adicionales: Jira, Sentry, conversación con el agente.
 - Web UI con la pantalla de revisión (diff + evidencia de gates).
 - Varios agentes en paralelo.

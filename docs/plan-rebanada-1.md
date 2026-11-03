@@ -23,7 +23,7 @@ Once PRs, cada uno con un solo objetivo y menos de 300 líneas, en orden de depe
 Una sesión de Claude Code por PR, partiendo de `main` actualizado:
 
 ```bash
-cd ~/Documents/Dev/projects/forja && git checkout main && git pull && claude
+cd ~/Documents/Dev/projects/togi && git checkout main && git pull && claude
 ```
 
 1. **Plan.** Activa el modo plan (Shift+Tab hasta ver *plan mode on*, o empieza el mensaje con `/plan`) y pega el prompt del PR.
@@ -50,7 +50,7 @@ Objetivo: dejar el monorepo listo para que los PRs siguientes solo añadan códi
 - CI en GitHub Actions: typecheck, lint y test en cada PR hacia main.
 - engines (Node >= 22) y packageManager fijados en el package.json raíz.
 
-Fuera de alcance: cualquier lógica de forja.
+Fuera de alcance: cualquier lógica de togi.
 
 Restricciones: las de AGENTS.md; si durante la construcción algo no encaja con el plan aprobado,
 para y pregunta en lugar de decidir; sin ficheros de seguimiento ni memoria propios (odd/, Engram); versiones exactas, con releases de al menos dos semanas;
@@ -164,7 +164,7 @@ Tarea: PR 5 de docs/plan-rebanada-1.md — feat(daemon): event store.
 Lee antes: AGENTS.md, docs/adr/004 (sección de almacenamiento) y docs/adr/005 (dependencias).
 
 Objetivo: la implementación SQLite del puerto EventStore en packages/daemon/src/store.
-- Configuración de rutas: la raíz es FORJA_HOME, por defecto ~/.forja. Los tests usan siempre un
+- Configuración de rutas: la raíz es TOGI_HOME, por defecto ~/.togi. Los tests usan siempre un
   directorio temporal.
 - Esquema del ADR-004: tablas events y agent_events (esta, vacía de momento), triggers append-only
   y versión de esquema con PRAGMA user_version.
@@ -201,12 +201,12 @@ Lee antes: AGENTS.md y docs/adr/004 (secciones de almacenamiento y datos persona
 
 Objetivo: la implementación del puerto BlobStore con cifrado y crypto-shredding.
 - Una interfaz Keychain con dos implementaciones: macOS, con el comando security vía execFile
-  (nunca a través de un shell), y una en fichero dentro de FORJA_HOME solo para tests, que el
-  daemon rechaza si no se activa explícitamente con FORJA_KEYCHAIN=file.
+  (nunca a través de un shell), y una en fichero dentro de TOGI_HOME solo para tests, que el
+  daemon rechaza si no se activa explícitamente con TOGI_KEYCHAIN=file.
 - Clave maestra de 32 bytes aleatorios guardada en el Keychain.
 - Una clave de datos por tarea y DataClass, envuelta con la clave maestra (AES-256-GCM) y guardada
   en una tabla data_keys. shred(keyId) elimina la clave envuelta.
-- Blobs cifrados con AES-256-GCM en FORJA_HOME/blobs/<keyId>/<sha256 del contenido en claro>.
+- Blobs cifrados con AES-256-GCM en TOGI_HOME/blobs/<keyId>/<sha256 del contenido en claro>.
 - erase(taskId, dataClass): destruye la clave y añade un evento data.erased (con keyId y motivo,
   sin contenido) en un stream admin.
 - Tests: ida y vuelta de un blob; get falla tras shred; data.erased queda en el log;
@@ -265,10 +265,10 @@ Tarea: PR 8 de docs/plan-rebanada-1.md — feat(daemon): API.
 Lee antes: AGENTS.md y docs/adr/005 entero.
 
 Objetivo: la API de comandos y consultas sobre el socket Unix.
-- Primer arranque: crea FORJA_HOME con permisos 0700, la clave maestra, la tabla users con el
+- Primer arranque: crea TOGI_HOME con permisos 0700, la clave maestra, la tabla users con el
   usuario usr_…, y un token aleatorio. En la base de datos se guarda solo el hash del token;
-  el token va a FORJA_HOME/credentials con permisos 0600.
-- Hono sobre @hono/node-server escuchando en FORJA_HOME/run/forja.sock.
+  el token va a TOGI_HOME/credentials con permisos 0600.
+- Hono sobre @hono/node-server escuchando en TOGI_HOME/run/togi.sock.
 - Middleware de autenticación: Bearer obligatorio, comparación en tiempo constante, 401 si falta
   o no es válido. El actor sale del token, nunca del cuerpo.
 - Rutas del ADR-005: POST /v1/tasks, PATCH /v1/tasks/:n, POST …/submit, POST …/reject,
@@ -327,13 +327,13 @@ No escribas código todavía. Propón un plan con:
 Tarea: PR 10 de docs/plan-rebanada-1.md — feat(cli): comandos.
 Lee antes: AGENTS.md y docs/adr/005 (sección de la CLI).
 
-Objetivo: el comando forja de la rebanada 1.
+Objetivo: el comando togi de la rebanada 1.
 - Cliente tipado con hc sobre el socket Unix. Propón cómo hacer el fetch sobre el socket
   (node:http o undici) y justifícalo.
-- forja daemon start | stop | status: arranque en segundo plano, fichero de PID en
-  FORJA_HOME/run y espera a que /v1/health responda.
-- forja task new | edit | submit | reject | show, forja status, forja watch y
-  forja admin verify-log, con los flags del ADR-005. Argumentos con parseArgs de node:util.
+- togi daemon start | stop | status: arranque en segundo plano, fichero de PID en
+  TOGI_HOME/run y espera a que /v1/health responda.
+- togi task new | edit | submit | reject | show, togi status, togi watch y
+  togi admin verify-log, con los flags del ADR-005. Argumentos con parseArgs de node:util.
 - task edit sin flags abre $EDITOR con una plantilla.
 - Mensajes de error legibles a partir del problem+json de la API.
 - Tests de los comandos contra un daemon de prueba.
@@ -359,8 +359,8 @@ No escribas código todavía. Propón un plan con:
 Tarea: PR 11 de docs/plan-rebanada-1.md — test: extremo a extremo de la rebanada 1.
 Lee antes: AGENTS.md y docs/adr/005 (criterio de hecho).
 
-Objetivo: un test que demuestre el criterio de hecho del ADR-005, con FORJA_HOME temporal y
-FORJA_KEYCHAIN=file, arrancando el daemon real y usando la CLI como lo haría una persona:
+Objetivo: un test que demuestre el criterio de hecho del ADR-005, con TOGI_HOME temporal y
+TOGI_KEYCHAIN=file, arrancando el daemon real y usando la CLI como lo haría una persona:
 - Crear, editar y enviar a planificación una tarea; crear y rechazar otra.
 - verify-log en verde, y detección de una manipulación.
 - Tras erase, el blob afectado no se puede leer.

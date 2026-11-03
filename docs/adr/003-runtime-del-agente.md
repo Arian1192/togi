@@ -1,4 +1,4 @@
-# ADR-003: Runtime del agente de forja
+# ADR-003: Runtime del agente de togi
 
 2 de noviembre de 2026 · Arian
 
@@ -6,13 +6,13 @@
 
 **Estado:** aprobado el 2 de noviembre de 2026.
 
-forja no construye su propio agente: usa uno existente y lo controla. El runtime elegido debe permitir:
+togi no construye su propio agente: usa uno existente y lo controla. El runtime elegido debe permitir:
 
 - Lanzarlo de forma programática desde el daemon (ADR-002: TypeScript sobre Node).
 - Restringir las herramientas según el estado del flujo: `planning` solo lee, `building` escribe.
 - Bloquear la edición de tests existentes, de la configuración de gates y de credenciales (principio 4).
 - Recibir sus acciones en streaming para registrarlas en el log de eventos (principio 7).
-- Que la configuración la decida forja, no un fichero del repo que el agente pueda modificar.
+- Que la configuración la decida togi, no un fichero del repo que el agente pueda modificar.
 
 ## Decisión
 
@@ -40,9 +40,9 @@ Codex (`@openai/codex-sdk`) es el candidato a segundo runtime, sobre todo como r
 
 ## Configuración por estado del flujo
 
-El agente solo tiene las herramientas que su estado necesita. Todo lo que no está en la lista se deniega sin preguntar (modo `dontAsk` con `allowedTools`), y los ajustes del repo no se cargan (`settingSources` vacío), así que la configuración la decide forja.
+El agente solo tiene las herramientas que su estado necesita. Todo lo que no está en la lista se deniega sin preguntar (modo `dontAsk` con `allowedTools`), y los ajustes del repo no se cargan (`settingSources` vacío), así que la configuración la decide togi.
 
-| Estado | Rol | Herramientas permitidas | Bloqueos del hook de forja |
+| Estado | Rol | Herramientas permitidas | Bloqueos del hook de togi |
 | --- | --- | --- | --- |
 | `planning` | planner | `Read`, `Glob`, `Grep` | Ninguno necesario: no puede escribir ni ejecutar. |
 | `building` | builder | `Read`, `Glob`, `Grep`, `Edit`, `Write`, `Bash` limitado a los comandos del perfil del repo (typecheck, lint, test) | Edición de tests existentes, configuración de gates, `.github/`, ficheros de credenciales y ficheros fuera del plan aprobado. |
@@ -50,7 +50,7 @@ El agente solo tiene las herramientas que su estado necesita. Todo lo que no est
 
 Los hooks del SDK se ejecutan antes que cualquier otra regla de permisos y pueden denegar una acción en cualquier modo. El bloqueo de ficheros fuera del plan en `building` da feedback temprano al agente; el contrato se vuelve a comprobar en `verifying`.
 
-Estas restricciones son una capa de defensa, no la garantía. La garantía es `verifying`, que forja ejecuta en un entorno que el agente no controla.
+Estas restricciones son una capa de defensa, no la garantía. La garantía es `verifying`, que togi ejecuta en un entorno que el agente no controla.
 
 ## Autenticación
 
@@ -67,7 +67,7 @@ Los términos han cambiado varias veces en 2026 (en junio se pausó un cambio an
 | --- | --- |
 | Codex como primer runtime | También tiene SDK en TypeScript y es válido. Se prefiere Claude porque es el agente que ya se usa en `promos` y por su control de permisos con hooks. Queda como segundo runtime. |
 | Lanzar `claude -p` como proceso y parsear su salida | Menos control: los permisos dependerían de ficheros de ajustes en disco, y el SDK ofrece lo mismo con una API tipada. |
-| Construir un bucle de agente propio sobre la API | Contradice la decisión de no construir el agente: forja es todo lo que lo rodea. |
+| Construir un bucle de agente propio sobre la API | Contradice la decisión de no construir el agente: togi es todo lo que lo rodea. |
 | Usar el runtime directamente, sin interfaz | Ata el núcleo a un proveedor e impide un revisor independiente de otro proveedor. |
 
 ## Consecuencias y riesgos

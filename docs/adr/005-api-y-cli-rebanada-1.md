@@ -17,12 +17,12 @@ El riesgo que condiciona el diseño: el agente se ejecuta con el mismo usuario d
 
 ## Decisión: transporte y autenticación
 
-El daemon sirve una API HTTP en un socket Unix, `~/.forja/run/forja.sock`, y toda petición lleva un token `Bearer`. No abre ningún puerto TCP, así que ni otro equipo ni una página del navegador pueden alcanzarlo. Cuando llegue la web UI se añadirá `127.0.0.1` con token y comprobación de `Origin`.
+El daemon sirve una API HTTP en un socket Unix, `~/.togi/run/togi.sock`, y toda petición lleva un token `Bearer`. No abre ningún puerto TCP, así que ni otro equipo ni una página del navegador pueden alcanzarlo. Cuando llegue la web UI se añadirá `127.0.0.1` con token y comprobación de `Origin`.
 
 La defensa frente al agente tiene tres capas:
 
-1. **Token obligatorio** en todas las peticiones, guardado en `~/.forja/credentials` con permisos `0600`. Entra en esta rebanada.
-2. **Sandbox para el agente y los gates.** Sus procesos no pueden leer `~/.forja` ni conectarse al socket. Se implementa en las rebanadas 2 y 3.
+1. **Token obligatorio** en todas las peticiones, guardado en `~/.togi/credentials` con permisos `0600`. Entra en esta rebanada.
+2. **Sandbox para el agente y los gates.** Sus procesos no pueden leer `~/.togi` ni conectarse al socket. Se implementa en las rebanadas 2 y 3.
 3. **Prueba de red teaming** en el criterio de hecho de la rebanada 3: una tarea cuyo código intenta aprobar su propio plan tiene que fallar.
 
 La capa 1 sola no basta: un proceso del mismo usuario puede leer el fichero del token. La garantía la dan las capas 2 y 3 juntas.
@@ -75,22 +75,22 @@ export const RejectTask = z.object({
 La CLI es un cliente fino: valida los argumentos, llama a la API con el cliente tipado de Hono y muestra el resultado. Nunca abre el SQLite ni toca git.
 
 ```
-forja daemon start | stop | status
-forja task new "Añadir filtro por fecha" --risk low --repo Arian1192/promos [--base dev]
-forja task edit 12 [--title …] [--criteria-file criterio.md]   # sin flags abre $EDITOR
-forja task submit 12
-forja task reject 12 --category scope --reason "…"
-forja task show 12 [--events]
-forja status [--state draft]
-forja watch                                                    # sigue el SSE
-forja admin verify-log
+togi daemon start | stop | status
+togi task new "Añadir filtro por fecha" --risk low --repo Arian1192/promos [--base dev]
+togi task edit 12 [--title …] [--criteria-file criterio.md]   # sin flags abre $EDITOR
+togi task submit 12
+togi task reject 12 --category scope --reason "…"
+togi task show 12 [--events]
+togi status [--state draft]
+togi watch                                                    # sigue el SSE
+togi admin verify-log
 ```
 
-En el primer arranque, `forja daemon start`:
+En el primer arranque, `togi daemon start`:
 
-- Crea `~/.forja` con permisos `0700`.
+- Crea `~/.togi` con permisos `0700`.
 - Genera la clave maestra y la guarda en el Llavero de macOS.
-- Crea el usuario `usr_…` y su token en `~/.forja/credentials`.
+- Crea el usuario `usr_…` y su token en `~/.togi/credentials`.
 - Crea la base de datos con la cadena de hashes y los triggers append-only.
 
 Los argumentos se leen con `parseArgs` de `node:util`, sin dependencias.
@@ -128,7 +128,7 @@ Hono frente a Fastify es una preferencia propia, no sale de ningún dato: los do
 La rebanada 1 está hecha cuando:
 
 - [ ] Cada regla del decider que se aplica a esta rebanada tiene su test unitario en `core`.
-- [ ] Un test de extremo a extremo, con un `~/.forja` temporal, recorre con la CLI contra el daemon real: crear, editar, enviar a planificación y rechazar otra tarea.
+- [ ] Un test de extremo a extremo, con un `~/.togi` temporal, recorre con la CLI contra el daemon real: crear, editar, enviar a planificación y rechazar otra tarea.
 - [ ] `verify-log` detecta una manipulación: el test quita los triggers, cambia una fila y comprueba que la verificación falla.
 - [ ] `erase` destruye la clave y leer el blob afectado falla.
 - [ ] Una petición sin token o con un token inválido recibe `401`.
