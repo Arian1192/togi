@@ -1,4 +1,4 @@
-# ADR-004: Modelo de datos de forja
+# ADR-004: Modelo de datos de togi
 
 2 de noviembre de 2026 · Arian
 
@@ -14,7 +14,7 @@ El ADR-001 fija que todo es un evento (regla 6): el estado de una tarea es una p
 - Toda decisión de pedir cambios o rechazar, y todo fallo de tarea, guarda un motivo con categoría y texto libre.
 - `core` sin infraestructura (ADR-002): las reglas del flujo se prueban sin base de datos.
 
-Añade dos requisitos que salen de revisar el diseño frente a SOC 2, ISO/IEC 27001:2022 e ISO/IEC 27701:2025. Ninguno de los tres certifica software, sino organizaciones; el objetivo es no impedir que una organización que use forja los cumpla:
+Añade dos requisitos que salen de revisar el diseño frente a SOC 2, ISO/IEC 27001:2022 e ISO/IEC 27701:2025. Ninguno de los tres certifica software, sino organizaciones; el objetivo es no impedir que una organización que use togi los cumpla:
 
 - El log debe detectar manipulaciones, no solo impedir modificaciones accidentales.
 - Los datos personales y los secretos deben poder borrarse aunque el log sea inmutable.
@@ -25,7 +25,7 @@ Cada evento pertenece a un stream: `task:<n>` para las tareas y `specialist:<id>
 
 ```typescript
 // core/src/model/ids.ts
-export type TaskId = number;                // secuencial: #12, rama forja/12-filtro-fecha
+export type TaskId = number;                // secuencial: #12, rama togi/12-filtro-fecha
 export type SessionId = `ses_${string}`;    // ULID
 export type WorkspaceId = `wsp_${string}`;
 export type GateRunId = `gr_${string}`;
@@ -175,7 +175,7 @@ export interface FlowPolicy { maxLines: 300; maxFailedCycles: 3 }
 Cuatro precisiones sobre el ADR-001:
 
 1. **Ciclo fallido.** Solo cuenta para el límite de 3 una `verification.completed` con `passed: false` en la que algún gate da `fail`. No cuentan un `error` de infraestructura, un "pide cambios" en `review` ni un conflicto al integrar `dev`: ninguno es fallo del agente.
-2. **Motivo de un `failed`.** forja no sabe si una tarea falló por un malentendido o por el alcance. `task.failed` guarda la causa técnica (los gates que fallaron) y el humano la clasifica después con `failure.classified`. Una proyección lista las tareas fallidas sin clasificar.
+2. **Motivo de un `failed`.** togi no sabe si una tarea falló por un malentendido o por el alcance. `task.failed` guarda la causa técnica (los gates que fallaron) y el humano la clasifica después con `failure.classified`. Una proyección lista las tareas fallidas sin clasificar.
 3. **Una ejecución por gate.** El ADR-001 habla de una ejecución de gate por ciclo. Se registra un `GateRun` por cada gate dentro del ciclo y `verification.completed` los agrupa, para que cada gate tenga su evidencia y su duración.
 4. **Modo sombra.** Una decisión con `mode: "shadow"` se guarda pero no mueve la tarea. La proyección `shadow_agreement` compara, por nivel de riesgo, la decisión del revisor delegado con la vinculante y lleva la racha de coincidencias: de ahí sale el criterio de las 20 tareas seguidas.
 
@@ -232,20 +232,20 @@ CREATE TABLE agent_events (
 );
 ```
 
-- **Cadena de hashes.** Los triggers evitan cambios accidentales; la cadena detecta los deliberados. Es global sobre `seq`, así que las escrituras se serializan, algo que forja ya hace. El JSON canónico sigue RFC 8785. `forja admin verify-log` recorre la cadena; en el modo equipo se publica periódicamente el último hash fuera del servidor.
+- **Cadena de hashes.** Los triggers evitan cambios accidentales; la cadena detecta los deliberados. Es global sobre `seq`, así que las escrituras se serializan, algo que togi ya hace. El JSON canónico sigue RFC 8785. `togi admin verify-log` recorre la cadena; en el modo equipo se publica periódicamente el último hash fuera del servidor.
 - **Trayectoria separada.** La regla 6 se mantiene: cada acción del agente queda en un log append-only. Va en `agent_events` porque una sesión genera miles de acciones que no cambian el estado de la tarea; el log de dominio solo registra el inicio y el fin de la sesión. Incluye las acciones denegadas por los hooks (ADR-003), materia prima del monitor de trayectoria.
-- **Proyecciones.** `tasks`, `plans`, `sessions`, `gate_runs`, `decisions`, `workspaces`, `shadow_agreement` y `unclassified_failures` se actualizan en la misma transacción que el `append`, así que la API nunca lee un estado distinto del log. `forja admin rebuild` las reconstruye desde cero.
+- **Proyecciones.** `tasks`, `plans`, `sessions`, `gate_runs`, `decisions`, `workspaces`, `shadow_agreement` y `unclassified_failures` se actualizan en la misma transacción que el `append`, así que la API nunca lee un estado distinto del log. `togi admin rebuild` las reconstruye desde cero.
 - **API.** Por el requisito nº 2, la API expone las proyecciones y emite `readAll` por SSE. La CLI nunca abre el SQLite.
 
 ## Datos personales y secretos
 
-El log no guarda datos personales ni secretos: solo referencias a blobs cifrados, que se pueden borrar destruyendo su clave (crypto-shredding). Así el log sigue siendo inmutable y forja puede atender una supresión del RGPD (artículo 17).
+El log no guarda datos personales ni secretos: solo referencias a blobs cifrados, que se pueden borrar destruyendo su clave (crypto-shredding). Así el log sigue siendo inmutable y togi puede atender una supresión del RGPD (artículo 17).
 
 - **Clave por tarea y clase de dato.** Cada combinación tarea × `DataClass` tiene su clave. Borrar la trayectoria de la tarea 12 es destruir una clave, sin tocar el log.
 - **Actores seudónimos.** El log solo guarda `usr_…`; nombre y email viven en la tabla `users`, que sí se puede borrar.
 - **Claves fuera del workspace.** La clave maestra va en el Llavero de macOS en local y en un KMS en el modo equipo. Nunca entra en el workspace del agente (ADR-003).
 - **Redacción de secretos antes de guardar.** Todo blob de clase `trajectory`, `gate_evidence` o `prompt` pasa por un detector de secretos con reglas tipo gitleaks; lo detectado se sustituye por `[REDACTED:<regla>]`.
-- **Borrado registrado.** `forja admin erase --task 12 --class untrusted_input` destruye la clave y añade un evento `data.erased` con los `keyId` y el motivo, sin el contenido.
+- **Borrado registrado.** `togi admin erase --task 12 --class untrusted_input` destruye la clave y añade un evento `data.erased` con los `keyId` y el motivo, sin el contenido.
 
 | Clase | Qué contiene | Retención propuesta |
 | --- | --- | --- |
@@ -274,7 +274,7 @@ Las retenciones son una propuesta propia, no salen de ninguna norma: se fijan co
 - El trailer `Assisted-by` sale de `session.started`: `runtime.id` y `model`.
 - Cada payload lleva `schemaVersion`; los cambios de forma se resuelven con funciones de migración al leer, nunca reescribiendo el log.
 - Riesgo: la clave maestra se pierde y con ella todos los blobs. Mitigación: copia de seguridad de la clave separada de la del SQLite.
-- Riesgo: el detector de secretos no detecta un formato. Mitigación: retención corta de trayectorias y prompts, y un borrado puntual con `forja admin erase`.
+- Riesgo: el detector de secretos no detecta un formato. Mitigación: retención corta de trayectorias y prompts, y un borrado puntual con `togi admin erase`.
 - Lo que no resuelve este ADR, y queda en el backlog del modo equipo: cifrado del servidor, autenticación y autorización en la API, copias de seguridad, sincronización de relojes y gestión de proveedores de modelos.
 
 Qué entra en cada rebanada, sin cambiar el esquema:
