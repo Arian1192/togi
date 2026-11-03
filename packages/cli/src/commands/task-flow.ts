@@ -21,20 +21,31 @@ function taskNumber(args: string[], command: string): string {
   return n;
 }
 
+/** Lo que `task edit` necesita del detalle: los textos y qué campos están borrados. */
+export interface TaskDetail {
+  title: string | null;
+  titleErased: boolean;
+  state: string;
+  description: string | null;
+  acceptanceCriteria: string | null;
+  erased: { description: boolean; acceptanceCriteria: boolean };
+}
+
 interface Read {
   etag: string;
   title: string | null;
+  task: TaskDetail;
 }
 
 /** Lee el detalle de la tarea: su `ETag`, tal cual, para `If-Match`, y el título para nombrarla. */
 async function readTask(client: Client, n: string): Promise<Read> {
-  const { body, headers } = await client.checkedWithHeaders<{ title: string | null }>(
+  const { body, headers } = await client.checkedWithHeaders<TaskDetail>(
     await client.api.v1.tasks[":n"].$get({ param: { n } }),
     { n: Number(n) },
   );
   const etag = headers.get("etag");
   if (etag === null) throw new Error("el daemon no devolvió ETag");
-  return { etag, title: body.title };
+  return { etag, title: body.title, task: body };
 }
 
 /** Envía la tarea a planning. Ante un 412 no reintenta: el error sale con código 4. */
@@ -49,6 +60,55 @@ export async function submitTask(home: string, n: string, hooks: FlowHooks = {})
     ),
     { n: Number(n) },
   );
+}
+
+export interface EditInput {
+  title?: string;
+  description?: string;
+  acceptanceCriteria?: string;
+}
+
+/**
+ * Edita la tarea con los campos que cambian. Un campo borrado nunca coincide con ningún valor.
+ * Si no cambia nada y la tarea está en draft devuelve el detalle leído sin enviar nada; si no está
+ * en draft envía igualmente, para que el daemon dé el error de la regla del flujo.
+ */
+export async function editTask(
+  home: string,
+  n: string,
+  input: EditInput,
+  hooks: FlowHooks = {},
+): Promise<{ changed: boolean; task: unknown }> {
+  const client = createClient(home);
+  const { etag, task } = await readTask(client, n);
+  const same = (current: string | null, erased: boolean, next: string | undefined) =>
+    next === undefined || (!erased && (current ?? "") === next);
+  const changes = {
+    ...(same(task.title, task.titleErased, input.title) ? {} : { title: input.title }),
+    ...(same(task.description, task.erased.description, input.description)
+      ? {}
+      : { description: input.description }),
+    ...(same(task.acceptanceCriteria, task.erased.acceptanceCriteria, input.acceptanceCriteria)
+      ? {}
+      : { acceptanceCriteria: input.acceptanceCriteria }),
+  };
+  if (task.state === "draft" && Object.keys(changes).length === 0) {
+    return { changed: false, task };
+  }
+  // Fuera de draft sin cambios se envía lo pedido tal cual: el daemon rechaza con 422 (un cuerpo vacío daría 400).
+  const body = Object.keys(changes).length === 0 ? input : changes;
+  await hooks.afterRead?.();
+  const done = await client.checked<unknown>(
+    await client.api.v1.tasks[":n"].$patch(
+      { param: { n } },
+      {
+        headers: { "if-match": etag, "content-type": "application/json" },
+        init: { body: JSON.stringify(body) },
+      },
+    ),
+    { n: Number(n) },
+  );
+  return { changed: true, task: done };
 }
 
 export interface RejectInput {
@@ -153,4 +213,46 @@ Ejemplo:
   },
 };
 
-export const flow = { submit, reject };
+const edit: Command = {
+  summary: "Edita el título, la descripción o el criterio de una tarea en draft.",
+  example: 'togi task edit 12 --criteria "Descarga un .csv"',
+  options: {
+    title: { type: "string" },
+    description: { type: "string" },
+    criteria: { type: "string" },
+  },
+  usage: `Uso: togi task edit <número> [--title <texto>] [--description <texto>] [--criteria <texto>] [--json]
+
+Edita una tarea en draft y envía solo los campos indicados.
+Un --description o --criteria vacío borra ese campo; el título no puede estar vacío.
+Si los valores ya son los actuales, no cambia nada.
+
+Ejemplo:
+  togi task edit 12 --criteria "Descarga un .csv"
+`,
+  async run({ home, json, out, values, args }) {
+    const command = "togi task edit --help";
+    const n = taskNumber(args, command);
+    const { title, description, criteria } = values;
+    if (title === undefined && description === undefined && criteria === undefined) {
+      throw usageError("edit_needs_flags", { n: Number(n), command });
+    }
+    if (typeof title === "string" && title.trim() === "") {
+      throw usageError("invalid_option", {
+        field: "--title",
+        detail: "no puede estar vacío",
+        command,
+      });
+    }
+    const done = await editTask(home, n, {
+      ...(typeof title === "string" ? { title: title.trim() } : {}),
+      ...(typeof description === "string" ? { description } : {}),
+      ...(typeof criteria === "string" ? { acceptanceCriteria: criteria } : {}),
+    });
+    if (!done.changed) process.stderr.write(`${say("edit_no_changes", { n: Number(n) })}\n`);
+    if (json) return `${JSON.stringify(done.task)}\n`;
+    return done.changed ? `${out.mark("ok", say("task_edited", { n: Number(n) }))}\n` : "";
+  },
+};
+
+export const flow = { submit, reject, edit };
