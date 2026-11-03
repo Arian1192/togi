@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -60,5 +60,11 @@ CREATE TABLE tasks (
   stream_version INTEGER NOT NULL,
   created_at     TEXT    NOT NULL,
   updated_at     TEXT    NOT NULL
+);`,
+  // Reserva de números de tarea. AUTOINCREMENT: un número reservado no se reutiliza (hay huecos).
+  4: `
+CREATE TABLE task_numbers (
+  number      INTEGER PRIMARY KEY AUTOINCREMENT,
+  reserved_at TEXT    NOT NULL
 );`,
 };

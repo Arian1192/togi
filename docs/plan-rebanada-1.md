@@ -237,7 +237,8 @@ Objetivo: el manejador de comandos que une decider, blobs y event store.
 - handleCommand(actor, cmd): guarda los textos como blobs (null si están vacíos), carga el stream,
   aplica evolve, llama a decide y hace append. Si decide devuelve un error, no escribe nada en el log.
   Los blobs huérfanos de un comando rechazado se aceptan por ahora.
-- Asignación del número de tarea secuencial dentro de la misma transacción.
+- Número de tarea secuencial reservado en su propia transacción (tabla `task_numbers`, esquema v4): un número
+  reservado nunca se reutiliza y los huecos son aceptables.
 - Proyección tasks (número, título, estado, riesgo, repo, rama base, streamVersion, fechas)
   actualizada en la misma transacción que el append.
 - rebuild(): reconstruye la proyección desde readAll.
