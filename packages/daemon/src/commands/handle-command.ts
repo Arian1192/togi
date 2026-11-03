@@ -73,6 +73,8 @@ export interface CommandOptions {
   ifMatch?: number;
   /** Se guarda como correlationId de los eventos. */
   correlationId?: string;
+  /** Solo en create: se ejecuta en la transacción del append, tras la proyección. Si lanza, se revierte todo. */
+  onCommit?: (stored: StoredEvent[], tx: Database.Database) => void;
 }
 
 export interface HandlerDeps {
@@ -132,6 +134,7 @@ export function createHandler(deps: HandlerDeps) {
       correlate(decided as NewTaskEvent[], opts.correlationId),
       (stored, tx) => {
         for (const event of stored) applyToTasks(tx, toDomainEvent(event));
+        opts.onCommit?.(stored, tx);
       },
     );
     return { number, events };

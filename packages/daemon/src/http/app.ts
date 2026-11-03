@@ -8,6 +8,7 @@ import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { eventRoutes } from "./events.ts";
+import { SAFE_ID } from "./idempotency.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
 import { taskRoutes } from "./tasks.ts";
@@ -22,7 +23,6 @@ const DAEMON_VERSION =
 export type AppEnv = { Variables: { actor: Actor; requestId: string } };
 
 const BEARER = /^Bearer +(\S+)$/i;
-const REQUEST_ID = /^[\w.:-]{1,128}$/;
 
 /** Tipo de la app para el cliente `hc` de la CLI. */
 export type AppType = ReturnType<typeof createApp>;
@@ -45,7 +45,7 @@ export function createApp(
 // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.
 const requestId = createMiddleware<AppEnv>(async (c, next) => {
   const sent = c.req.header("x-request-id");
-  const id = sent !== undefined && REQUEST_ID.test(sent) ? sent : randomUUID();
+  const id = sent !== undefined && SAFE_ID.test(sent) ? sent : randomUUID();
   c.set("requestId", id);
   await next();
   c.res.headers.set("x-request-id", id);

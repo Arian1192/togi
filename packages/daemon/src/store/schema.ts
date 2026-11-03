@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -78,5 +78,17 @@ CREATE TABLE tokens (
   token_hash TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL REFERENCES users(user_id),
   created_at TEXT NOT NULL
+);`,
+  // Idempotency-Key de POST /v1/tasks (ADR-005). Por usuario; se escribe en la transacción de la
+  // tarea. Sin caducidad por ahora. Sin triggers: la limpieza futura borrará filas.
+  6: `
+CREATE TABLE idempotency_keys (
+  user_id       TEXT    NOT NULL,
+  key           TEXT    NOT NULL,
+  request_hash  TEXT    NOT NULL,
+  status        INTEGER NOT NULL,
+  response_body TEXT    NOT NULL,
+  created_at    TEXT    NOT NULL,
+  PRIMARY KEY (user_id, key)
 );`,
 };
