@@ -1,6 +1,7 @@
 import type { ParseArgsConfig } from "node:util";
 import type { Output } from "../output.ts";
 import { daemon } from "./daemon.ts";
+import { status } from "./status.ts";
 import { task } from "./task.ts";
 
 export type Options = NonNullable<ParseArgsConfig["options"]>;
@@ -31,4 +32,4 @@ export interface Command {
 export const COMMANDS: Record<string, Record<string, Command>> = { daemon, task };
 
 /** Atajos de un verbo (`togi status`), sin recurso. */
-export const SHORTCUTS: Record<string, Command> = {};
+export const SHORTCUTS: Record<string, Command> = { status };
