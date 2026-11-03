@@ -57,7 +57,23 @@ export interface RejectTaskInput {
 
 export type CommandInput = CreateTaskInput | EditTaskInput | SubmitTaskInput | RejectTaskInput;
 
-export type HandleResult = { number: number; events: StoredEvent[] } | DomainError;
+/** If-Match no coincide con la versión actual del stream. No se ha escrito nada. */
+export interface PreconditionFailed {
+  kind: "precondition_failed";
+  current: number;
+}
+
+export type HandleResult =
+  | { number: number; events: StoredEvent[] }
+  | DomainError
+  | PreconditionFailed;
+
+export interface CommandOptions {
+  /** Versión del stream que el cliente dice haber visto; solo aplica a tareas existentes. */
+  ifMatch?: number;
+  /** Se guarda como correlationId de los eventos. */
+  correlationId?: string;
+}
 
 export interface HandlerDeps {
   db: Database.Database;
@@ -87,7 +103,14 @@ export function createHandler(deps: HandlerDeps) {
     return { view, version };
   };
 
-  const create = async (actor: Actor, cmd: CreateTaskInput): Promise<HandleResult> => {
+  const correlate = (events: NewTaskEvent[], correlationId?: string): NewTaskEvent[] =>
+    correlationId === undefined ? events : events.map((event) => ({ ...event, correlationId }));
+
+  const create = async (
+    actor: Actor,
+    cmd: CreateTaskInput,
+    opts: CommandOptions,
+  ): Promise<HandleResult> => {
     // 1. Reserva en su propia transacción: si algo falla después, el número queda gastado.
     const at = clock().toISOString();
     const number = Number(reserve.run(at).lastInsertRowid);
@@ -106,7 +129,7 @@ export function createHandler(deps: HandlerDeps) {
     const events = store.appendWithin(
       `task:${number}`,
       0,
-      decided as NewTaskEvent[],
+      correlate(decided as NewTaskEvent[], opts.correlationId),
       (stored, tx) => {
         for (const event of stored) applyToTasks(tx, toDomainEvent(event));
       },
@@ -117,9 +140,14 @@ export function createHandler(deps: HandlerDeps) {
   const modify = async (
     actor: Actor,
     cmd: EditTaskInput | SubmitTaskInput | RejectTaskInput,
+    opts: CommandOptions,
   ): Promise<HandleResult> => {
     const stream = `task:${cmd.number}`;
     const { view, version } = await loadView(stream);
+    // Sin tarea, task_not_found gana: lo da decide más abajo.
+    if (view.exists && opts.ifMatch !== undefined && opts.ifMatch !== version) {
+      return { kind: "precondition_failed", current: version };
+    }
     const at = clock().toISOString();
     // Sin tarea no se guardan blobs: decide devuelve task_not_found.
     const blob = (text: string) =>
@@ -142,13 +170,22 @@ export function createHandler(deps: HandlerDeps) {
     }
     const decided = decide(view, command, POLICY);
     if (!Array.isArray(decided)) return decided;
-    const events = store.appendWithin(stream, version, decided as NewTaskEvent[], (stored, tx) => {
-      for (const event of stored) applyToTasks(tx, toDomainEvent(event));
-    });
+    const events = store.appendWithin(
+      stream,
+      version,
+      correlate(decided as NewTaskEvent[], opts.correlationId),
+      (stored, tx) => {
+        for (const event of stored) applyToTasks(tx, toDomainEvent(event));
+      },
+    );
     return { number: cmd.number, events };
   };
 
-  return function handleCommand(actor: Actor, cmd: CommandInput): Promise<HandleResult> {
-    return cmd.type === "create" ? create(actor, cmd) : modify(actor, cmd);
+  return function handleCommand(
+    actor: Actor,
+    cmd: CommandInput,
+    opts: CommandOptions = {},
+  ): Promise<HandleResult> {
+    return cmd.type === "create" ? create(actor, cmd, opts) : modify(actor, cmd, opts);
   };
 }
