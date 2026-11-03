@@ -1,6 +1,6 @@
 import { resolveHome } from "@togi/daemon/config";
 import { parseCommandLine } from "./args.ts";
-import { COMMANDS } from "./commands/index.ts";
+import { COMMANDS, SHORTCUTS } from "./commands/index.ts";
 import { CliError, renderError, usageError } from "./errors.ts";
 import { createOutput } from "./output.ts";
 
@@ -11,7 +11,7 @@ async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const noColorFlag = argv.includes("--no-color");
   try {
-    const parsed = parseCommandLine(argv, COMMANDS);
+    const parsed = parseCommandLine(argv, COMMANDS, SHORTCUTS);
     if (parsed.kind === "help") {
       process.stdout.write(parsed.text);
       return 0;

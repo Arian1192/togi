@@ -73,3 +73,32 @@ test("un recurso o verbo desconocido sugiere el parecido", () => {
   assert.equal(fail(["cosa", "hacr"]).exitCode, 2);
   assert.equal(fail(["zzzzzz"]).context.suggestion, undefined);
 });
+
+test("un atajo se enruta sin recurso y recibe todos sus argumentos", () => {
+  const estado = make({
+    usage: "Uso: togi estado\n",
+    options: { all: { type: "boolean" } },
+  });
+  const shortcuts = { estado };
+  const p = parseCommandLine(["estado", "uno", "--all", "--json"], COMMANDS, shortcuts);
+  assert.equal(p.kind, "run");
+  const r = p as Extract<typeof p, { kind: "run" }>;
+  assert.equal(r.command, estado);
+  assert.equal(r.values.all, true);
+  assert.equal(r.json, true);
+  assert.deepEqual(r.args, ["uno"]);
+  assert.deepEqual(parseCommandLine(["estado", "-h"], COMMANDS, shortcuts), {
+    kind: "help",
+    text: "Uso: togi estado\n",
+  });
+});
+
+test("la ayuda general lista los atajos y un atajo mal escrito sugiere el parecido", () => {
+  const shortcuts = { estado: make({ summary: "Muestra el estado." }) };
+  const general = parseCommandLine([], COMMANDS, shortcuts) as { text: string };
+  assert.match(general.text, /togi estado {2}Muestra el estado\./);
+  assert.throws(
+    () => parseCommandLine(["estdo"], COMMANDS, shortcuts),
+    (e: CliError) => e.context.suggestion === "togi estado",
+  );
+});

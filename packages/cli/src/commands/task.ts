@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { CreateTask, RISK_LEVELS, SAFE_ID } from "@togi/core";
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
-import { clean, say, section } from "../format.ts";
+import { clean, headerIndent, say, section } from "../format.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
@@ -161,7 +161,7 @@ Ejemplo:
       `${out.paint("accent", `#${t.number}`)}  ${
         t.titleErased || t.title === null ? out.paint("muted", say("text_erased")) : clean(t.title)
       }`,
-      `     ${meta}`,
+      `${headerIndent(t.number)}${meta}`,
       "",
       section(say("section_description"), t.description, t.erased.description, out),
       "",
