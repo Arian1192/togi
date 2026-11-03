@@ -42,7 +42,7 @@ test("crear y ver con show: la salida sigue la guía", async () => {
     shown.stdout,
     [
       `#${n}  Exportar CSV`,
-      "     draft · riesgo bajo · o/r → dev · versión 1",
+      `${" ".repeat(n.length + 3)}draft · riesgo bajo · o/r → dev · versión 1`,
       "",
       "Descripción",
       "  (vacío)",

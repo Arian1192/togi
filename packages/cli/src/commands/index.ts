@@ -29,3 +29,6 @@ export interface Command {
 
 /** Enrutado `recurso verbo`. */
 export const COMMANDS: Record<string, Record<string, Command>> = { daemon, task };
+
+/** Atajos de un verbo (`togi status`), sin recurso. */
+export const SHORTCUTS: Record<string, Command> = {};

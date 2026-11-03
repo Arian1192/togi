@@ -23,3 +23,6 @@ export function section(
     .map((line) => `  ${line}`)
     .join("\n")}`;
 }
+
+/** Sangría de la segunda línea de `task show`: el ancho de `#N` más los dos espacios que lo separan del título. */
+export const headerIndent = (n: number): string => " ".repeat(`#${n}`.length + 2);

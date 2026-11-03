@@ -3,6 +3,8 @@ import type { Command } from "./commands/index.ts";
 import { usageError } from "./errors.ts";
 
 type Commands = Record<string, Record<string, Command>>;
+/** Atajos `togi <verbo>`: un comando sin recurso. */
+type Shortcuts = Record<string, Command>;
 
 /** Opciones que acepta todo comando. */
 export const OPTIONS = {
@@ -31,7 +33,7 @@ function distance(a: string, b: string): number {
 const closest = (word: string, options: string[]): string | undefined =>
   options.find((o) => distance(word, o) <= 2);
 
-export function help(commands: Commands, resource?: string): string {
+export function help(commands: Commands, resource?: string, shortcuts: Shortcuts = {}): string {
   const entries = Object.entries(commands).filter(
     ([name]) => resource === undefined || name === resource,
   );
@@ -41,6 +43,9 @@ export function help(commands: Commands, resource?: string): string {
       lines.push(`  togi ${name} ${verb}  ${c.summary}`);
     const example = Object.values(verbs)[0]?.example;
     if (example !== undefined) lines.push("", `Ejemplo: ${example}`);
+  }
+  if (resource === undefined) {
+    for (const [name, c] of Object.entries(shortcuts)) lines.push(`  togi ${name}  ${c.summary}`);
   }
   return `${lines.join("\n")}\n`;
 }
@@ -60,24 +65,29 @@ export type Parsed =
  * qué opciones declara el comando. Segunda, en estricto, con las globales más las del comando; un
  * flag desconocido lanza el error de `parseArgs` (`ERR_PARSE_ARGS_*`).
  */
-export function parseCommandLine(argv: string[], commands: Commands): Parsed {
+export function parseCommandLine(
+  argv: string[],
+  commands: Commands,
+  shortcuts: Shortcuts = {},
+): Parsed {
   const probe = parseArgs({ args: argv, options: OPTIONS, allowPositionals: true, strict: false });
   const [resource, verb] = probe.positionals;
+  const shortcut = resource === undefined ? undefined : shortcuts[resource];
   const verbs = resource === undefined ? undefined : commands[resource];
-  const command = verb === undefined ? undefined : verbs?.[verb];
+  const command = shortcut ?? (verb === undefined ? undefined : verbs?.[verb]);
   if (probe.values.help === true || resource === undefined) {
-    return { kind: "help", text: command?.usage ?? help(commands, resource) };
+    return { kind: "help", text: command?.usage ?? help(commands, resource, shortcuts) };
   }
   const typed = `togi ${probe.positionals.join(" ")}`;
-  if (verbs === undefined) {
-    const suggestion = closest(resource, Object.keys(commands));
+  if (verbs === undefined && shortcut === undefined) {
+    const suggestion = closest(resource, [...Object.keys(commands), ...Object.keys(shortcuts)]);
     throw usageError("unknown_command", {
       command: typed,
       ...(suggestion && { suggestion: `togi ${suggestion}` }),
     });
   }
-  if (verb === undefined || command === undefined) {
-    const suggestion = verb && closest(verb, Object.keys(verbs));
+  if (command === undefined) {
+    const suggestion = verb && closest(verb, Object.keys(verbs ?? {}));
     throw usageError("unknown_command", {
       command: typed,
       ...(suggestion && { suggestion: `togi ${resource} ${suggestion}` }),
@@ -93,6 +103,6 @@ export function parseCommandLine(argv: string[], commands: Commands): Parsed {
     command,
     json: values.json === true,
     values,
-    args: positionals.slice(2),
+    args: positionals.slice(shortcut === undefined ? 2 : 1),
   };
 }
