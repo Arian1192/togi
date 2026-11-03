@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -66,5 +66,17 @@ CREATE TABLE tasks (
 CREATE TABLE task_numbers (
   number      INTEGER PRIMARY KEY AUTOINCREMENT,
   reserved_at TEXT    NOT NULL
+);`,
+  // Identidad (ADR-005). Solo se guarda el hash del token; revocar es borrar sus filas.
+  5: `
+CREATE TABLE users (
+  user_id      TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+CREATE TABLE tokens (
+  token_hash TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL REFERENCES users(user_id),
+  created_at TEXT NOT NULL
 );`,
 };
