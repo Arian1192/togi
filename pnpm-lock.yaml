@@ -176,7 +176,17 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  packages/cli: {}
+  packages/cli:
+    dependencies:
+      '@togi/core':
+        specifier: workspace:*
+        version: link:../core
+      '@togi/daemon':
+        specifier: workspace:*
+        version: link:../daemon
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
 
   packages/core:
     dependencies:

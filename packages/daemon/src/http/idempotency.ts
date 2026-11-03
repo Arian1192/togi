@@ -2,9 +2,6 @@ import { createHash } from "node:crypto";
 import { canonicalize } from "@togi/core";
 import type Database from "better-sqlite3";
 
-/** Formato seguro para ids que el cliente elige (X-Request-Id, Idempotency-Key). */
-export const SAFE_ID = /^[\w.:-]{1,128}$/;
-
 export interface SavedResponse {
   request_hash: string;
   status: number;

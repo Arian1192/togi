@@ -1,9 +1,9 @@
-import { CreateTask, EditTask, RejectTask, VersionConflictError } from "@togi/core";
+import { CreateTask, EditTask, RejectTask, SAFE_ID, VersionConflictError } from "@togi/core";
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { AppEnv } from "./app.ts";
-import { hashBody, idempotencyKeys, SAFE_ID, type SavedResponse } from "./idempotency.ts";
+import { hashBody, idempotencyKeys, type SavedResponse } from "./idempotency.ts";
 import { domainStatus, problem } from "./problem.ts";
 
 type Handle = ReturnType<typeof createHandler>;
