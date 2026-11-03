@@ -6,6 +6,7 @@ import { clean, headerIndent, say, section } from "../format.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
+import { flow } from "./task-flow.ts";
 
 interface Created {
   number: number;
@@ -170,4 +171,4 @@ Ejemplo:
   },
 };
 
-export const task = { new: newTask, show };
+export const task = { new: newTask, show, ...flow };
