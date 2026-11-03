@@ -43,6 +43,22 @@ En curso
 3 tareas · 2 rechazadas ocultas (togi status --all)
 ```
 
+**Cerradas.** Las tareas `merged` y `rejected` no salen por defecto: la línea final las cuenta como ocultas. El grupo «Cerradas» aparece, después de «En curso», solo con `--all` o con `--state merged` / `--state rejected`; en esos casos ya no hay línea de ocultas.
+
+```
+$ togi status --all
+En curso
+  #12  Filtro por fecha en envíos  planning  bajo   hace 2 h
+
+Cerradas
+  #9   Exportar a PDF              rejected  medio  hace 3 d
+  #10  Login con enlace mágico     merged    alto   hace 1 d
+
+3 tareas
+```
+
+Si la API devuelve 200 tareas (el máximo por petición), la línea final avisa de que solo se muestran las primeras 200 y no presenta el recuento como total.
+
 **`togi task new`**: una línea con el resultado y el siguiente paso.
 
 ```
