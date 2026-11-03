@@ -121,3 +121,51 @@ test("las rutas de comandos exigen token", async () => {
   const res = await app.request("/v1/tasks", { method: "POST", body: "{}" });
   assert.equal(res.status, 401);
 });
+
+test("submit pasa a planning; reject pasa a rejected", async () => {
+  await create();
+  const submitted = await send("POST", "/v1/tasks/1/submit", undefined, { "if-match": "1" });
+  assert.equal(submitted.status, 200);
+  assert.equal((await submitted.json()).state, "planning");
+  const rejected = await send(
+    "POST",
+    "/v1/tasks/1/reject",
+    { reason: { category: "other", text: "no" } },
+    { "if-match": "2" },
+  );
+  assert.equal(rejected.status, 200);
+  assert.equal((await rejected.json()).state, "rejected");
+});
+
+test("submit sin If-Match: 428; con valor inválido: 400", async () => {
+  await create();
+  assert.equal((await send("POST", "/v1/tasks/1/submit")).status, 428);
+  for (const value of ["*", "abc", 'W/"1"', ""]) {
+    const res = await send("POST", "/v1/tasks/1/submit", undefined, { "if-match": value });
+    assert.equal(res.status, 400, value);
+    assert.equal((await res.json()).code, "invalid_if_match");
+  }
+});
+
+test("submit sin criterios: 422; tarea inexistente o número raro: 404", async () => {
+  await create({ ...NEW, acceptanceCriteria: "" });
+  const submit = await send("POST", "/v1/tasks/1/submit", undefined, { "if-match": "1" });
+  assert.equal(submit.status, 422);
+  assert.equal((await submit.json()).code, "missing_acceptance_criteria");
+  for (const n of ["99", "0", "x"]) {
+    const res = await send("POST", `/v1/tasks/${n}/submit`, undefined, { "if-match": "1" });
+    assert.equal(res.status, 404, n);
+    assert.equal((await res.json()).code, "task_not_found");
+  }
+});
+
+test("reject sin motivo válido: 400", async () => {
+  await create();
+  const res = await send(
+    "POST",
+    "/v1/tasks/1/reject",
+    { reason: { category: "other", text: "" } },
+    { "if-match": "1" },
+  );
+  assert.equal(res.status, 400);
+});

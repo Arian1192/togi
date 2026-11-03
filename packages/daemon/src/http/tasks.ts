@@ -1,4 +1,4 @@
-import { CreateTask, EditTask, VersionConflictError } from "@togi/core";
+import { CreateTask, EditTask, RejectTask, VersionConflictError } from "@togi/core";
 import type Database from "better-sqlite3";
 import type { Context, Hono } from "hono";
 import type { createHandler } from "../commands/handle-command.ts";
@@ -125,6 +125,19 @@ export function registerTaskRoutes(app: Hono<AppEnv>, db: Database.Database, han
       ...(input.acceptanceCriteria === undefined
         ? {}
         : { acceptanceCriteria: input.acceptanceCriteria }),
+    })),
+  );
+  app.post(
+    "/v1/tasks/:n/submit",
+    existing(null, (number) => ({ type: "submit", number })),
+  );
+  app.post(
+    "/v1/tasks/:n/reject",
+    existing(RejectTask, (number, { reason }) => ({
+      type: "reject",
+      number,
+      category: reason.category,
+      text: reason.text,
     })),
   );
 }
