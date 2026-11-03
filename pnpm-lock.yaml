@@ -186,7 +186,7 @@ importers:
 
   packages/daemon:
     dependencies:
-      '@forja/core':
+      '@togi/core':
         specifier: workspace:*
         version: link:../core
 

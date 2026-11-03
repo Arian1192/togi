@@ -1,5 +1,5 @@
 {
-  "name": "@forja/cli",
+  "name": "@togi/cli",
   "private": true,
   "type": "module",
   "exports": {
