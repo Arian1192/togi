@@ -1,6 +1,7 @@
 import type { ParseArgsConfig } from "node:util";
 import type { Output } from "../output.ts";
 import { daemon } from "./daemon.ts";
+import { task } from "./task.ts";
 
 export type Options = NonNullable<ParseArgsConfig["options"]>;
 
@@ -27,4 +28,4 @@ export interface Command {
 }
 
 /** Enrutado `recurso verbo`. */
-export const COMMANDS: Record<string, Record<string, Command>> = { daemon };
+export const COMMANDS: Record<string, Record<string, Command>> = { daemon, task };

@@ -11,6 +11,8 @@ export interface MessageParams {
   socket?: string;
   /** Cola del log del daemon, ya sin caracteres de control. */
   detail?: string;
+  title?: string;
+  risk?: string;
 }
 
 export interface NextStep {
@@ -29,6 +31,10 @@ export interface Message {
 const task = (p: MessageParams) => `#${p.n ?? "?"}`;
 const edit = (p: MessageParams) => `togi task edit ${p.n ?? "<número>"}`;
 const showTask = (p: MessageParams) => `togi task show ${p.n ?? "<número>"}`;
+
+/** Texto de una entrada del catálogo con sufijo (`risk_low`); si no existe, el propio valor. */
+const t = (prefix: string, value = ""): string =>
+  MESSAGES[`${prefix}_${value}`]?.({}).text ?? value;
 
 export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   daemon_unavailable: () => ({
@@ -106,6 +112,24 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Comando desconocido: ${p.command ?? ""}`,
     ...(p.suggestion === undefined ? {} : { next: { label: `¿Querías decir ${p.suggestion}?` } }),
   }),
+  missing_option: (p) => ({
+    text: `Falta ${p.field ?? "un valor"}.`,
+    next: { label: "Mira el uso con", command: p.command ?? "togi --help" },
+  }),
+  invalid_option: (p) => ({
+    text: `El valor de ${p.field ?? "un flag"} no es válido${p.detail === undefined ? "" : `: ${p.detail}`}.`,
+    next: { label: "Mira el uso con", command: p.command ?? "togi --help" },
+  }),
+  task_created: (p) => ({
+    text: `Creada ${task(p)} «${p.title ?? ""}» (riesgo ${t("risk", p.risk)}, ${p.state ?? "draft"})`,
+  }),
+  task_missing_criteria: (p) => ({
+    text: "Falta el criterio de aceptación",
+    next: { label: "Añádelo con", command: edit(p) },
+  }),
+  risk_low: () => ({ text: "bajo" }),
+  risk_medium: () => ({ text: "medio" }),
+  risk_high: () => ({ text: "alto" }),
   usage: (p) => ({
     text: p.command ?? "Uso incorrecto.",
     next: { label: "Mira el uso con", command: "togi --help" },
