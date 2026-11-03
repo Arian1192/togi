@@ -20,7 +20,7 @@ export type TaskEvent =
   | E<
       "task.created",
       {
-        title: string;
+        title: BlobRef;
         description: BlobRef | null;
         acceptanceCriteria: BlobRef | null;
         risk: RiskLevel;
@@ -32,7 +32,7 @@ export type TaskEvent =
   | E<
       "task.edited",
       Partial<{
-        title: string;
+        title: BlobRef;
         description: BlobRef | null;
         acceptanceCriteria: BlobRef | null;
       }>

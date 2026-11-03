@@ -54,7 +54,7 @@ const actor = z.discriminatedUnion("kind", [
 ]);
 
 const taskCreated = z.strictObject({
-  title: z.string(),
+  title: blobRef,
   description: nullableBlob,
   acceptanceCriteria: nullableBlob,
   risk,
@@ -63,7 +63,7 @@ const taskCreated = z.strictObject({
   source,
 });
 const taskEdited = z.strictObject({
-  title: z.string().optional(),
+  title: blobRef.optional(),
   description: nullableBlob.optional(),
   acceptanceCriteria: nullableBlob.optional(),
 });

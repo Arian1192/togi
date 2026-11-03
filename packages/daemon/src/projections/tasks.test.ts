@@ -30,9 +30,10 @@ const ev = (type: string, payload: unknown): NewEvent => ({
   at: `2026-11-03T10:00:${String(clock++).padStart(2, "0")}Z`,
   payload,
 });
+const ref = (name: string) => ({ hash: `hmac-sha256:${name}`, keyId: "k", dataClass: "task_text" });
 const created = (title: string) =>
   ev("task.created", {
-    title,
+    title: ref(title),
     description: null,
     acceptanceCriteria: null,
     risk: "low",
@@ -58,14 +59,15 @@ const table = () => db.prepare("SELECT * FROM tasks ORDER BY number").all();
 test("crear → editar → enviar → rechazar deja la fila esperada", () => {
   append("task:1", 0, [
     created("a"),
-    ev("task.edited", { title: "b" }),
+    ev("task.edited", { title: ref("b") }),
     ev("task.submitted", {}),
     rejected(),
   ]);
   const [row] = table() as Record<string, unknown>[];
-  assert.deepEqual(row, {
+  assert.deepEqual(JSON.parse(String(row?.title)), ref("b"));
+  const { title: _title, ...rest } = row ?? {};
+  assert.deepEqual(rest, {
     number: 1,
-    title: "b",
     state: "rejected",
     risk: "low",
     repo: "r",
@@ -93,8 +95,8 @@ test("un evento sobre una tarea inexistente lanza", () => {
 test("rebuildTasks da la misma tabla que la aplicación incremental", () => {
   append("task:1", 0, [created("a"), ev("task.submitted", {})]);
   append("task:2", 0, [created("c")]);
-  append("task:1", 2, [ev("task.edited", { title: "b" }), rejected()]);
-  append("task:2", 1, [ev("task.edited", { title: "d" })]);
+  append("task:1", 2, [ev("task.edited", { title: ref("b") }), rejected()]);
+  append("task:2", 1, [ev("task.edited", { title: ref("d") })]);
   const incremental = table();
   for (const batchSize of [1, 2, 500]) {
     rebuildTasks(db, store, batchSize);

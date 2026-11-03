@@ -40,7 +40,7 @@ export function createApp(
       c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION, pid: process.pid }),
     )
     .route("/", taskRoutes(db, handle))
-    .route("/", queryRoutes(db, reads))
+    .route("/", queryRoutes(db, reads, handle))
     .route("/", eventRoutes(reads))
     .route("/", adminRoutes(reads));
 }

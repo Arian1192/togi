@@ -90,8 +90,10 @@ export function createHandler(deps: HandlerDeps) {
   const { db, store, blobs, clock = () => new Date(), decide = coreDecide } = deps;
   const reserve = db.prepare("INSERT INTO task_numbers (reserved_at) VALUES (?)");
 
+  const putText = (text: string, taskId: number): Promise<BlobRef> =>
+    blobs.put(new TextEncoder().encode(text), "task_text", taskId);
   const textBlob = async (text: string, taskId: number): Promise<BlobRef | null> =>
-    text.trim() === "" ? null : blobs.put(new TextEncoder().encode(text), "task_text", taskId);
+    text.trim() === "" ? null : putText(text, taskId);
 
   /** La vista sale SIEMPRE del stream, evento a evento; nunca de la proyección `tasks`. */
   const loadView = async (stream: string) => {
@@ -117,13 +119,14 @@ export function createHandler(deps: HandlerDeps) {
     const at = clock().toISOString();
     const number = Number(reserve.run(at).lastInsertRowid);
     // 2. Blobs con el taskId reservado.
+    const title = await putText(cmd.title, number);
     const description = await textBlob(cmd.description, number);
     const acceptanceCriteria = await textBlob(cmd.acceptanceCriteria, number);
     // 3-4. Una tarea nueva se decide sobre la vista de una tarea inexistente.
     const { type: _type, ...fields } = cmd;
     const decided = decide(
       NO_TASK,
-      { ...fields, type: "create", description, acceptanceCriteria, actor, at },
+      { ...fields, type: "create", title, description, acceptanceCriteria, actor, at },
       POLICY,
     );
     if (!Array.isArray(decided)) return decided;
@@ -158,7 +161,8 @@ export function createHandler(deps: HandlerDeps) {
     let command: TaskCommand;
     if (cmd.type === "edit") {
       const changes: Extract<TaskCommand, { type: "edit" }>["changes"] = {};
-      if (cmd.title !== undefined) changes.title = cmd.title;
+      if (cmd.title !== undefined && view.exists)
+        changes.title = await putText(cmd.title, cmd.number);
       if (cmd.description !== undefined) changes.description = await blob(cmd.description);
       if (cmd.acceptanceCriteria !== undefined) {
         changes.acceptanceCriteria = await blob(cmd.acceptanceCriteria);
@@ -184,11 +188,17 @@ export function createHandler(deps: HandlerDeps) {
     return { number: cmd.number, events };
   };
 
-  return function handleCommand(
+  function handleCommand(
     actor: Actor,
     cmd: CommandInput,
     opts: CommandOptions = {},
   ): Promise<HandleResult> {
     return cmd.type === "create" ? create(actor, cmd, opts) : modify(actor, cmd, opts);
-  };
+  }
+
+  /** Descifra un texto de tarea. Lanza si el blob no se puede leer (clave destruida o manipulado). */
+  const readText = async (ref: BlobRef): Promise<string> =>
+    new TextDecoder().decode(await blobs.get(ref));
+
+  return Object.assign(handleCommand, { readText });
 }

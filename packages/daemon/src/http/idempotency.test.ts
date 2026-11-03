@@ -159,3 +159,14 @@ test("sin Idempotency-Key cada POST crea su tarea", async () => {
   assert.equal(count("tasks"), 2);
   assert.equal(count("idempotency_keys"), 0);
 });
+
+test("la clave guardada no lleva el título en claro y la repetición lo descifra", async () => {
+  const first = await post(NEW, "k-1");
+  const saved = db.prepare("SELECT response_body FROM idempotency_keys").get() as {
+    response_body: string;
+  };
+  assert.ok(!saved.response_body.includes("Filtro"));
+  const again = (await (await post(NEW, "k-1")).json()) as { title: string };
+  assert.equal(again.title, "Filtro");
+  assert.equal(first.status, 201);
+});

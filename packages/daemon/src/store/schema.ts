@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -91,4 +91,7 @@ CREATE TABLE idempotency_keys (
   created_at    TEXT    NOT NULL,
   PRIMARY KEY (user_id, key)
 );`,
+  // `tasks.title` guarda ahora la BlobRef del título en JSON, no el texto (ADR-004). No hay logs
+  // reales con títulos en claro: se vacía la proyección en lugar de migrar sus filas.
+  7: "DELETE FROM tasks;",
 };

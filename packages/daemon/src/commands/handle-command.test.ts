@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
@@ -68,11 +68,26 @@ test("create guarda la tarea en el log y en tasks con números 1 y 2", async () 
   assert.deepEqual([first.number, second.number], [1, 2]);
   assert.equal(first.events[0]?.stream, "task:1");
   assert.equal(first.events[0]?.at, "2026-11-03T10:00:00.000Z");
-  const rows = db.prepare("SELECT number, title, state FROM tasks ORDER BY number").all();
-  assert.deepEqual(rows, [
-    { number: 1, title: "Filtro por fecha", state: "draft" },
-    { number: 2, title: "Otra", state: "draft" },
-  ]);
+  const rows = db.prepare("SELECT number, title, state FROM tasks ORDER BY number").all() as {
+    number: number;
+    title: string;
+    state: string;
+  }[];
+  assert.deepEqual(
+    rows.map((r) => [r.number, r.state]),
+    [
+      [1, "draft"],
+      [2, "draft"],
+    ],
+  );
+  for (const [row, plain] of [
+    [rows[0], "Filtro por fecha"],
+    [rows[1], "Otra"],
+  ] as const) {
+    assert.ok(row !== undefined && !row.title.includes(plain));
+    const ref = JSON.parse(row.title) as Parameters<BlobStore["get"]>[0];
+    assert.equal(new TextDecoder().decode(await blobs.get(ref)), plain);
+  }
   assert.equal(count("events"), 2);
 });
 
@@ -102,8 +117,11 @@ test("un texto vacío o solo espacios da BlobRef null y no crea blob", async () 
   const payload = result.events[0]?.payload as Record<string, unknown>;
   assert.equal(payload.description, null);
   assert.equal(payload.acceptanceCriteria, null);
-  assert.equal(count("data_keys"), 0);
-  assert.equal(existsSync(paths(home).blobs), false);
+  // Solo el título (obligatorio) tiene clave y blob.
+  assert.equal(count("data_keys"), 1);
+  const root = paths(home).blobs;
+  const files = readdirSync(root).flatMap((dir) => readdirSync(join(root, dir)));
+  assert.equal(files.length, 1);
 });
 
 test("si el decider rechaza no se escribe ningún evento ni fila", async () => {

@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { BlobRef } from "../model/blob.ts";
 import { decide } from "./decider.ts";
 import type { TaskView } from "./task-view.ts";
 
 const view: TaskView = {
   exists: true,
   state: "draft",
-  title: "t",
+  title: { hash: "hmac-sha256:t", keyId: "k1", dataClass: "task_text" } satisfies BlobRef,
   description: null,
   acceptanceCriteria: null,
   risk: "low",

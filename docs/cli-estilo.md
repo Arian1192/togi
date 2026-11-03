@@ -205,5 +205,5 @@ Ejemplo:
 Pendiente de decidir:
 
 - [ ] Mapear los cinco tokens de color a la paleta del manual de marca de togi, con contraste en fondo claro y oscuro.
-- [ ] Decidir si el título de las tareas se cifra (ADR-004); cambiaría cómo `togi status` muestra un título borrado.
+- [x] Decidir si el título de las tareas se cifra (ADR-004): se cifra como `task_text`. La API devuelve `[borrado]` si su clave se destruyó, y así lo muestra la CLI.
 - [ ] Decidir en la rebanada 2 si `togi inbox` se construye con Ink (TypeScript) o con Bubble Tea (Go), tras comprobar el estado de las dos.
