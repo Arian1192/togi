@@ -9,8 +9,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "2.1.5",
     "@togi/core": "workspace:*",
-    "better-sqlite3": "13.0.3"
+    "better-sqlite3": "13.0.3",
+    "hono": "4.13.13"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0"
