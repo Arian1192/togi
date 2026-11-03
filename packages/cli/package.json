@@ -7,5 +7,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@togi/core": "workspace:*",
+    "@togi/daemon": "workspace:*",
+    "hono": "4.13.13"
   }
 }

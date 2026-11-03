@@ -1,3 +1,6 @@
+/** Formato seguro para ids que el cliente elige (X-Request-Id, Idempotency-Key). */
+export const SAFE_ID = /^[\w.:-]{1,128}$/;
+
 export type TaskId = number;
 export type SessionId = `ses_${string}`;
 export type WorkspaceId = `wsp_${string}`;

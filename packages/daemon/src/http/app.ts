@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { Actor, UserId } from "@togi/core";
+import { type Actor, SAFE_ID, type UserId } from "@togi/core";
 import type Database from "better-sqlite3";
 import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
@@ -9,7 +9,6 @@ import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { adminRoutes } from "./admin.ts";
 import { eventRoutes } from "./events.ts";
-import { SAFE_ID } from "./idempotency.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
 import { taskRoutes } from "./tasks.ts";
