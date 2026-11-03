@@ -1,8 +1,23 @@
-import { TASK_STATES, type TaskState } from "@togi/core";
+import type { BlobRef, BlobStore } from "@togi/core";
+import {
+  evolve,
+  NO_TASK,
+  TASK_STATES,
+  type TaskState,
+  type TaskView,
+  toDomainEvent,
+} from "@togi/core";
 import type Database from "better-sqlite3";
 import { Hono } from "hono";
+import type { SqliteEventStore } from "../store/event-store.ts";
 import type { AppEnv } from "./app.ts";
 import { problem } from "./problem.ts";
+import { NUMBER } from "./tasks.ts";
+
+export interface ReadDeps {
+  store: SqliteEventStore;
+  blobs: BlobStore;
+}
 
 const LIMIT = /^\d+$/;
 
@@ -14,8 +29,14 @@ interface TaskRow {
   stream_version: number;
 }
 
-/** Consultas del ADR-005, encadenadas para que `hc` infiera sus tipos. */
-export function queryRoutes(db: Database.Database) {
+type Text = { text: string | null; erased: boolean };
+
+/**
+ * Consultas del ADR-005, encadenadas para que `hc` infiera sus tipos. El detalle sin `reads`
+ * responde 503. Un texto cuenta como borrado SOLO si su clave de datos ya no existe; cualquier otro
+ * fallo al leer el blob (manipulación, fichero ausente, disco) es un error de integridad.
+ */
+export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) {
   const list = (state: string | undefined, limit: number) =>
     db
       .prepare(
@@ -23,24 +44,62 @@ export function queryRoutes(db: Database.Database) {
          ${state === undefined ? "" : "WHERE state = ?"} ORDER BY number LIMIT ?`,
       )
       .all(...(state === undefined ? [limit] : [state, limit])) as TaskRow[];
+  const keyExists = db.prepare("SELECT 1 FROM data_keys WHERE key_id = ?");
 
-  return new Hono<AppEnv>().get("/v1/tasks", (c) => {
-    const state = c.req.query("state");
-    if (state !== undefined && !TASK_STATES.includes(state as TaskState)) {
-      return problem(400, "validation_error", `state debe ser uno de ${TASK_STATES.join(", ")}`);
-    }
-    const raw = c.req.query("limit") ?? "50";
-    const limit = LIMIT.test(raw) ? Number(raw) : 0;
-    if (limit < 1 || limit > 200) {
-      return problem(400, "validation_error", "limit debe ser un entero entre 1 y 200");
-    }
-    const tasks = list(state, limit).map((r) => ({
-      number: r.number,
-      title: r.title,
-      state: r.state,
-      risk: r.risk,
-      version: r.stream_version,
-    }));
-    return c.json({ tasks });
-  });
+  const read = async (blobs: BlobStore, ref: BlobRef | null): Promise<Text> => {
+    if (ref === null) return { text: null, erased: false };
+    if (keyExists.get(ref.keyId) === undefined) return { text: null, erased: true };
+    return { text: new TextDecoder().decode(await blobs.get(ref)), erased: false };
+  };
+
+  return new Hono<AppEnv>()
+    .get("/v1/tasks", (c) => {
+      const state = c.req.query("state");
+      if (state !== undefined && !TASK_STATES.includes(state as TaskState)) {
+        return problem(400, "validation_error", `state debe ser uno de ${TASK_STATES.join(", ")}`);
+      }
+      const raw = c.req.query("limit") ?? "50";
+      const limit = LIMIT.test(raw) ? Number(raw) : 0;
+      if (limit < 1 || limit > 200) {
+        return problem(400, "validation_error", "limit debe ser un entero entre 1 y 200");
+      }
+      const tasks = list(state, limit).map((r) => ({
+        number: r.number,
+        title: r.title,
+        state: r.state,
+        risk: r.risk,
+        version: r.stream_version,
+      }));
+      return c.json({ tasks });
+    })
+    .get("/v1/tasks/:n", async (c) => {
+      if (reads === undefined) return problem(503, "not_configured", "consultas no disponibles");
+      const param = c.req.param("n");
+      if (!NUMBER.test(param)) return problem(404, "task_not_found", "tarea inexistente");
+      let view: TaskView = NO_TASK;
+      let version = 0;
+      for await (const stored of reads.store.readStream(`task:${param}`)) {
+        const event = toDomainEvent(stored);
+        if (event.type !== "data.erased") view = evolve(view, event);
+        version = stored.streamVersion;
+      }
+      if (!view.exists) return problem(404, "task_not_found", "tarea inexistente");
+      try {
+        const description = await read(reads.blobs, view.description);
+        const criteria = await read(reads.blobs, view.acceptanceCriteria);
+        c.header("etag", `"${version}"`);
+        return c.json({
+          number: Number(param),
+          title: view.title,
+          state: view.state,
+          risk: view.risk,
+          version,
+          description: description.text,
+          acceptanceCriteria: criteria.text,
+          erased: { description: description.erased, acceptanceCriteria: criteria.erased },
+        });
+      } catch {
+        return problem(500, "integrity_error", "no se pudo leer un texto de la tarea");
+      }
+    });
 }
