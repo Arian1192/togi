@@ -6,6 +6,7 @@ import type { AppType } from "@togi/daemon";
 import { paths } from "@togi/daemon/config";
 import { hc } from "hono/client";
 import { daemonUnavailable, fromProblem } from "./errors.ts";
+import type { MessageParams } from "./messages.ts";
 
 const NO_DAEMON = new Set(["ENOENT", "ECONNREFUSED"]);
 
@@ -70,10 +71,13 @@ export function createClient(home: string) {
   const api = hc<AppType>("http://togi", { fetch: guarded });
 
   /** Devuelve el JSON de una respuesta correcta; si no, lanza el `CliError` del problem+json. */
-  async function checked<T>(res: Response): Promise<T> {
+  async function checked<T>(res: Response, context: MessageParams = {}): Promise<T> {
     const body: unknown = await res.json().catch(() => null);
     if (res.ok) return body as T;
-    throw fromProblem(res.status, body, { requestId: trustedRequestId(requestId, res) });
+    throw fromProblem(res.status, body, {
+      ...context,
+      requestId: trustedRequestId(requestId, res),
+    });
   }
 
   return { api, requestId, socket: p.socket, checked };

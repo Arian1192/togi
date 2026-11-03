@@ -130,6 +130,10 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   risk_low: () => ({ text: "bajo" }),
   risk_medium: () => ({ text: "medio" }),
   risk_high: () => ({ text: "alto" }),
+  section_description: () => ({ text: "Descripción" }),
+  section_criteria: () => ({ text: "Criterio de aceptación" }),
+  text_empty: () => ({ text: "(vacío)" }),
+  text_erased: () => ({ text: "[borrado]" }),
   usage: (p) => ({
     text: p.command ?? "Uso incorrecto.",
     next: { label: "Mira el uso con", command: "togi --help" },
