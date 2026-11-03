@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -94,4 +94,15 @@ CREATE TABLE idempotency_keys (
   // `tasks.title` guarda ahora la BlobRef del título en JSON, no el texto (ADR-004). No hay logs
   // reales con títulos en claro: se vacía la proyección en lugar de migrar sus filas.
   7: "DELETE FROM tasks;",
+  // `has_criteria`: si la tarea tiene criterio de aceptación. Es un booleano; el texto sigue cifrado.
+  // Vacía la proyección porque DEFAULT 0 mentiría en las filas viejas; `REBUILD_PROJECTIONS` la repuebla.
+  8: `
+ALTER TABLE tasks ADD COLUMN has_criteria INTEGER NOT NULL DEFAULT 0;
+DELETE FROM tasks;`,
 };
+
+/**
+ * Migraciones que dejan las proyecciones vacías o inválidas. Al abrir la base, si alguna de las
+ * aplicadas está aquí, se reconstruyen desde el log dentro de la misma transacción.
+ */
+export const REBUILD_PROJECTIONS: ReadonlySet<number> = new Set([7, 8]);
