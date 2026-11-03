@@ -14,7 +14,7 @@ type Parser<T> = {
 type Result = Awaited<ReturnType<Handle>>;
 
 const IF_MATCH = /^"?(\d+)"?$/;
-const NUMBER = /^[1-9]\d*$/;
+export const NUMBER = /^[1-9]\d*$/;
 
 interface TaskRow {
   number: number;

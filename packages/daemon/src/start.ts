@@ -16,8 +16,9 @@ export async function startDaemon(
   try {
     const p = paths(home);
     const blobs = new FileBlobStore(p.blobs, new DataKeyring(db, masterKey));
-    const handle = createHandler({ db, store: new SqliteEventStore(db), blobs });
-    const server = await listen(createApp(db, handle).fetch, p.socket);
+    const store = new SqliteEventStore(db);
+    const handle = createHandler({ db, store, blobs });
+    const server = await listen(createApp(db, handle, { store, blobs }).fetch, p.socket);
     return {
       userId,
       db,

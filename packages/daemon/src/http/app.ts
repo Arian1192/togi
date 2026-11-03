@@ -8,7 +8,7 @@ import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { problem } from "./problem.ts";
-import { queryRoutes } from "./queries.ts";
+import { queryRoutes, type ReadDeps } from "./queries.ts";
 import { taskRoutes } from "./tasks.ts";
 
 const DAEMON_VERSION =
@@ -26,14 +26,18 @@ const REQUEST_ID = /^[\w.:-]{1,128}$/;
 /** Tipo de la app para el cliente `hc` de la CLI. */
 export type AppType = ReturnType<typeof createApp>;
 
-export function createApp(db: Database.Database, handle?: ReturnType<typeof createHandler>) {
+export function createApp(
+  db: Database.Database,
+  handle?: ReturnType<typeof createHandler>,
+  reads?: ReadDeps,
+) {
   // Rutas encadenadas: `hc` solo infiere los tipos de lo que se encadena aquí.
   return new Hono<AppEnv>()
     .use("*", requestId)
     .use("*", authenticated(db))
     .get("/v1/health", (c) => c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION }))
     .route("/", taskRoutes(db, handle))
-    .route("/", queryRoutes(db));
+    .route("/", queryRoutes(db, reads));
 }
 
 // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.
