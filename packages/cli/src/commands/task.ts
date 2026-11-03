@@ -9,7 +9,9 @@ import type { Command } from "./index.ts";
 
 interface Created {
   number: number;
-  title: string;
+  /** `null` con `titleErased` si se repite una creación idempotente cuyo título ya se borró. */
+  title: string | null;
+  titleErased: boolean;
   state: string;
   risk: string;
   hasCriteria: boolean;
@@ -17,7 +19,8 @@ interface Created {
 
 interface Detail {
   number: number;
-  title: string;
+  title: string | null;
+  titleErased: boolean;
   state: string;
   risk: string;
   repo: string;
@@ -115,7 +118,12 @@ const newTask: Command = {
 };
 
 function createdLines(t: Created, out: Output): string {
-  const params = { n: t.number, title: clean(t.title), risk: t.risk, state: t.state };
+  const params = {
+    n: t.number,
+    title: t.title === null ? say("text_erased") : clean(t.title),
+    risk: t.risk,
+    state: t.state,
+  };
   const lines = [out.mark("ok", MESSAGES.task_created?.(params).text ?? "")];
   if (!t.hasCriteria) {
     const next = MESSAGES.task_missing_criteria?.(params);
@@ -150,7 +158,9 @@ Ejemplo:
     const risk = say(`risk_${t.risk}`);
     const meta = `${t.state} · riesgo ${risk} · ${t.repo} → ${t.baseBranch} · versión ${t.version}`;
     return `${[
-      `${out.paint("accent", `#${t.number}`)}  ${clean(t.title)}`,
+      `${out.paint("accent", `#${t.number}`)}  ${
+        t.titleErased || t.title === null ? out.paint("muted", say("text_erased")) : clean(t.title)
+      }`,
       `     ${meta}`,
       "",
       section(say("section_description"), t.description, t.erased.description, out),

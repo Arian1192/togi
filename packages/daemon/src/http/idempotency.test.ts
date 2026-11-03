@@ -6,6 +6,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import type { NewEvent, StoredEvent } from "@togi/core";
 import type Database from "better-sqlite3";
 import { hashToken } from "../auth/tokens.ts";
+import { erase } from "../blobs/erase.ts";
 import { FileBlobStore } from "../blobs/file-blob-store.ts";
 import { createHandler } from "../commands/handle-command.ts";
 import { paths } from "../config/app.ts";
@@ -169,4 +170,22 @@ test("la clave guardada no lleva el título en claro y la repetición lo descifr
   const again = (await (await post(NEW, "k-1")).json()) as { title: string };
   assert.equal(again.title, "Filtro");
   assert.equal(first.status, 201);
+});
+
+test("repetir una creación cuyo título se borró devuelve title null y titleErased true", async () => {
+  await post(NEW, "k-1");
+  const keys = new DataKeyring(
+    db,
+    await loadOrCreateMasterKey(selectKeychain({ home, env: { TOGI_KEYCHAIN: "file" } })),
+  );
+  const blobs = new FileBlobStore(paths(home).blobs, keys);
+  await erase({ events: store, keys, blobs }, 1, "task_text", "RGPD", {
+    kind: "human",
+    userId: "usr_1",
+  });
+  const again = (await (await post(NEW, "k-1")).json()) as {
+    title: string | null;
+    titleErased: boolean;
+  };
+  assert.deepEqual([again.title, again.titleErased], [null, true]);
 });

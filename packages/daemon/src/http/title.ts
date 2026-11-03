@@ -4,7 +4,11 @@ import type Database from "better-sqlite3";
 /** Descifra un blob de texto; lanza si no se puede leer. */
 export type TextReader = (ref: BlobRef) => Promise<string>;
 
-export const ERASED_TITLE = "[borrado]";
+/** Título legible, o `null` con `titleErased` si se borró con `erase`. */
+export interface TitleView {
+  title: string | null;
+  titleErased: boolean;
+}
 
 /**
  * Descifra el título de una tarea. Cuenta como borrado SOLO si su clave de datos ya no existe;
@@ -13,6 +17,8 @@ export const ERASED_TITLE = "[borrado]";
  */
 export function titleReader(db: Database.Database) {
   const keyExists = db.prepare("SELECT 1 FROM data_keys WHERE key_id = ?");
-  return async (read: TextReader, ref: BlobRef): Promise<string> =>
-    keyExists.get(ref.keyId) === undefined ? ERASED_TITLE : read(ref);
+  return async (read: TextReader, ref: BlobRef): Promise<TitleView> =>
+    keyExists.get(ref.keyId) === undefined
+      ? { title: null, titleErased: true }
+      : { title: await read(ref), titleErased: false };
 }

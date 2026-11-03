@@ -137,3 +137,21 @@ test("task show --help trae el uso y un ejemplo", async () => {
   assert.match(r.stdout, /Uso: togi task show <número>/);
   assert.match(r.stdout, /Ejemplo:\n {2}togi task show 12/);
 });
+
+test("un título borrado con erase aparece como [borrado] en gris, no como null", async () => {
+  const n = await create();
+  const keys = new DataKeyring(
+    daemon.db,
+    await loadOrCreateMasterKey(selectKeychain({ home, env: { TOGI_KEYCHAIN: "file" } })),
+  );
+  const deps = {
+    events: new SqliteEventStore(daemon.db),
+    keys,
+    blobs: new FileBlobStore(paths(home).blobs, keys),
+  };
+  await erase(deps, Number(n), "task_text", "prueba", { kind: "human", userId: daemon.userId });
+  const plain = await runCli(["task", "show", n, "--no-color"], home);
+  assert.match(plain.stdout, new RegExp(`^#${n} {2}\\[borrado\\]\\n`));
+  const color = await runCli(["task", "show", n], home, { FORCE_COLOR: "1" });
+  assert.ok(color.stdout.includes("  \x1b[90m[borrado]\x1b[0m\n"), color.stdout);
+});

@@ -72,6 +72,7 @@ test("el detalle devuelve los textos descifrados", async () => {
   assert.deepEqual(body, {
     number: 1,
     title: "Filtro",
+    titleErased: false,
     state: "draft",
     risk: "low",
     repo: "o/r",
@@ -110,7 +111,8 @@ test("tras erase de task_text: 200 y textos null marcados como borrados", async 
   assert.equal(body.description, null);
   assert.equal(body.acceptanceCriteria, null);
   assert.deepEqual(body.erased, { description: true, acceptanceCriteria: true });
-  assert.equal(body.title, "[borrado]");
+  assert.equal(body.title, null);
+  assert.equal(body.titleErased, true);
 });
 
 test("un blob alterado en disco con su clave intacta es error de integridad, no un borrado", async () => {
@@ -161,15 +163,21 @@ test("hc<AppType> tipa GET /v1/tasks/:n", () => {
   void (() => client.v1.tasks[":n"].$get({ param: { n: "1" } }));
 });
 
-test("la lista da [borrado] tras erase de task_text y 500 integrity_error si el blob está alterado", async () => {
+test("la lista da title null y titleErased tras erase de task_text y 500 integrity_error si el blob está alterado", async () => {
   await send("POST", "/v1/tasks", NEW);
   await send("POST", "/v1/tasks", NEW);
   await erase(deps, 2, "task_text", "RGPD", { kind: "human", userId: "usr_1" });
-  const titles = ((await (await send("GET", "/v1/tasks")).json()) as { tasks: { title: string }[] })
-    .tasks;
+  const titles = (
+    (await (await send("GET", "/v1/tasks")).json()) as {
+      tasks: { title: string | null; titleErased: boolean }[];
+    }
+  ).tasks;
   assert.deepEqual(
-    titles.map((t) => t.title),
-    ["Filtro", "[borrado]"],
+    titles.map((t) => [t.title, t.titleErased]),
+    [
+      ["Filtro", false],
+      [null, true],
+    ],
   );
   rmSync(paths(home).blobs, { recursive: true });
   const res = await send("GET", "/v1/tasks");
