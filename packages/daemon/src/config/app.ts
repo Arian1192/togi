@@ -22,5 +22,6 @@ export function paths(root: string) {
     runDir,
     socket: join(runDir, `${APP.name}.sock`),
     credentials: join(root, "credentials"),
+    blobs: join(root, "blobs"),
   };
 }

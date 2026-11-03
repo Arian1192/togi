@@ -206,7 +206,7 @@ Objetivo: la implementación del puerto BlobStore con cifrado y crypto-shredding
 - Clave maestra de 32 bytes aleatorios guardada en el Keychain.
 - Una clave de datos por tarea y DataClass, envuelta con la clave maestra (AES-256-GCM) y guardada
   en una tabla data_keys. shred(keyId) elimina la clave envuelta.
-- Blobs cifrados con AES-256-GCM en TOGI_HOME/blobs/<keyId>/<sha256 del contenido en claro>.
+- Blobs cifrados con AES-256-GCM en TOGI_HOME/blobs/<keyId>/<identificador>, donde el identificador es el HMAC-SHA256 del contenido en claro (ADR-004).
 - erase(taskId, dataClass): destruye la clave y añade un evento data.erased (con keyId y motivo,
   sin contenido) en un stream admin.
 - Tests: ida y vuelta de un blob; get falla tras shred; data.erased queda en el log;

@@ -13,7 +13,7 @@ const policy: FlowPolicy = { maxLines: 300, maxFailedCycles: 3 };
 const actor: Actor = { kind: "human", userId: "usr_1" };
 const meta = { actor, at: "2026-11-03T10:00:00Z" };
 const blob = (n: string): BlobRef => ({
-  hash: `sha256:${n}`,
+  hash: `hmac-sha256:${n}`,
   keyId: "k1",
   dataClass: "task_text",
 });
