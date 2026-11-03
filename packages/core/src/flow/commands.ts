@@ -1,7 +1,7 @@
 import type { BlobRef } from "../model/blob.ts";
 import type { TaskEvent } from "../model/events.ts";
 import type { Actor } from "../model/ids.ts";
-import type { Reason, RiskLevel, TaskSource } from "../model/task.ts";
+import type { ReasonCategory, RiskLevel, TaskSource } from "../model/task.ts";
 
 interface Meta {
   actor: Actor;
@@ -23,4 +23,4 @@ export type TaskCommand =
     })
   | (Meta & { type: "edit"; changes: TaskChanges })
   | (Meta & { type: "submit" })
-  | (Meta & { type: "reject"; reason: Reason });
+  | (Meta & { type: "reject"; reason: { category: ReasonCategory; text: BlobRef | null } });

@@ -46,7 +46,7 @@ export function decide(
       if (!REASON_CATEGORIES.includes(category) || !text) {
         return domainError("invalid_reason", "el motivo exige categoría válida y texto");
       }
-      return [{ ...meta, type: "task.rejected", payload: { reason: cmd.reason } }];
+      return [{ ...meta, type: "task.rejected", payload: { reason: { category, text } } }];
     }
     default: {
       const unhandled: never = cmd;
