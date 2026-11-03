@@ -56,11 +56,13 @@ El contenido grande o sensible nunca va en el payload: va a un blob y el payload
 ```typescript
 export type DataClass = "task_text" | "untrusted_input" | "trajectory" | "gate_evidence" | "prompt";
 export interface BlobRef {
-  hash: `sha256:${string}`;   // del contenido en claro, para deduplicar y verificar
+  hash: `hmac-sha256:${string}`;  // HMAC del contenido en claro: identifica, deduplica y verifica
   keyId: string;              // clave con la que está cifrado
   dataClass: DataClass;       // decide la retención
 }
 ```
+
+`hash` es un HMAC-SHA256 del contenido en claro, no un SHA-256 simple. Su clave sale de la clave de datos con HKDF-SHA-256 y una etiqueta fija (`togi/blob-id/v1`), distinta de la que deriva la clave de cifrado (`togi/blob-enc/v1`). El motivo: el log conserva `hash` para siempre, y con un hash simple permitiría confirmar un contenido ya borrado probando candidatos. Con HMAC, al destruir la clave de datos ya no se puede. El blob vive en `blobs/<keyId>/<identificador>`, donde el identificador es el hash sin el prefijo `hmac-sha256:`.
 
 ## Eventos y entidades
 
@@ -195,7 +197,7 @@ export interface EventStore {
   verify(): Promise<{ ok: true } | { ok: false; brokenAt: number }>;
 }
 export interface BlobStore {
-  put(bytes: Uint8Array, dataClass: DataClass, subject?: UserId): Promise<BlobRef>;
+  put(bytes: Uint8Array, dataClass: DataClass, taskId: TaskId): Promise<BlobRef>;
   get(ref: BlobRef): Promise<Uint8Array>;     // falla si la clave se ha destruido
   shred(keyId: string): Promise<void>;        // borrado por destrucción de clave
 }

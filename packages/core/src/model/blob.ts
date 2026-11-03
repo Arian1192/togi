@@ -8,7 +8,8 @@ export const DATA_CLASSES = [
 export type DataClass = (typeof DATA_CLASSES)[number];
 
 export interface BlobRef {
-  hash: `sha256:${string}`;
+  /** HMAC-SHA256 del contenido en claro con una clave derivada de la clave de datos (ADR-004). */
+  hash: `hmac-sha256:${string}`;
   keyId: string;
   dataClass: DataClass;
 }
