@@ -1,7 +1,9 @@
 import { closeSync, mkdirSync, openSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import { MIGRATIONS, SCHEMA_V1_SQL, SCHEMA_VERSION } from "./schema.ts";
+import { rebuildTasks } from "../projections/tasks.ts";
+import { SqliteEventStore } from "./event-store.ts";
+import { MIGRATIONS, REBUILD_PROJECTIONS, SCHEMA_V1_SQL, SCHEMA_VERSION } from "./schema.ts";
 
 /**
  * Abre (o crea) la base del event store. El fichero se crea con 0600 antes de abrirlo: SQLite
@@ -10,6 +12,7 @@ import { MIGRATIONS, SCHEMA_V1_SQL, SCHEMA_VERSION } from "./schema.ts";
 export function openEventDatabase(
   path: string,
   migrations: Readonly<Record<number, string>> = MIGRATIONS,
+  rebuild: ReadonlySet<number> = REBUILD_PROJECTIONS,
 ): Database.Database {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   try {
@@ -31,12 +34,15 @@ export function openEventDatabase(
           db.exec(SCHEMA_V1_SQL);
           db.pragma("user_version = 1");
         }
+        let needsRebuild = false;
         for (let target = Math.max(version, 1) + 1; target <= SCHEMA_VERSION; target++) {
           const sql = migrations[target];
           if (sql === undefined) throw new Error(`falta la migración a la versión ${target}`);
           db.exec(sql);
           db.pragma(`user_version = ${target}`);
+          needsRebuild ||= rebuild.has(target);
         }
+        if (needsRebuild) rebuildTasks(db, new SqliteEventStore(db));
       })();
     } catch (error) {
       db.close();

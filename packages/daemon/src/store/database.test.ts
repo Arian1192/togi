@@ -66,13 +66,13 @@ async function createV1(path: string): Promise<void> {
   old.pragma("user_version = 1");
   const store = new SqliteEventStore(old);
   const event = (n: number): NewEvent => ({
-    type: "task.edited",
+    type: "data.erased",
     schemaVersion: 1,
     actor: { kind: "human", userId: "usr_1" },
     at: "2026-11-03T10:00:00Z",
-    payload: { n },
+    payload: { keyId: `k${n}`, taskId: 1, dataClass: "prompt", reason: "ejemplo" },
   });
-  await store.append("task:1", 0, [event(1), event(2)]);
+  await store.append("admin", 0, [event(1), event(2)]);
   old.close();
 }
 

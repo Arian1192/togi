@@ -136,7 +136,7 @@ test("dos peticiones simultáneas con la misma clave dejan una sola tarea", asyn
 test("otra restricción que falla no se confunde con la clave: se relanza el error original", async () => {
   // La PK de tasks choca con el siguiente número reservado: mismo código SQLite que la clave.
   db.prepare(
-    "INSERT INTO tasks VALUES (1, 'x', 'draft', 'low', 'o/r', 'main', 1, 'now', 'now')",
+    "INSERT INTO tasks VALUES (1, 'x', 'draft', 'low', 'o/r', 'main', 1, 'now', 'now', 0)",
   ).run();
   const res = await post(NEW, "k-1");
   assert.equal(res.status, 500);

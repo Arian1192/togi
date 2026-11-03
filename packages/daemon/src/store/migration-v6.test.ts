@@ -22,13 +22,13 @@ test("la migración 5→6 crea idempotency_keys, conserva los eventos y la caden
   for (let v = 2; v <= 5; v++) old.exec(MIGRATIONS[v] as string);
   old.pragma("user_version = 5");
   const event: NewEvent = {
-    type: "task.edited",
+    type: "data.erased",
     schemaVersion: 1,
     actor: { kind: "human", userId: "usr_1" },
     at: "2026-11-03T10:00:00Z",
-    payload: {},
+    payload: { keyId: "k1", taskId: 1, dataClass: "prompt", reason: "ejemplo" },
   };
-  await new SqliteEventStore(old).append("task:1", 0, [event]);
+  await new SqliteEventStore(old).append("admin", 0, [event]);
   old.close();
 
   const db = openEventDatabase(path);

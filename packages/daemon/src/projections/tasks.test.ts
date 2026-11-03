@@ -72,6 +72,7 @@ test("crear → editar → enviar → rechazar deja la fila esperada", () => {
     risk: "low",
     repo: "r",
     base_branch: "main",
+    has_criteria: 0,
     stream_version: 4,
     created_at: "2026-11-03T10:00:00Z",
     updated_at: "2026-11-03T10:00:03Z",
