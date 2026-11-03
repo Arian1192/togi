@@ -106,7 +106,7 @@ export function queryRoutes(
         const tasks = await Promise.all(
           list(state, limit).map(async (r) => ({
             number: r.number,
-            title: await titleOf(reader, JSON.parse(r.title) as BlobRef),
+            ...(await titleOf(reader, JSON.parse(r.title) as BlobRef)),
             state: r.state,
             risk: r.risk,
             repo: r.repo,
@@ -152,7 +152,7 @@ export function queryRoutes(
         c.header("etag", `"${version}"`);
         return c.json({
           number: Number(param),
-          title,
+          ...title,
           state: view.state,
           risk: view.risk,
           repo: dates.repo,

@@ -53,6 +53,7 @@ test("POST /v1/tasks crea la tarea en draft: 201 con ETag", async () => {
   assert.deepEqual(await res.json(), {
     number: 1,
     title: "Filtro",
+    titleErased: false,
     state: "draft",
     risk: "low",
     repo: "o/r",

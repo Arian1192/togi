@@ -68,6 +68,7 @@ test("GET /v1/tasks devuelve número, título, estado, riesgo y versión", async
     {
       number: 2,
       title: "Filtro",
+      titleErased: false,
       state: "planning",
       risk: "low",
       repo: "o/r",

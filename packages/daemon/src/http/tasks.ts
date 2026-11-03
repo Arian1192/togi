@@ -66,7 +66,7 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
   const taskBody = async (h: Handle, { titleRef, ...rest }: Snapshot) =>
     JSON.stringify({
       number: rest.number,
-      title: await titleOf(h.readText, titleRef),
+      ...(await titleOf(h.readText, titleRef)),
       state: rest.state,
       risk: rest.risk,
       repo: rest.repo,
