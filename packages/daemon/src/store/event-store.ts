@@ -7,14 +7,64 @@ import {
   type NewEvent,
   type StoredEvent,
   VersionConflictError,
+  verifyChain,
 } from "@togi/core";
 import type Database from "better-sqlite3";
+
+const BATCH_SIZE = 500;
+
+interface Row {
+  seq: number;
+  stream: string;
+  stream_version: number;
+  type: string;
+  schema_version: number;
+  actor: string;
+  at: string;
+  correlation_id: string | null;
+  payload: string;
+  prev_hash: string;
+  hash: string;
+}
+
+/** correlation_id NULL se vuelve campo ausente: hashEvent rechaza null (PR 4). */
+const toEvent = (row: Row): StoredEvent => ({
+  seq: row.seq,
+  stream: row.stream,
+  streamVersion: row.stream_version,
+  type: row.type,
+  schemaVersion: row.schema_version,
+  actor: JSON.parse(row.actor),
+  at: row.at,
+  ...(row.correlation_id === null ? {} : { correlationId: row.correlation_id }),
+  payload: JSON.parse(row.payload),
+  prevHash: row.prev_hash,
+  hash: row.hash,
+});
+
+/** Lee por lotes, sin cursor abierto: el consumidor puede escribir mientras itera. */
+async function* paged(
+  statement: Database.Statement,
+  args: unknown[],
+  from: number,
+  key: "seq" | "stream_version",
+): AsyncGenerator<StoredEvent> {
+  for (let next = from; ; ) {
+    const rows = statement.all(...args, next, BATCH_SIZE) as Row[];
+    yield* rows.map(toEvent);
+    const last = rows.at(-1);
+    if (last === undefined || rows.length < BATCH_SIZE) return;
+    next = last[key] + 1;
+  }
+}
 
 export class SqliteEventStore implements EventStore {
   readonly #db: Database.Database;
   readonly #version: Database.Statement;
   readonly #last: Database.Statement;
   readonly #insert: Database.Statement;
+  readonly #allFrom: Database.Statement;
+  readonly #streamFrom: Database.Statement;
 
   constructor(db: Database.Database) {
     this.#db = db;
@@ -22,6 +72,10 @@ export class SqliteEventStore implements EventStore {
     this.#last = db.prepare("SELECT seq, hash FROM events ORDER BY seq DESC LIMIT 1");
     this.#insert = db.prepare(
       "INSERT INTO events (seq, stream, stream_version, type, schema_version, actor, at, correlation_id, payload, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    );
+    this.#allFrom = db.prepare("SELECT * FROM events WHERE seq >= ? ORDER BY seq LIMIT ?");
+    this.#streamFrom = db.prepare(
+      "SELECT * FROM events WHERE stream = ? AND stream_version >= ? ORDER BY stream_version LIMIT ?",
     );
   }
 
@@ -82,15 +136,15 @@ export class SqliteEventStore implements EventStore {
     return this.appendWithin(stream, expectedVersion, events, () => {});
   }
 
-  readStream(_stream: string, _fromVersion?: number): AsyncIterable<StoredEvent> {
-    throw new Error("not implemented: llega en 5b-2");
+  readStream(stream: string, fromVersion = 1): AsyncIterable<StoredEvent> {
+    return paged(this.#streamFrom, [stream], fromVersion, "stream_version");
   }
 
-  readAll(_fromSeq?: number): AsyncIterable<StoredEvent> {
-    throw new Error("not implemented: llega en 5b-2");
+  readAll(fromSeq = 1): AsyncIterable<StoredEvent> {
+    return paged(this.#allFrom, [], fromSeq, "seq");
   }
 
   verify(): Promise<ChainVerdict> {
-    throw new Error("not implemented: llega en 5b-2");
+    return verifyChain(this.readAll());
   }
 }
