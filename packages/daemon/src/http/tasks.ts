@@ -135,7 +135,12 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
         if (key === undefined || actor.kind !== "human") {
           return respond(await handle(actor, command, { correlationId }), 201);
         }
-        const requestHash = hashBody(json);
+        let requestHash: string;
+        try {
+          requestHash = hashBody(json);
+        } catch {
+          return problem(400, "invalid_json", "el cuerpo no es JSON canonicalizable");
+        }
         const replay = (saved: SavedResponse | undefined) => {
           if (saved === undefined) return undefined;
           if (saved.request_hash !== requestHash) {
@@ -146,17 +151,33 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
         };
         const previous = replay(keys.find(actor.userId, key));
         if (previous !== undefined) return previous;
-        const result = await handle(actor, command, {
-          correlationId,
-          // Misma transacción que la tarea: la clave y su respuesta nacen o se revierten juntas.
-          onCommit: (stored, tx) => {
-            const stream = stored[0]?.stream ?? "";
-            const row = select(tx, Number(stream.slice("task:".length)));
-            const saved = { request_hash: requestHash, status: 201, response_body: taskBody(row) };
-            keys.save(tx, actor.userId, key, saved);
-          },
-        });
-        return respond(result, 201);
+        try {
+          const result = await handle(actor, command, {
+            correlationId,
+            // Misma transacción que la tarea: la clave y su respuesta nacen o se revierten juntas.
+            onCommit: (stored, tx) => {
+              const stream = stored[0]?.stream ?? "";
+              const row = select(tx, Number(stream.slice("task:".length)));
+              const saved = {
+                request_hash: requestHash,
+                status: 201,
+                response_body: taskBody(row),
+              };
+              keys.save(tx, actor.userId, key, saved);
+            },
+          });
+          return respond(result, 201);
+        } catch (error) {
+          // Una carrera con la misma clave rompe la PK. Solo si la clave existe es eso; si no, es
+          // otra restricción y el error original sigue su camino.
+          const code = (error as { code?: string }).code;
+          const raced =
+            code === "SQLITE_CONSTRAINT_PRIMARYKEY"
+              ? replay(keys.find(actor.userId, key))
+              : undefined;
+          if (raced !== undefined) return raced;
+          throw error;
+        }
       }),
     )
     .patch(
