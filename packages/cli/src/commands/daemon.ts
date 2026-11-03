@@ -6,11 +6,11 @@ const status: Command = {
   example: "togi daemon status",
   async run({ home, json, out }) {
     const client = createClient(home);
-    const health = await client.checked<{ daemon: string; schema: number }>(
+    const health = await client.checked<{ daemon: string; schema: number; pid: number }>(
       await client.api.v1.health.$get(),
     );
     if (json) return `${JSON.stringify(health)}\n`;
-    return `${out.mark("ok", `Daemon en marcha · versión ${health.daemon} · ${client.socket}`)}\n`;
+    return `${out.mark("ok", `Daemon en marcha · versión ${health.daemon} · pid ${health.pid} · ${client.socket}`)}\n`;
   },
 };
 

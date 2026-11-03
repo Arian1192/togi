@@ -37,9 +37,14 @@ test("con daemon, status muestra la versión y sale con 0", async () => {
   );
 });
 
+test("status muestra el pid que devuelve /v1/health", async () => {
+  const r = await runCli(["daemon", "status"], home);
+  assert.match(r.stdout, new RegExp(`pid ${process.pid} `));
+});
+
 test("--json: stdout es JSON de la API y sin daemon el error va a stderr", async () => {
   const ok = await runCli(["daemon", "status", "--json"], home);
-  assert.deepEqual(Object.keys(JSON.parse(ok.stdout)).sort(), ["daemon", "schema"]);
+  assert.deepEqual(Object.keys(JSON.parse(ok.stdout)).sort(), ["daemon", "pid", "schema"]);
   const fail = await runCli(["daemon", "status", "--json"], join(root, "vacio"));
   assert.equal(fail.stdout, "");
   assert.equal(fail.code, 6);
@@ -69,8 +74,8 @@ test("--help y daemon --help traen un ejemplo", async () => {
 
 test("un comando mal escrito sugiere el parecido y sale con 2", async () => {
   for (const [args, hint] of [
-    [["daemn", "status"], "daemon"],
-    [["daemon", "statsu"], "daemon status"],
+    [["daemn", "status"], "togi daemon"],
+    [["daemon", "statsu"], "togi daemon status"],
   ] as const) {
     const r = await runCli([...args], home);
     assert.equal(r.code, 2);

@@ -36,7 +36,9 @@ export function createApp(
   return new Hono<AppEnv>()
     .use("*", requestId)
     .use("*", authenticated(db))
-    .get("/v1/health", (c) => c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION }))
+    .get("/v1/health", (c) =>
+      c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION, pid: process.pid }),
+    )
     .route("/", taskRoutes(db, handle))
     .route("/", queryRoutes(db, reads))
     .route("/", eventRoutes(reads))
