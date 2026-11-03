@@ -2,13 +2,9 @@
   "permissions": {
     "deny": [
       "Edit(.github/workflows/**)",
-      "Write(.github/workflows/**)",
       "Edit(AGENTS.md)",
-      "Write(AGENTS.md)",
       "Edit(CLAUDE.md)",
-      "Write(CLAUDE.md)",
-      "Edit(.claude/**)",
-      "Write(.claude/**)"
+      "Edit(.claude/**)"
     ]
   }
 }
