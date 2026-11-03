@@ -3,6 +3,7 @@ import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { AppEnv } from "./app.ts";
+import { hashBody, idempotencyKeys, SAFE_ID, type SavedResponse } from "./idempotency.ts";
 import { domainStatus, problem } from "./problem.ts";
 
 type Handle = ReturnType<typeof createHandler>;
@@ -29,9 +30,24 @@ interface TaskRow {
  * siempre del token, nunca del cuerpo. Sin `handle` las rutas existen pero responden 503.
  */
 export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
-  const select = db.prepare(
-    "SELECT number, title, state, risk, stream_version FROM tasks WHERE number = ?",
-  );
+  const select = (conn: Database.Database, number: number) =>
+    conn
+      .prepare("SELECT number, title, state, risk, stream_version FROM tasks WHERE number = ?")
+      .get(number) as TaskRow;
+  const keys = idempotencyKeys(db);
+  const taskBody = (row: TaskRow) =>
+    JSON.stringify({
+      number: row.number,
+      title: row.title,
+      state: row.state,
+      risk: row.risk,
+      version: row.stream_version,
+    });
+  const taskResponse = (status: number, json: string, version: number) =>
+    new Response(json, {
+      status,
+      headers: { "content-type": "application/json", etag: `"${version}"` },
+    });
 
   /** If-Match: la versión vista, con o sin comillas. Ausente → 428; `*` o ilegible → 400. */
   const ifMatch = (c: Context<AppEnv>): number | Response => {
@@ -44,11 +60,19 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
     return Number(version);
   };
 
-  const body = async <T>(c: Context<AppEnv>, schema: Parser<T>): Promise<T | Response> => {
+  const readJson = async (c: Context<AppEnv>): Promise<unknown> => {
     const json: unknown = await c.req.json().catch(() => undefined);
-    if (json === undefined) return problem(400, "invalid_json", "el cuerpo no es JSON");
+    return json === undefined ? problem(400, "invalid_json", "el cuerpo no es JSON") : json;
+  };
+
+  const validate = <T>(json: unknown, schema: Parser<T>): T | Response => {
     const parsed = schema.safeParse(json);
     return parsed.success ? parsed.data : problem(400, "validation_error", parsed.error.message);
+  };
+
+  const body = async <T>(c: Context<AppEnv>, schema: Parser<T>): Promise<T | Response> => {
+    const json = await readJson(c);
+    return json instanceof Response ? json : validate(json, schema);
   };
 
   const respond = (result: Result, status: 200 | 201): Response => {
@@ -60,20 +84,8 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
     if ("kind" in result) {
       return problem(domainStatus(result.code), result.code, result.message);
     }
-    const row = select.get((result as { number: number }).number) as TaskRow;
-    return new Response(
-      JSON.stringify({
-        number: row.number,
-        title: row.title,
-        state: row.state,
-        risk: row.risk,
-        version: row.stream_version,
-      }),
-      {
-        status,
-        headers: { "content-type": "application/json", etag: `"${row.stream_version}"` },
-      },
-    );
+    const row = select(db, (result as { number: number }).number);
+    return taskResponse(status, taskBody(row), row.stream_version);
   };
 
   /** El comando perdió la carrera contra otra escritura: 409, no 500. */
@@ -109,13 +121,41 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
   return new Hono<AppEnv>()
     .post("/v1/tasks", (c) =>
       guard(async (handle) => {
-        const input = await body(c, CreateTask);
+        const key = c.req.header("idempotency-key");
+        if (key !== undefined && !SAFE_ID.test(key)) {
+          return problem(400, "invalid_idempotency_key", "Idempotency-Key no tiene formato seguro");
+        }
+        const json = await readJson(c);
+        if (json instanceof Response) return json;
+        const input = validate(json, CreateTask);
         if (input instanceof Response) return input;
-        const result = await handle(
-          c.get("actor"),
-          { type: "create", ...input, source: { kind: "cli" } },
-          { correlationId: c.get("requestId") },
-        );
+        const command = { type: "create", ...input, source: { kind: "cli" } } as const;
+        const correlationId = c.get("requestId");
+        const actor = c.get("actor");
+        if (key === undefined || actor.kind !== "human") {
+          return respond(await handle(actor, command, { correlationId }), 201);
+        }
+        const requestHash = hashBody(json);
+        const replay = (saved: SavedResponse | undefined) => {
+          if (saved === undefined) return undefined;
+          if (saved.request_hash !== requestHash) {
+            return problem(422, "idempotency_key_reused", "la clave ya se usó con otro cuerpo");
+          }
+          const { version } = JSON.parse(saved.response_body) as { version: number };
+          return taskResponse(saved.status, saved.response_body, version);
+        };
+        const previous = replay(keys.find(actor.userId, key));
+        if (previous !== undefined) return previous;
+        const result = await handle(actor, command, {
+          correlationId,
+          // Misma transacción que la tarea: la clave y su respuesta nacen o se revierten juntas.
+          onCommit: (stored, tx) => {
+            const stream = stored[0]?.stream ?? "";
+            const row = select(tx, Number(stream.slice("task:".length)));
+            const saved = { request_hash: requestHash, status: 201, response_body: taskBody(row) };
+            keys.save(tx, actor.userId, key, saved);
+          },
+        });
         return respond(result, 201);
       }),
     )
