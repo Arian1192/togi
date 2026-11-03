@@ -62,13 +62,27 @@ export const CreateTask = z.object({
   description: z.string().max(20_000).default(""),
   acceptanceCriteria: z.string().max(20_000).default(""),   // obligatorio en submit, no aquí
   risk: z.enum(["low", "medium", "high"]),
-  repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/),
-  baseBranch: z.string().default("dev"),
+  // owner/repo: ninguna parte empieza por "-" ni por ".", así que no puede ser una opción, "." ni ".."
+  repo: z.string().regex(/^\w[\w.-]*\/\w[\w.-]*$/),
+  // acabará como argumento de git: ver la regla de abajo
+  baseBranch: baseBranch.default("dev"),
 });
 export const RejectTask = z.object({
   reason: z.object({ category: ReasonCategory, text: z.string().min(1).max(5_000) }),
 });
+
+const baseBranch = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[A-Za-z0-9._/-]+$/)
+  .refine((b) => !b.startsWith("-") && !b.startsWith("/") && !b.endsWith("/") && !b.includes(".."));
 ```
+
+`repo` y `baseBranch` llegan a la API desde la entrada del usuario y acabarán como argumentos de git y de la CLI de GitHub en la rebanada 3, así que se validan contra la inyección de opciones:
+
+- **`repo`:** `owner/repo`, con letras, números, `.`, `_` y `-`, y ninguna de las dos partes empieza por `-` ni por `.` (con lo que tampoco puede ser `.` ni `..`).
+- **`baseBranch`:** solo letras, números, `.`, `_`, `/` y `-`; no puede estar vacío, ni empezar por `-` o `/`, ni terminar en `/`, ni contener `..`; máximo 100 caracteres.
 
 ## CLI de la rebanada 1
 
