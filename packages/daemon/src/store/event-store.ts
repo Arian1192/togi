@@ -141,6 +141,11 @@ export class SqliteEventStore implements EventStore {
     return this.appendWithin(stream, expectedVersion, events, () => {});
   }
 
+  /** Lectura síncrona de un lote, para usarla dentro de una transacción. Interna del daemon. */
+  readBatchSync(fromSeq: number, limit: number): StoredEvent[] {
+    return (this.#allFrom.all(fromSeq, limit) as Row[]).map(toEvent);
+  }
+
   readStream(stream: string, fromVersion = 1): AsyncIterable<StoredEvent> {
     return paged(this.#streamFrom, [stream], fromVersion, "stream_version");
   }
