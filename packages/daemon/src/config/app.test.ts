@@ -15,6 +15,8 @@ test("paths cuelga todo de la raíz y del nombre de la app", () => {
   const p = paths("/r");
   assert.equal(p.database, `/r/${APP.name}.db`);
   assert.equal(p.socket, `/r/run/${APP.name}.sock`);
+  assert.equal(p.pid, `/r/run/${APP.name}.pid`);
+  assert.equal(p.log, "/r/run/daemon.log");
   assert.equal(p.credentials, "/r/credentials");
   assert.equal(p.blobs, "/r/blobs");
 });

@@ -7,6 +7,10 @@ export interface MessageParams {
   field?: string;
   command?: string;
   suggestion?: string;
+  pid?: number;
+  socket?: string;
+  /** Cola del log del daemon, ya sin caracteres de control. */
+  detail?: string;
 }
 
 export interface NextStep {
@@ -78,6 +82,25 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: "El log o un blob no supera la verificación.",
     warning: "Puede indicar una manipulación.",
     next: { label: "Verifícalo con", command: "togi admin verify-log" },
+  }),
+  daemon_started: (p) => ({ text: `Daemon arrancado · pid ${p.pid} · ${p.socket}` }),
+  daemon_already_running: (p) => ({ text: `El daemon ya está en marcha · pid ${p.pid}` }),
+  daemon_stopped: (p) => ({ text: `Daemon parado · pid ${p.pid}` }),
+  daemon_not_running: () => ({ text: "No hay ningún daemon en marcha." }),
+  daemon_start_failed: (p) => ({
+    text: `El daemon murió al arrancar.${p.detail ? `\n${p.detail}` : ""}`,
+    next: { label: "Mira el log en ~/.togi/run/daemon.log" },
+  }),
+  daemon_start_timeout: () => ({
+    text: "El daemon no respondió en 10 s y se ha parado.",
+    next: { label: "Mira el log en ~/.togi/run/daemon.log" },
+  }),
+  daemon_pid_mismatch: (p) => ({
+    text: `El daemon que responde (pid ${p.pid}) no es el del fichero de pid, así que no se le envía ninguna señal.`,
+    next: { label: "Revisa ~/.togi/run/togi.pid" },
+  }),
+  daemon_stop_timeout: (p) => ({
+    text: `El daemon (pid ${p.pid}) no terminó en 10 s.`,
   }),
   unknown_command: (p) => ({
     text: `Comando desconocido: ${p.command ?? ""}`,

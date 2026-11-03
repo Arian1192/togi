@@ -21,6 +21,8 @@ export function paths(root: string) {
     database: join(root, `${APP.name}.db`),
     runDir,
     socket: join(runDir, `${APP.name}.sock`),
+    pid: join(runDir, `${APP.name}.pid`),
+    log: join(runDir, "daemon.log"),
     credentials: join(root, "credentials"),
     blobs: join(root, "blobs"),
   };
