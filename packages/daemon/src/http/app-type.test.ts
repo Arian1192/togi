@@ -12,6 +12,7 @@ test("hc<AppType> tipa todas las rutas y rechaza las inexistentes", () => {
     void client.v1.tasks[":n"].$patch({ param: { n: "1" } });
     void client.v1.tasks[":n"].submit.$post({ param: { n: "1" } });
     void client.v1.tasks[":n"].reject.$post({ param: { n: "1" } });
+    void client.v1.tasks[":n"].events.$get({ param: { n: "1" } });
     // @ts-expect-error la ruta no existe
     void client.v1.nada.$get();
     // @ts-expect-error el método no existe en esa ruta

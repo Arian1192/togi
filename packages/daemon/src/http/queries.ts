@@ -1,5 +1,7 @@
 import type { BlobRef, BlobStore } from "@togi/core";
 import {
+  type DomainEvent,
+  EventParseError,
   evolve,
   NO_TASK,
   TASK_STATES,
@@ -52,6 +54,22 @@ export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) 
     return { text: new TextDecoder().decode(await blobs.get(ref)), erased: false };
   };
 
+  // Todos los eventos de la tarea validados, o ninguno: un evento corrupto es un error de
+  // integridad con su seq, nunca una lista parcial. Un stream vacío es una tarea inexistente.
+  const loadEvents = async (store: SqliteEventStore, n: string) => {
+    const events: DomainEvent[] = [];
+    let version = 0;
+    for await (const stored of store.readStream(`task:${n}`)) {
+      events.push(toDomainEvent(stored));
+      version = stored.streamVersion;
+    }
+    return { events, version };
+  };
+  const corrupt = (e: unknown) =>
+    e instanceof EventParseError
+      ? problem(500, "integrity_error", "un evento del log no es válido", {}, { seq: e.seq })
+      : undefined;
+
   return new Hono<AppEnv>()
     .get("/v1/tasks", (c) => {
       const state = c.req.query("state");
@@ -77,11 +95,17 @@ export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) 
       const param = c.req.param("n");
       if (!NUMBER.test(param)) return problem(404, "task_not_found", "tarea inexistente");
       let view: TaskView = NO_TASK;
-      let version = 0;
-      for await (const stored of reads.store.readStream(`task:${param}`)) {
-        const event = toDomainEvent(stored);
-        if (event.type !== "data.erased") view = evolve(view, event);
-        version = stored.streamVersion;
+      let version: number;
+      try {
+        const loaded = await loadEvents(reads.store, param);
+        version = loaded.version;
+        for (const event of loaded.events) {
+          if (event.type !== "data.erased") view = evolve(view, event);
+        }
+      } catch (e) {
+        const res = corrupt(e);
+        if (res === undefined) throw e;
+        return res;
       }
       if (!view.exists) return problem(404, "task_not_found", "tarea inexistente");
       try {
@@ -100,6 +124,20 @@ export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) 
         });
       } catch {
         return problem(500, "integrity_error", "no se pudo leer un texto de la tarea");
+      }
+    })
+    .get("/v1/tasks/:n/events", async (c) => {
+      if (reads === undefined) return problem(503, "not_configured", "consultas no disponibles");
+      const param = c.req.param("n");
+      if (!NUMBER.test(param)) return problem(404, "task_not_found", "tarea inexistente");
+      try {
+        const { events } = await loadEvents(reads.store, param);
+        if (events.length === 0) return problem(404, "task_not_found", "tarea inexistente");
+        return c.json({ events });
+      } catch (e) {
+        const res = corrupt(e);
+        if (res === undefined) throw e;
+        return res;
       }
     });
 }
