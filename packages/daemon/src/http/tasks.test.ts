@@ -55,6 +55,9 @@ test("POST /v1/tasks crea la tarea en draft: 201 con ETag", async () => {
     title: "Filtro",
     state: "draft",
     risk: "low",
+    repo: "o/r",
+    baseBranch: "dev",
+    hasCriteria: true,
     version: 1,
   });
 });

@@ -31,6 +31,9 @@ interface TaskRow {
   title: string;
   state: string;
   risk: string;
+  repo: string;
+  base_branch: string;
+  has_criteria: number;
   stream_version: number;
 }
 
@@ -41,7 +44,9 @@ interface TaskRow {
 export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
   const select = (conn: Database.Database, number: number) =>
     conn
-      .prepare("SELECT number, title, state, risk, stream_version FROM tasks WHERE number = ?")
+      .prepare(
+        "SELECT number, title, state, risk, repo, base_branch, has_criteria, stream_version FROM tasks WHERE number = ?",
+      )
       .get(number) as TaskRow;
   const keys = idempotencyKeys(db);
   const titleOf = titleReader(db);
@@ -51,8 +56,12 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
     titleRef: JSON.parse(row.title) as BlobRef,
     state: row.state,
     risk: row.risk,
+    repo: row.repo,
+    baseBranch: row.base_branch,
+    hasCriteria: row.has_criteria === 1,
     version: row.stream_version,
   });
+  // Los snapshots guardados antes no tienen los campos nuevos: se repiten tal como se guardaron.
   type Snapshot = ReturnType<typeof snapshot>;
   const taskBody = async (h: Handle, { titleRef, ...rest }: Snapshot) =>
     JSON.stringify({
@@ -60,6 +69,9 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
       title: await titleOf(h.readText, titleRef),
       state: rest.state,
       risk: rest.risk,
+      repo: rest.repo,
+      baseBranch: rest.baseBranch,
+      hasCriteria: rest.hasCriteria,
       version: rest.version,
     });
   /** Un título que no se puede leer (y no está borrado) es un error de integridad. */

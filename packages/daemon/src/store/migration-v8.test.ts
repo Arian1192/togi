@@ -7,7 +7,9 @@ import type { NewEvent } from "@togi/core";
 import Database from "better-sqlite3";
 import { hashToken } from "../auth/tokens.ts";
 import { FileBlobStore } from "../blobs/file-blob-store.ts";
+import { createHandler } from "../commands/handle-command.ts";
 import { paths } from "../config/app.ts";
+import { createApp } from "../http/app.ts";
 import { DataKeyring } from "../keys/data-keys.ts";
 import { loadOrCreateMasterKey } from "../keys/master-key.ts";
 import { selectKeychain } from "../keys/select-keychain.ts";
@@ -79,6 +81,37 @@ test("una base en versión 7 con eventos migra y la proyección queda llena con 
     { number: 2, repo: "o/r", base_branch: "dev", has_criteria: 1 },
     { number: 3, repo: "o/r", base_branch: "dev", has_criteria: 0 },
   ]);
+  db.close();
+});
+
+test("una base en versión 7 con eventos migra y la lista de la API queda llena con hasCriteria correcto", async () => {
+  const path = await seedV7();
+  const db = openEventDatabase(path);
+  assert.equal(db.pragma("user_version", { simple: true }), SCHEMA_VERSION);
+  const keychain = selectKeychain({ home, env: { TOGI_KEYCHAIN: "file" } });
+  const blobs = new FileBlobStore(
+    paths(home).blobs,
+    new DataKeyring(db, await loadOrCreateMasterKey(keychain)),
+  );
+  const app = createApp(db, createHandler({ db, store: new SqliteEventStore(db), blobs }));
+  const res = await app.request("/v1/tasks", { headers: { authorization: "Bearer tok" } });
+  const { tasks } = (await res.json()) as {
+    tasks: {
+      number: number;
+      title: string;
+      repo: string;
+      baseBranch: string;
+      hasCriteria: boolean;
+    }[];
+  };
+  assert.deepEqual(
+    tasks.map((t) => [t.number, t.title, t.repo, t.baseBranch, t.hasCriteria]),
+    [
+      [1, "Tarea 1", "o/r", "dev", false],
+      [2, "Tarea 2", "o/r", "dev", true],
+      [3, "Tarea 3", "o/r", "dev", false],
+    ],
+  );
   db.close();
 });
 
