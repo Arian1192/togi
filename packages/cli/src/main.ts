@@ -64,14 +64,17 @@ async function main(): Promise<number> {
     const verbs = COMMANDS[resource];
     if (verbs === undefined) {
       const suggestion = closest(resource, Object.keys(COMMANDS));
-      throw usageError("unknown_command", { command: resource, ...(suggestion && { suggestion }) });
+      throw usageError("unknown_command", {
+        command: `togi ${positionals.join(" ")}`,
+        ...(suggestion && { suggestion: `togi ${suggestion}` }),
+      });
     }
     const command = verb === undefined ? undefined : verbs[verb];
     if (verb === undefined || command === undefined) {
       const suggestion = verb && closest(verb, Object.keys(verbs));
       throw usageError("unknown_command", {
-        command: `${resource} ${verb ?? ""}`.trim(),
-        ...(suggestion && { suggestion: `${resource} ${suggestion}` }),
+        command: `togi ${positionals.join(" ")}`,
+        ...(suggestion && { suggestion: `togi ${resource} ${suggestion}` }),
       });
     }
     const out = createOutput({ env, isTTY: process.stdout.isTTY === true, noColorFlag });
