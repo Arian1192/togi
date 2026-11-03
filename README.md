@@ -2,7 +2,7 @@
 
 togi es una software factory local: agentes de código trabajan en un flujo con gates automáticos y aprobación humana en los puntos críticos. Su nombre viene del *togi* (研ぎ), el pulido de espadas japonés: no forja el código, lo afina y lo verifica por etapas hasta que está listo.
 
-> **Estado:** rebanada 1 en curso. Ya funcionan el daemon y los comandos para crear, consultar y enviar tareas. Todavía no hay agentes: llegan en la rebanada 2.
+> **Estado:** rebanada 1 en curso. Ya funcionan el daemon y todos los comandos de tareas: crear, consultar, editar, enviar y rechazar. Todavía no hay agentes: llegan en la rebanada 2.
 
 ## Cómo funciona
 
@@ -51,6 +51,26 @@ togi daemon stop
 
 Sin `TOGI_HOME` ni `TOGI_KEYCHAIN`, togi usa `~/.togi` y el Llavero de macOS.
 
+## El Llavero y tus datos
+
+togi cifra con AES-256-GCM los textos de cada tarea (título, descripción y criterio de aceptación) y los guarda fuera del log. Las claves funcionan en dos niveles:
+
+- **Una clave de datos por tarea y tipo de texto**, guardada en la base de datos, pero cifrada a su vez con la clave maestra.
+- **Una clave maestra de 32 bytes**, guardada en el Llavero de macOS, nunca en `~/.togi`. Quien copie esa carpeta se lleva los datos cifrados, pero no la clave para abrirlos.
+
+Cómo se gestiona la clave maestra:
+
+- **Se crea en el primer `togi daemon start`.** Cada `TOGI_HOME` tiene la suya: la cuenta del Llavero incluye un identificador de la ruta.
+- **Nunca se sobrescribe.** Si togi no puede leerla porque el Llavero está bloqueado o falla, el daemon no arranca. Nunca crea una clave nueva en su lugar, porque eso dejaría ilegibles todos los textos.
+- **No pasa por los argumentos de ningún proceso**, donde otro programa podría verla: se entrega al comando `security` por su entrada estándar.
+- **Puedes verla o borrarla** con la app Acceso a Llaveros, buscando `togi`.
+
+`TOGI_KEYCHAIN=file` guarda la clave maestra en un fichero dentro de `TOGI_HOME`, junto a los datos. Solo sirve para pruebas: sin el Llavero, la clave no está protegida.
+
+**Si pierdes la clave maestra, pierdes los textos de todas las tareas.** El log sigue íntegro y verificable, pero los títulos, descripciones y criterios ya no se pueden descifrar. Si haces copias de seguridad de `~/.togi`, guarda también la del Llavero.
+
+Borrar un texto es destruir su clave de datos (`erase`). Tiene un límite: una copia de seguridad hecha antes del borrado, por ejemplo con Time Machine, conserva la clave de datos cifrada, y mientras exista la clave maestra se podría recuperar. Está documentado en el [ADR-004](docs/adr/004-modelo-de-datos.md).
+
 ## Comandos
 
 | Comando | Qué hace |
@@ -60,10 +80,14 @@ Sin `TOGI_HOME` ni `TOGI_KEYCHAIN`, togi usa `~/.togi` y el Llavero de macOS.
 | `togi task show <n>` | Muestra el detalle de una tarea |
 | `togi status [--state <estado>] [--all]` | Lista las tareas, primero las que esperan una decisión tuya |
 | `togi task submit <n>` | Envía la tarea a planificación |
+| `togi task reject <n> --category <categoría> --reason <texto> [--yes]` | Rechaza una tarea; pide confirmación |
+| `togi task edit <n> [--title …] [--description …] [--criteria …]` | Edita una tarea en `draft`; sin flags, abre `$EDITOR` |
 
 Todos aceptan `--json` y `--help`. Los códigos de salida y el formato de los mensajes están en [`docs/cli-estilo.md`](docs/cli-estilo.md).
 
-Pendientes en la rebanada 1: `togi task reject`, `togi task edit`, `togi watch` y `togi admin verify-log`.
+Pendientes en la rebanada 1: `togi watch` y `togi admin verify-log`.
+
+`togi task edit` sin flags abre `$VISUAL` o `$EDITOR` con una plantilla. Las líneas que empiezan por `#togi` son comentarios y cabeceras de sección; el resto, incluido el Markdown, es texto. Guardar el fichero vacío cancela. El editor se lanza sin shell, así que una ruta con espacios no funciona. El texto se edita en un fichero temporal privado que se borra al terminar, pero algunos editores guardan copias propias fuera de esa carpeta.
 
 ## Desarrollo
 
