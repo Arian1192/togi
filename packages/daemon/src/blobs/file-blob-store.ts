@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { BlobRef, BlobStore, DataClass, TaskId } from "@togi/core";
 import { open, seal } from "../crypto/aead.ts";
@@ -56,8 +56,16 @@ export class FileBlobStore implements BlobStore {
     return plain;
   }
 
-  async shred(_keyId: string): Promise<void> {
-    throw new Error("no implementado hasta 6c-2");
+  /**
+   * Destruye la clave y limpia el directorio. Idempotente: tras `erase`, que ya borró la clave en
+   * su transacción, solo hace la limpieza. Si falla después de borrar la clave, el dato ya es
+   * ilegible; basta repetir `shred`.
+   */
+  async shred(keyId: string): Promise<void> {
+    if (!KEY_ID.test(keyId)) throw new Error("identificador de clave inválido");
+    this.#keys.destroy(keyId);
+    this.#keys.checkpoint();
+    await rm(join(this.#root, keyId), { recursive: true, force: true });
   }
 }
 

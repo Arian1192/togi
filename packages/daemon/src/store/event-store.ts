@@ -79,6 +79,11 @@ export class SqliteEventStore implements EventStore {
     );
   }
 
+  /** Versión actual del stream (0 si no existe). Síncrona, para usarla con `appendWithin`. */
+  currentVersion(stream: string): number {
+    return (this.#version.get(stream) as { v: number | null }).v ?? 0;
+  }
+
   /**
    * Como `append`, pero ejecuta `within` en la misma transacción: si lanza, se revierte todo, el
    * evento incluido. Es síncrono porque better-sqlite3 no admite esperas dentro de una transacción.
