@@ -58,8 +58,11 @@ async function* paged(
   }
 }
 
+export type EventListener = (event: StoredEvent) => void;
+
 export class SqliteEventStore implements EventStore {
   readonly #db: Database.Database;
+  readonly #listeners = new Set<EventListener>();
   readonly #version: Database.Statement;
   readonly #last: Database.Statement;
   readonly #insert: Database.Statement;
@@ -85,6 +88,33 @@ export class SqliteEventStore implements EventStore {
   }
 
   /**
+   * Avisa de cada evento nuevo, solo después de que su transacción se confirme. Un listener que
+   * lanza se registra y no afecta a quien escribe ni al resto. Devuelve la función para darse de baja.
+   */
+  subscribe(listener: EventListener): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  }
+
+  subscriberCount(): number {
+    return this.#listeners.size;
+  }
+
+  #notify(events: StoredEvent[]): void {
+    for (const event of events) {
+      for (const listener of [...this.#listeners]) {
+        try {
+          listener(event);
+        } catch (error) {
+          console.error(`listener de eventos falló en seq ${event.seq}:`, error);
+        }
+      }
+    }
+  }
+
+  /**
    * Como `append`, pero ejecuta `within` en la misma transacción: si lanza, se revierte todo, el
    * evento incluido. Es síncrono porque better-sqlite3 no admite esperas dentro de una transacción.
    */
@@ -95,7 +125,11 @@ export class SqliteEventStore implements EventStore {
     within: (stored: StoredEvent[], db: Database.Database) => void,
   ): StoredEvent[] {
     if (events.length === 0) throw new RangeError("append: la lista de eventos está vacía");
-    return this.#db
+    // Dentro de otra transacción no hay commit propio: avisar ahora sería avisar de algo revocable.
+    if (this.#db.inTransaction) {
+      throw new Error("appendWithin no puede ejecutarse dentro de otra transacción");
+    }
+    const stored = this.#db
       .transaction((): StoredEvent[] => {
         const actual = (this.#version.get(stream) as { v: number | null }).v ?? 0;
         if (actual !== expectedVersion) {
@@ -131,6 +165,8 @@ export class SqliteEventStore implements EventStore {
         return stored;
       })
       .immediate();
+    this.#notify(stored);
+    return stored;
   }
 
   async append(
