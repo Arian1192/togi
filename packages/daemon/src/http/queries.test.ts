@@ -62,8 +62,20 @@ test("GET /v1/tasks devuelve número, título, estado, riesgo y versión", async
   const body = (await (await send("GET", "/v1/tasks?state=planning")).json()) as {
     tasks: unknown[];
   };
+  const [task] = body.tasks as { updatedAt: string }[];
+  assert.match(task?.updatedAt ?? "", /^\d{4}-\d{2}-\d{2}T/);
   assert.deepEqual(body.tasks, [
-    { number: 2, title: "Filtro", state: "planning", risk: "low", version: 2 },
+    {
+      number: 2,
+      title: "Filtro",
+      state: "planning",
+      risk: "low",
+      repo: "o/r",
+      baseBranch: "dev",
+      hasCriteria: true,
+      updatedAt: task?.updatedAt,
+      version: 2,
+    },
   ]);
 });
 

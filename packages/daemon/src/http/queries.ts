@@ -31,7 +31,12 @@ interface TaskRow {
   title: string;
   state: string;
   risk: string;
+  repo: string;
+  base_branch: string;
+  has_criteria: number;
   stream_version: number;
+  created_at: string;
+  updated_at: string;
 }
 
 type Text = { text: string | null; erased: boolean };
@@ -56,7 +61,7 @@ export function queryRoutes(
   const list = (state: string | undefined, limit: number) =>
     db
       .prepare(
-        `SELECT number, title, state, risk, stream_version FROM tasks
+        `SELECT number, title, state, risk, repo, base_branch, has_criteria, stream_version, updated_at FROM tasks
          ${state === undefined ? "" : "WHERE state = ?"} ORDER BY number LIMIT ?`,
       )
       .all(...(state === undefined ? [limit] : [state, limit])) as TaskRow[];
@@ -104,6 +109,10 @@ export function queryRoutes(
             title: await titleOf(reader, JSON.parse(r.title) as BlobRef),
             state: r.state,
             risk: r.risk,
+            repo: r.repo,
+            baseBranch: r.base_branch,
+            hasCriteria: r.has_criteria === 1,
+            updatedAt: r.updated_at,
             version: r.stream_version,
           })),
         );
@@ -134,12 +143,22 @@ export function queryRoutes(
         const title = await titleOf(textReader() as TextReader, view.title);
         const description = await read(reads.blobs, view.description);
         const criteria = await read(reads.blobs, view.acceptanceCriteria);
+        const dates = db
+          .prepare("SELECT repo, base_branch, created_at, updated_at FROM tasks WHERE number = ?")
+          .get(Number(param)) as Pick<
+          TaskRow,
+          "repo" | "base_branch" | "created_at" | "updated_at"
+        >;
         c.header("etag", `"${version}"`);
         return c.json({
           number: Number(param),
           title,
           state: view.state,
           risk: view.risk,
+          repo: dates.repo,
+          baseBranch: dates.base_branch,
+          createdAt: dates.created_at,
+          updatedAt: dates.updated_at,
           version,
           description: description.text,
           acceptanceCriteria: criteria.text,

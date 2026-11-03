@@ -67,11 +67,17 @@ test("el detalle devuelve los textos descifrados", async () => {
   await send("POST", "/v1/tasks", NEW);
   const res = await detail();
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), {
+  const body = (await res.json()) as { createdAt: string; updatedAt: string };
+  assert.match(body.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.deepEqual(body, {
     number: 1,
     title: "Filtro",
     state: "draft",
     risk: "low",
+    repo: "o/r",
+    baseBranch: "dev",
+    createdAt: body.createdAt,
+    updatedAt: body.updatedAt,
     version: 1,
     description: "descripción secreta",
     acceptanceCriteria: "criterio secreto",
