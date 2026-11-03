@@ -1,5 +1,5 @@
-import type { BlobRef } from "./blob.ts";
-import type { Actor } from "./ids.ts";
+import type { BlobRef, DataClass } from "./blob.ts";
+import type { Actor, TaskId } from "./ids.ts";
 import type { Reason, RiskLevel, TaskSource } from "./task.ts";
 
 export interface EventEnvelope<T extends string, P> {
@@ -39,3 +39,10 @@ export type TaskEvent =
     >
   | E<"task.submitted", Record<string, never>>
   | E<"task.rejected", { reason: Reason }>;
+
+/** Stream `admin`: operaciones de administración que no pertenecen a una tarea. */
+export type AdminEvent = E<
+  "data.erased",
+  // Sin contenido: `reason` es un motivo corto sin datos personales.
+  { keyId: string; taskId: TaskId; dataClass: DataClass; reason: string }
+>;

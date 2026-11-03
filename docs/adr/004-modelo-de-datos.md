@@ -247,7 +247,23 @@ El log no guarda datos personales ni secretos: solo referencias a blobs cifrados
 - **Actores seudónimos.** El log solo guarda `usr_…`; nombre y email viven en la tabla `users`, que sí se puede borrar.
 - **Claves fuera del workspace.** La clave maestra va en el Llavero de macOS en local y en un KMS en el modo equipo. Nunca entra en el workspace del agente (ADR-003).
 - **Redacción de secretos antes de guardar.** Todo blob de clase `trajectory`, `gate_evidence` o `prompt` pasa por un detector de secretos con reglas tipo gitleaks; lo detectado se sustituye por `[REDACTED:<regla>]`.
-- **Borrado registrado.** `togi admin erase --task 12 --class untrusted_input` destruye la clave y añade un evento `data.erased` con los `keyId` y el motivo, sin el contenido.
+- **Borrado registrado.** `togi admin erase --task 12 --class untrusted_input` destruye la clave y añade un evento `data.erased` en el stream `admin` con `keyId`, `taskId`, `dataClass` y el motivo (texto corto, sin datos personales), sin el contenido. Si no existe clave para esa tarea y clase, no se escribe ningún evento.
+
+```sql
+CREATE TABLE data_keys (          -- migración a la versión 2; sin triggers append-only
+  key_id      TEXT    PRIMARY KEY,   -- key_<32 hex>
+  task_id     INTEGER NOT NULL,
+  data_class  TEXT    NOT NULL,
+  wrapped_key BLOB    NOT NULL,      -- clave de datos cifrada con la maestra (AES-256-GCM)
+  created_at  TEXT    NOT NULL,
+  UNIQUE (task_id, data_class)
+);
+```
+
+- **Atomicidad.** El evento `data.erased` y el borrado de la fila de `data_keys` van en la misma transacción: si uno falla, no se aplica ninguno. La limpieza posterior (checkpoint del WAL y borrado de `blobs/<keyId>`) no es atómica; si falla, la clave ya no existe y el dato es ilegible, y basta repetir `shred`, que es idempotente.
+- **Bytes en disco.** La conexión usa `PRAGMA secure_delete = ON` y, tras borrar, `wal_checkpoint(TRUNCATE)`, para que la clave envuelta no quede en el fichero de la base ni en el WAL. En SSD y sistemas de ficheros con copy-on-write (APFS) el sistema operativo no garantiza el borrado físico de cada página.
+- **Llavero de macOS.** El secreto se pasa a `security -i` por stdin, nunca en los argumentos (visibles con `ps`), y el comando se lanza con `execFile`, sin shell.
+- **Limitación.** El crypto-shredding no alcanza las copias de seguridad hechas antes del borrado (Time Machine u otras): mientras la clave maestra exista, esas copias contienen la clave envuelta y los blobs, y se pueden descifrar. La supresión completa exige además retirar esas copias o rotar la clave maestra.
 
 | Clase | Qué contiene | Retención propuesta |
 | --- | --- | --- |
