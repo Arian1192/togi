@@ -124,6 +124,26 @@ test("si el append falla no queda la clave y un reintento crea la tarea", async 
   assert.equal(count("idempotency_keys"), 1);
 });
 
+test("dos peticiones simultáneas con la misma clave dejan una sola tarea", async () => {
+  const [a, b] = await Promise.all([post(NEW, "k-1"), post(NEW, "k-1")]);
+  assert.equal(a.status, 201);
+  assert.equal(b.status, 201);
+  assert.deepEqual(await a.json(), await b.json());
+  assert.equal(count("tasks"), 1);
+  assert.equal(count("idempotency_keys"), 1);
+});
+
+test("otra restricción que falla no se confunde con la clave: se relanza el error original", async () => {
+  // La PK de tasks choca con el siguiente número reservado: mismo código SQLite que la clave.
+  db.prepare(
+    "INSERT INTO tasks VALUES (1, 'x', 'draft', 'low', 'o/r', 'main', 1, 'now', 'now')",
+  ).run();
+  const res = await post(NEW, "k-1");
+  assert.equal(res.status, 500);
+  assert.equal(count("idempotency_keys"), 0);
+  assert.equal(count("events"), 0);
+});
+
 test("una clave con formato inválido da 400", async () => {
   for (const key of ["con espacios", "a".repeat(129), "ñ"]) {
     const res = await post(NEW, key);
@@ -131,4 +151,11 @@ test("una clave con formato inválido da 400", async () => {
     assert.equal(((await res.json()) as { code: string }).code, "invalid_idempotency_key");
   }
   assert.equal(count("tasks"), 0);
+});
+
+test("sin Idempotency-Key cada POST crea su tarea", async () => {
+  await post(NEW);
+  await post(NEW);
+  assert.equal(count("tasks"), 2);
+  assert.equal(count("idempotency_keys"), 0);
 });
