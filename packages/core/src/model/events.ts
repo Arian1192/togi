@@ -46,3 +46,5 @@ export type AdminEvent = E<
   // Sin contenido: `reason` es un motivo corto sin datos personales.
   { keyId: string; taskId: TaskId; dataClass: DataClass; reason: string }
 >;
+
+export type DomainEvent = TaskEvent | AdminEvent;
