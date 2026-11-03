@@ -1,6 +1,7 @@
 import { resolveHome } from "@togi/daemon/config";
 import { parseCommandLine } from "./args.ts";
 import { COMMANDS, SHORTCUTS } from "./commands/index.ts";
+import { confirm } from "./confirm.ts";
 import { CliError, renderError, usageError } from "./errors.ts";
 import { createOutput } from "./output.ts";
 
@@ -24,6 +25,8 @@ async function main(): Promise<number> {
         out,
         values: parsed.values,
         args: parsed.args,
+        interactive: process.stdin.isTTY === true && process.stderr.isTTY === true,
+        confirm: (question) => confirm(question, { input: process.stdin, output: process.stderr }),
       }),
     );
     return 0;

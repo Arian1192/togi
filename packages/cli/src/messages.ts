@@ -124,6 +124,15 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Creada ${task(p)} «${p.title ?? ""}» (riesgo ${t("risk", p.risk)}, ${p.state ?? "draft"})`,
   }),
   task_submitted: (p) => ({ text: `Enviada ${task(p)} a ${p.state ?? "planning"}` }),
+  task_rejected: (p) => ({ text: `Rechazada ${task(p)}` }),
+  reject_confirm: (p) => ({
+    text: `¿Rechazar ${task(p)} «${p.title ?? ""}»? Es definitivo: la tarea queda cerrada. [s/N]`,
+  }),
+  reject_cancelled: () => ({ text: "Cancelado. No se ha cambiado nada." }),
+  confirmation_required: (p) => ({
+    text: `Rechazar ${task(p)} necesita confirmación y esto no es una terminal.`,
+    next: { label: "Repite con", command: "--yes" },
+  }),
   task_missing_criteria: (p) => ({
     text: "Falta el criterio de aceptación",
     next: { label: "Añádelo con", command: edit(p) },

@@ -14,6 +14,10 @@ export interface RunContext {
   values: Record<string, string | boolean | undefined>;
   /** Argumentos posicionales tras `recurso verbo`. */
   args: string[];
+  /** ¿Hay una terminal interactiva (stdin y stderr)? Solo entonces se puede preguntar. */
+  interactive: boolean;
+  /** Hace una pregunta de sí/no por stderr. */
+  confirm(question: string): Promise<boolean>;
 }
 
 export interface Command {

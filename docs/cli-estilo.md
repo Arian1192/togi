@@ -154,6 +154,8 @@ Filtro por fecha en envíos
 
 **Confirmaciones.** `togi task reject` pide confirmación nombrando la tarea; `--yes` la omite. Rechazar es definitivo: la tarea queda cerrada. Crear, editar y enviar no preguntan, porque no cierran nada.
 
+Si respondes que no (o dejas la respuesta vacía), la CLI imprime «Cancelado. No se ha cambiado nada.» y sale con 0: cancelar no es un error.
+
 **Concurrencia.** La CLI lee la versión con el detalle de la tarea y la envía en `If-Match`. Ante un 412 no reintenta sola, porque sobrescribiría un cambio que no has visto: muestra el error y tú repites el comando.
 
 **Progreso.** Un spinner solo si la operación tarda más de 300 ms y hay terminal, como en `togi daemon start`.
