@@ -19,6 +19,8 @@ import { NUMBER } from "./tasks.ts";
 export interface ReadDeps {
   store: SqliteEventStore;
   blobs: BlobStore;
+  /** Intervalo del latido del SSE; 15 s por defecto. */
+  heartbeatMs?: number;
 }
 
 const LIMIT = /^\d+$/;

@@ -7,6 +7,7 @@ import { createMiddleware } from "hono/factory";
 import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
+import { eventRoutes } from "./events.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
 import { taskRoutes } from "./tasks.ts";
@@ -37,7 +38,8 @@ export function createApp(
     .use("*", authenticated(db))
     .get("/v1/health", (c) => c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION }))
     .route("/", taskRoutes(db, handle))
-    .route("/", queryRoutes(db, reads));
+    .route("/", queryRoutes(db, reads))
+    .route("/", eventRoutes(reads));
 }
 
 // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.
