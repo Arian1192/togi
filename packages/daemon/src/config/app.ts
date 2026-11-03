@@ -5,6 +5,7 @@ import { join } from "node:path";
 export const APP = { name: "togi", envPrefix: "TOGI_", dataDirName: ".togi" } as const;
 
 export const HOME_ENV = `${APP.envPrefix}HOME`;
+export const KEYCHAIN_ENV = `${APP.envPrefix}KEYCHAIN`;
 
 export function resolveHome(
   env: Record<string, string | undefined> = process.env,
