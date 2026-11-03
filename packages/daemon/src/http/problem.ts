@@ -8,6 +8,8 @@ const TITLES: Record<number, string> = {
   412: "Precondition Failed",
   422: "Unprocessable Content",
   428: "Precondition Required",
+  500: "Internal Server Error",
+  503: "Service Unavailable",
 };
 
 /** Regla del flujo → status. Solo `task_not_found` es otra cosa que 422. */
