@@ -131,6 +131,12 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Indica qué editar: --title, --description o --criteria (${task(p)}).`,
     next: { label: "Mira el uso con", command: p.command ?? "togi task edit --help" },
   }),
+  edit_cancelled: () => ({ text: "Cancelado. No se ha cambiado nada." }),
+  editor_failed: (p) => ({ text: `El editor falló (${p.detail}); no se ha cambiado nada.` }),
+  edit_editor_unsafe: (p) => ({
+    text: `La tarea ${task(p)} tiene una línea que empieza por #togi y el editor no puede abrirse sin perderla.`,
+    next: { label: "Edítala con flags", command: `togi task edit ${p.n ?? "<número>"} --help` },
+  }),
   reject_confirm: (p) => ({
     text: `¿Rechazar ${task(p)} «${p.title ?? ""}»? Es definitivo: la tarea queda cerrada. [s/N]`,
   }),

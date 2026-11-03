@@ -138,6 +138,8 @@ La CLI solo pregunta si está en una terminal interactiva; en un script, falta u
 
 **Editor.** `togi task new` sin descripción y `togi task edit N` sin flags abren `$VISUAL` o `$EDITOR` con una plantilla. Las líneas que empiezan por `#togi` son comentarios o cabeceras de sección y se ignoran; el resto, incluidas las que empiezan por `#` o `##` (Markdown), es texto y se conserva. Guardar un fichero vacío cancela sin escribir nada. Un campo borrado lleva un comentario que lo indica y ningún texto; si lo dejas vacío, no se toca. Si algún texto actual tiene una línea que empieza por `#togi`, el editor no se abre: sale con 2 y sugiere los flags.
 
+`$VISUAL` y `$EDITOR` se separan por espacios y se lanzan sin shell, así que una ruta con espacios no funciona: usa un enlace sin espacios o los flags. El fichero temporal está en una carpeta propia (0700), con modo 0600, y se borra siempre al terminar. Algunos editores, sin embargo, guardan copias del texto fuera de esa carpeta (por ejemplo, en un directorio de swap global) y togi no puede borrarlas.
+
 ```
 #togi Tarea #12 · versión 3. Las líneas que empiezan por #togi se ignoran.
 #togi Guarda el fichero vacío para cancelar.

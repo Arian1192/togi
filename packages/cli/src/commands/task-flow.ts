@@ -2,6 +2,8 @@ import { REASON_CATEGORIES } from "@togi/core";
 import { type Client, createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
 import { clean, say } from "../format.ts";
+import { buildTemplate, hasMarkerLine, parseTemplate } from "./edit-template.ts";
+import { resolveEditor, runEditor } from "./editor.ts";
 import type { Command } from "./index.ts";
 
 const NUMBER = /^[1-9]\d*$/;
@@ -23,6 +25,8 @@ function taskNumber(args: string[], command: string): string {
 
 /** Lo que `task edit` necesita del detalle: los textos y qué campos están borrados. */
 export interface TaskDetail {
+  number: number;
+  version: number;
   title: string | null;
   titleErased: boolean;
   state: string;
@@ -31,14 +35,14 @@ export interface TaskDetail {
   erased: { description: boolean; acceptanceCriteria: boolean };
 }
 
-interface Read {
+export interface Read {
   etag: string;
   title: string | null;
   task: TaskDetail;
 }
 
 /** Lee el detalle de la tarea: su `ETag`, tal cual, para `If-Match`, y el título para nombrarla. */
-async function readTask(client: Client, n: string): Promise<Read> {
+export async function readTask(client: Client, n: string): Promise<Read> {
   const { body, headers } = await client.checkedWithHeaders<TaskDetail>(
     await client.api.v1.tasks[":n"].$get({ param: { n } }),
     { n: Number(n) },
@@ -78,9 +82,24 @@ export async function editTask(
   n: string,
   input: EditInput,
   hooks: FlowHooks = {},
-): Promise<{ changed: boolean; task: unknown }> {
+): Promise<EditResult> {
   const client = createClient(home);
-  const { etag, task } = await readTask(client, n);
+  return sendEdit(client, n, await readTask(client, n), input, hooks);
+}
+
+export interface EditResult {
+  changed: boolean;
+  task: unknown;
+}
+
+/** Envía la edición con el `ETag` de una lectura anterior: la que vio la persona, no una más nueva. */
+async function sendEdit(
+  client: Client,
+  n: string,
+  { etag, task }: Read,
+  input: EditInput,
+  hooks: FlowHooks,
+): Promise<EditResult> {
   const same = (current: string | null, erased: boolean, next: string | undefined) =>
     next === undefined || (!erased && (current ?? "") === next);
   const changes = {
@@ -109,6 +128,37 @@ export async function editTask(
     { n: Number(n) },
   );
   return { changed: true, task: done };
+}
+
+/**
+ * Edita la tarea en el editor. Lee el detalle una sola vez, antes de abrirlo: el `ETag` es el de lo
+ * que la persona vio, así que un cambio ajeno durante la edición da 412 en vez de sobrescribirse.
+ * `null` si cancela (fichero vacío).
+ */
+export async function editWithEditor(
+  home: string,
+  n: string,
+  editor: string[],
+  hooks: FlowHooks = {},
+): Promise<EditResult | null> {
+  const client = createClient(home);
+  const read = await readTask(client, n);
+  const { task } = read;
+  const erased = { title: task.titleErased, ...task.erased };
+  const shown = { ...task, erased };
+  if (hasMarkerLine(shown)) {
+    throw usageError("edit_editor_unsafe", { n: Number(n), command: "togi task edit --help" });
+  }
+  const input = parseTemplate(await runEditor(editor, buildTemplate(shown)), erased);
+  if (input === null) return null;
+  if (input.title !== undefined && input.title.trim() === "") {
+    throw usageError("invalid_option", {
+      field: "el título",
+      detail: "no puede estar vacío",
+      command: "togi task edit --help",
+    });
+  }
+  return sendEdit(createClient(home), n, read, input, hooks);
 }
 
 export interface RejectInput {
@@ -227,14 +277,21 @@ Edita una tarea en draft y envía solo los campos indicados.
 Un --description o --criteria vacío borra ese campo; el título no puede estar vacío.
 Si los valores ya son los actuales, no cambia nada.
 
+Sin flags, en una terminal, abre $VISUAL o $EDITOR con una plantilla. El editor se separa por
+espacios y se lanza sin shell: una ruta con espacios no funciona; usa un enlace sin espacios o
+los flags. Algunos editores guardan copias del texto fuera de la carpeta temporal (por ejemplo,
+un directorio de swap global) y togi no puede borrarlas.
+
 Ejemplo:
   togi task edit 12 --criteria "Descarga un .csv"
 `,
-  async run({ home, json, out, values, args }) {
+  async run({ home, json, out, values, args, interactive }) {
     const command = "togi task edit --help";
     const n = taskNumber(args, command);
     const { title, description, criteria } = values;
-    if (title === undefined && description === undefined && criteria === undefined) {
+    const noFlags = title === undefined && description === undefined && criteria === undefined;
+    const editor = noFlags && interactive ? resolveEditor(process.env) : undefined;
+    if (noFlags && editor === undefined) {
       throw usageError("edit_needs_flags", { n: Number(n), command });
     }
     if (typeof title === "string" && title.trim() === "") {
@@ -244,11 +301,18 @@ Ejemplo:
         command,
       });
     }
-    const done = await editTask(home, n, {
-      ...(typeof title === "string" ? { title: title.trim() } : {}),
-      ...(typeof description === "string" ? { description } : {}),
-      ...(typeof criteria === "string" ? { acceptanceCriteria: criteria } : {}),
-    });
+    const done =
+      editor !== undefined
+        ? await editWithEditor(home, n, editor)
+        : await editTask(home, n, {
+            ...(typeof title === "string" ? { title: title.trim() } : {}),
+            ...(typeof description === "string" ? { description } : {}),
+            ...(typeof criteria === "string" ? { acceptanceCriteria: criteria } : {}),
+          });
+    if (done === null) {
+      process.stderr.write(`${say("edit_cancelled")}\n`);
+      return "";
+    }
     if (!done.changed) process.stderr.write(`${say("edit_no_changes", { n: Number(n) })}\n`);
     if (json) return `${JSON.stringify(done.task)}\n`;
     return done.changed ? `${out.mark("ok", say("task_edited", { n: Number(n) }))}\n` : "";
