@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -47,5 +47,18 @@ CREATE TABLE data_keys (
   wrapped_key BLOB    NOT NULL,
   created_at  TEXT    NOT NULL,
   UNIQUE (task_id, data_class)
+);`,
+  // Proyección de lectura (ver projections/tasks.ts). Sin triggers: se reconstruye.
+  3: `
+CREATE TABLE tasks (
+  number         INTEGER PRIMARY KEY,
+  title          TEXT    NOT NULL,
+  state          TEXT    NOT NULL,
+  risk           TEXT    NOT NULL,
+  repo           TEXT    NOT NULL,
+  base_branch    TEXT    NOT NULL,
+  stream_version INTEGER NOT NULL,
+  created_at     TEXT    NOT NULL,
+  updated_at     TEXT    NOT NULL
 );`,
 };

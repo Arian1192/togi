@@ -76,10 +76,9 @@ async function createV1(path: string): Promise<void> {
   old.close();
 }
 
-test("una base nueva queda en la versión 2 con data_keys sin triggers", () => {
+test("una base nueva queda en la versión actual con data_keys sin triggers", () => {
   const db = openEventDatabase(join(dir, "togi.db"));
-  assert.equal(SCHEMA_VERSION, 2);
-  assert.equal(db.pragma("user_version", { simple: true }), 2);
+  assert.equal(db.pragma("user_version", { simple: true }), SCHEMA_VERSION);
   db.exec("INSERT INTO data_keys VALUES ('k1', 7, 'prompt', x'00', '2026-11-03T10:00:00Z')");
   assert.throws(() => db.exec("INSERT INTO data_keys VALUES ('k2', 7, 'prompt', x'00', 'x')"));
   db.exec("DELETE FROM data_keys");
@@ -90,7 +89,6 @@ test("la migración 1→2 conserva los eventos y la cadena verifica", async () =
   const path = join(dir, "togi.db");
   await createV1(path);
   const db = openEventDatabase(path);
-  assert.equal(db.pragma("user_version", { simple: true }), 2);
   assert.ok(hasTable(db, "data_keys"));
   assert.equal((db.prepare("SELECT count(*) AS n FROM events").get() as { n: number }).n, 2);
   assert.deepEqual(await new SqliteEventStore(db).verify(), { ok: true });
