@@ -8,6 +8,7 @@ import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { problem } from "./problem.ts";
+import { queryRoutes } from "./queries.ts";
 import { taskRoutes } from "./tasks.ts";
 
 const DAEMON_VERSION =
@@ -31,7 +32,8 @@ export function createApp(db: Database.Database, handle?: ReturnType<typeof crea
     .use("*", requestId)
     .use("*", authenticated(db))
     .get("/v1/health", (c) => c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION }))
-    .route("/", taskRoutes(db, handle));
+    .route("/", taskRoutes(db, handle))
+    .route("/", queryRoutes(db));
 }
 
 // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.
