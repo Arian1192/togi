@@ -125,6 +125,12 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   }),
   task_submitted: (p) => ({ text: `Enviada ${task(p)} a ${p.state ?? "planning"}` }),
   task_rejected: (p) => ({ text: `Rechazada ${task(p)}` }),
+  task_edited: (p) => ({ text: `Editada ${task(p)}` }),
+  edit_no_changes: (p) => ({ text: `La tarea ${task(p)} ya tiene esos valores: no hay cambios.` }),
+  edit_needs_flags: (p) => ({
+    text: `Indica qué editar: --title, --description o --criteria (${task(p)}).`,
+    next: { label: "Mira el uso con", command: p.command ?? "togi task edit --help" },
+  }),
   reject_confirm: (p) => ({
     text: `¿Rechazar ${task(p)} «${p.title ?? ""}»? Es definitivo: la tarea queda cerrada. [s/N]`,
   }),
