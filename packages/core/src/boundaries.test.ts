@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-const forbidden = ["@forja/daemon", "@forja/cli"];
+const forbidden = ["@togi/daemon", "@togi/cli"];
 const pkgDir = join(import.meta.dirname, "..");
 
 test("core no declara dependencias en daemon ni cli", () => {
