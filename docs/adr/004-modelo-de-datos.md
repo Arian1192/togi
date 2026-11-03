@@ -293,6 +293,7 @@ Las retenciones son una propuesta propia, no salen de ninguna norma: se fijan co
 - Cada payload lleva `schemaVersion`; los cambios de forma se resuelven con funciones de migración al leer, nunca reescribiendo el log.
 - Riesgo: la clave maestra se pierde y con ella todos los blobs. Mitigación: copia de seguridad de la clave separada de la del SQLite.
 - Riesgo: el detector de secretos no detecta un formato. Mitigación: retención corta de trayectorias y prompts, y un borrado puntual con `togi admin erase`.
+- Limitación conocida y decisión pendiente: el título de una tarea (`task.created` y `task.edited`) se guarda en claro en el log inmutable y `erase` no puede borrarlo. Hay que decidir antes de cerrar la rebanada 1 si se cifra como los demás textos (clase `task_text`).
 - Lo que no resuelve este ADR, y queda en el backlog del modo equipo: cifrado del servidor, autenticación y autorización en la API, copias de seguridad, sincronización de relojes y gestión de proveedores de modelos.
 
 Qué entra en cada rebanada, sin cambiar el esquema:

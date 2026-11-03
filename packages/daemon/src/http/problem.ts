@@ -22,8 +22,10 @@ export function problem(
   code: string,
   detail?: string,
   headers: Record<string, string> = {},
+  extra: Record<string, unknown> = {},
 ): Response {
   const body = {
+    ...extra,
     type: "about:blank",
     title: TITLES[status] ?? "Error",
     status,
