@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -6,8 +6,8 @@ BEGIN SELECT RAISE(ABORT, 'append-only'); END;
 CREATE TRIGGER ${table}_no_delete BEFORE DELETE ON ${table}
 BEGIN SELECT RAISE(ABORT, 'append-only'); END;`;
 
-/** Esquema del ADR-004. */
-export const SCHEMA_SQL = `
+/** Esquema de la versión 1 (ADR-004). Congelado: los cambios van como migraciones. */
+export const SCHEMA_V1_SQL = `
 CREATE TABLE events (
   seq            INTEGER PRIMARY KEY AUTOINCREMENT,
   stream         TEXT    NOT NULL,
@@ -35,3 +35,17 @@ CREATE TABLE agent_events (
 );
 ${appendOnly("agent_events")}
 `;
+
+/** Migraciones por versión de destino. Cada una se ejecuta dentro de la transacción de apertura. */
+export const MIGRATIONS: Readonly<Record<number, string>> = {
+  // Sin triggers append-only: crypto-shredding borra filas.
+  2: `
+CREATE TABLE data_keys (
+  key_id      TEXT    PRIMARY KEY,
+  task_id     INTEGER NOT NULL,
+  data_class  TEXT    NOT NULL,
+  wrapped_key BLOB    NOT NULL,
+  created_at  TEXT    NOT NULL,
+  UNIQUE (task_id, data_class)
+);`,
+};
