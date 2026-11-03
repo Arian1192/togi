@@ -7,7 +7,7 @@ import type { NewEvent } from "@togi/core";
 import Database from "better-sqlite3";
 import { openEventDatabase } from "./database.ts";
 import { SqliteEventStore } from "./event-store.ts";
-import { MIGRATIONS, SCHEMA_V1_SQL } from "./schema.ts";
+import { MIGRATIONS, SCHEMA_V1_SQL, SCHEMA_VERSION } from "./schema.ts";
 
 let dir: string;
 beforeEach(() => {
@@ -33,7 +33,7 @@ test("la migración 3→4 crea task_numbers, conserva los eventos y la cadena ve
   old.close();
 
   const db = openEventDatabase(path);
-  assert.equal(db.pragma("user_version", { simple: true }), 4);
+  assert.equal(db.pragma("user_version", { simple: true }), SCHEMA_VERSION);
   assert.equal((db.prepare("SELECT count(*) AS n FROM events").get() as { n: number }).n, 2);
   assert.deepEqual(await new SqliteEventStore(db).verify(), { ok: true });
   const reserve = db.prepare("INSERT INTO task_numbers (reserved_at) VALUES ('x')");
