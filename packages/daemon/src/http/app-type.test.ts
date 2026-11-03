@@ -7,6 +7,7 @@ test("hc<AppType> tipa todas las rutas y rechaza las inexistentes", () => {
   const client = hc<AppType>("http://localhost");
   void (() => {
     void client.v1.health.$get();
+    void client.v1.tasks.$get({ query: { state: "draft", limit: "10" } });
     void client.v1.tasks.$post();
     void client.v1.tasks[":n"].$patch({ param: { n: "1" } });
     void client.v1.tasks[":n"].submit.$post({ param: { n: "1" } });
