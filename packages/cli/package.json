@@ -8,6 +8,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "bin": {
+    "togi": "./bin/togi.js"
+  },
   "dependencies": {
     "@togi/core": "workspace:*",
     "@togi/daemon": "workspace:*",
