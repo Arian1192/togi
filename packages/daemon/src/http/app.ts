@@ -4,8 +4,10 @@ import type { Actor, UserId } from "@togi/core";
 import type Database from "better-sqlite3";
 import { Hono } from "hono";
 import { authenticate, type TokenRow } from "../auth/tokens.ts";
+import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { problem } from "./problem.ts";
+import { registerTaskRoutes } from "./tasks.ts";
 
 const DAEMON_VERSION =
   (
@@ -19,7 +21,7 @@ export type AppEnv = { Variables: { actor: Actor; requestId: string } };
 const BEARER = /^Bearer +(\S+)$/i;
 const REQUEST_ID = /^[\w.:-]{1,128}$/;
 
-export function createApp(db: Database.Database) {
+export function createApp(db: Database.Database, handle?: ReturnType<typeof createHandler>) {
   const app = new Hono<AppEnv>();
 
   // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.
@@ -43,5 +45,6 @@ export function createApp(db: Database.Database) {
   });
 
   app.get("/v1/health", (c) => c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION }));
+  if (handle !== undefined) registerTaskRoutes(app, db, handle);
   return app;
 }
