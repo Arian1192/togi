@@ -1,4 +1,5 @@
 import {
+  type BlobRef,
   type DomainEvent,
   evolve,
   type RiskLevel,
@@ -15,6 +16,7 @@ import type { SqliteEventStore } from "../store/event-store.ts";
  */
 
 interface TaskRow {
+  /** BlobRef del título serializada en JSON; el texto solo existe cifrado. */
   title: string;
   state: TaskState;
   risk: RiskLevel;
@@ -35,7 +37,16 @@ export function applyToTasks(db: Database.Database, event: DomainEvent): void {
     db.prepare(
       `INSERT INTO tasks (number, title, state, risk, repo, base_branch, stream_version, created_at, updated_at)
        VALUES (?, ?, 'draft', ?, ?, ?, ?, ?, ?)`,
-    ).run(number, title, risk, repo, baseBranch, event.streamVersion, event.at, event.at);
+    ).run(
+      number,
+      JSON.stringify(title),
+      risk,
+      repo,
+      baseBranch,
+      event.streamVersion,
+      event.at,
+      event.at,
+    );
     return;
   }
 
@@ -44,11 +55,15 @@ export function applyToTasks(db: Database.Database, event: DomainEvent): void {
     | undefined;
   if (row === undefined) throw new Error(`evento ${event.type} sobre la tarea ${number} sin fila`);
   // La tabla no guarda description ni acceptanceCriteria: evolve solo los sobrescribe, no los lee.
-  const view = evolve({ exists: true, ...row, description: null, acceptanceCriteria: null }, event);
+  const title = JSON.parse(row.title) as BlobRef;
+  const view = evolve(
+    { exists: true, ...row, title, description: null, acceptanceCriteria: null },
+    event,
+  );
   if (!view.exists) return;
   db.prepare(
     "UPDATE tasks SET title = ?, state = ?, risk = ?, stream_version = ?, updated_at = ? WHERE number = ?",
-  ).run(view.title, view.state, view.risk, event.streamVersion, event.at, number);
+  ).run(JSON.stringify(view.title), view.state, view.risk, event.streamVersion, event.at, number);
 }
 
 /**

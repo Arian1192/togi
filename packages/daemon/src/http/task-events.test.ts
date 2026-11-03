@@ -77,7 +77,7 @@ test("los eventos salen en orden de streamVersion y coinciden con los del stream
   );
 });
 
-test("la respuesta no contiene los textos en claro; el título sí, está en el evento", async () => {
+test("la respuesta no contiene los textos en claro, tampoco el título", async () => {
   await send("POST", "/v1/tasks", NEW);
   await send(
     "POST",
@@ -91,7 +91,7 @@ test("la respuesta no contiene los textos en claro; el título sí, está en el 
   for (const secret of ["descripción secreta", "criterio secreto", "motivo secreto"]) {
     assert.ok(!text.includes(secret), secret);
   }
-  assert.ok(text.includes('"title":"Filtro"'));
+  assert.ok(!text.includes('"title":"Filtro"'));
   assert.ok(text.includes("hmac-sha256:"));
 });
 

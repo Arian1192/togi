@@ -15,6 +15,7 @@ import type { SqliteEventStore } from "../store/event-store.ts";
 import type { AppEnv } from "./app.ts";
 import { problem } from "./problem.ts";
 import { NUMBER } from "./tasks.ts";
+import { type TextReader, titleReader } from "./title.ts";
 
 export interface ReadDeps {
   store: SqliteEventStore;
@@ -40,7 +41,18 @@ type Text = { text: string | null; erased: boolean };
  * responde 503. Un texto cuenta como borrado SOLO si su clave de datos ya no existe; cualquier otro
  * fallo al leer el blob (manipulación, fichero ausente, disco) es un error de integridad.
  */
-export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) {
+export function queryRoutes(
+  db: Database.Database,
+  reads: ReadDeps | undefined,
+  handle?: { readText: TextReader },
+) {
+  // Sin `reads` el descifrado llega por el manejador de comandos.
+  const textReader = (): TextReader | undefined =>
+    handle?.readText ??
+    (reads === undefined
+      ? undefined
+      : async (ref) => new TextDecoder().decode(await reads.blobs.get(ref)));
+  const titleOf = titleReader(db);
   const list = (state: string | undefined, limit: number) =>
     db
       .prepare(
@@ -73,7 +85,7 @@ export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) 
       : undefined;
 
   return new Hono<AppEnv>()
-    .get("/v1/tasks", (c) => {
+    .get("/v1/tasks", async (c) => {
       const state = c.req.query("state");
       if (state !== undefined && !TASK_STATES.includes(state as TaskState)) {
         return problem(400, "validation_error", `state debe ser uno de ${TASK_STATES.join(", ")}`);
@@ -83,14 +95,22 @@ export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) 
       if (limit < 1 || limit > 200) {
         return problem(400, "validation_error", "limit debe ser un entero entre 1 y 200");
       }
-      const tasks = list(state, limit).map((r) => ({
-        number: r.number,
-        title: r.title,
-        state: r.state,
-        risk: r.risk,
-        version: r.stream_version,
-      }));
-      return c.json({ tasks });
+      const reader = textReader();
+      if (reader === undefined) return problem(503, "not_configured", "consultas no disponibles");
+      try {
+        const tasks = await Promise.all(
+          list(state, limit).map(async (r) => ({
+            number: r.number,
+            title: await titleOf(reader, JSON.parse(r.title) as BlobRef),
+            state: r.state,
+            risk: r.risk,
+            version: r.stream_version,
+          })),
+        );
+        return c.json({ tasks });
+      } catch {
+        return problem(500, "integrity_error", "no se pudo leer un título de tarea");
+      }
     })
     .get("/v1/tasks/:n", async (c) => {
       if (reads === undefined) return problem(503, "not_configured", "consultas no disponibles");
@@ -111,12 +131,13 @@ export function queryRoutes(db: Database.Database, reads: ReadDeps | undefined) 
       }
       if (!view.exists) return problem(404, "task_not_found", "tarea inexistente");
       try {
+        const title = await titleOf(textReader() as TextReader, view.title);
         const description = await read(reads.blobs, view.description);
         const criteria = await read(reads.blobs, view.acceptanceCriteria);
         c.header("etag", `"${version}"`);
         return c.json({
           number: Number(param),
-          title: view.title,
+          title,
           state: view.state,
           risk: view.risk,
           version,

@@ -121,7 +121,7 @@ test("reject con texto vacío devuelve el mismo invalid_reason que core", async 
     {
       exists: true,
       state: "draft",
-      title: "",
+      title: { hash: "hmac-sha256:t", keyId: "k", dataClass: "task_text" },
       description: null,
       acceptanceCriteria: null,
       risk: "low",

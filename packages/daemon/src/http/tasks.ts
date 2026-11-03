@@ -1,10 +1,18 @@
-import { CreateTask, EditTask, RejectTask, SAFE_ID, VersionConflictError } from "@togi/core";
+import {
+  type BlobRef,
+  CreateTask,
+  EditTask,
+  RejectTask,
+  SAFE_ID,
+  VersionConflictError,
+} from "@togi/core";
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { AppEnv } from "./app.ts";
 import { hashBody, idempotencyKeys, type SavedResponse } from "./idempotency.ts";
 import { domainStatus, problem } from "./problem.ts";
+import { titleReader } from "./title.ts";
 
 type Handle = ReturnType<typeof createHandler>;
 type Parser<T> = {
@@ -19,6 +27,7 @@ export const NUMBER = /^[1-9]\d*$/;
 
 interface TaskRow {
   number: number;
+  /** BlobRef del título en JSON. */
   title: string;
   state: string;
   risk: string;
@@ -35,14 +44,32 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
       .prepare("SELECT number, title, state, risk, stream_version FROM tasks WHERE number = ?")
       .get(number) as TaskRow;
   const keys = idempotencyKeys(db);
-  const taskBody = (row: TaskRow) =>
+  const titleOf = titleReader(db);
+  // Lo que se guarda para repetir una respuesta lleva la referencia al título, nunca el texto.
+  const snapshot = (row: TaskRow) => ({
+    number: row.number,
+    titleRef: JSON.parse(row.title) as BlobRef,
+    state: row.state,
+    risk: row.risk,
+    version: row.stream_version,
+  });
+  type Snapshot = ReturnType<typeof snapshot>;
+  const taskBody = async (h: Handle, { titleRef, ...rest }: Snapshot) =>
     JSON.stringify({
-      number: row.number,
-      title: row.title,
-      state: row.state,
-      risk: row.risk,
-      version: row.stream_version,
+      number: rest.number,
+      title: await titleOf(h.readText, titleRef),
+      state: rest.state,
+      risk: rest.risk,
+      version: rest.version,
     });
+  /** Un título que no se puede leer (y no está borrado) es un error de integridad. */
+  const readable = async (render: () => Promise<Response>): Promise<Response> => {
+    try {
+      return await render();
+    } catch {
+      return problem(500, "integrity_error", "no se pudo leer el título de la tarea");
+    }
+  };
   const taskResponse = (status: number, json: string, version: number) =>
     new Response(json, {
       status,
@@ -75,7 +102,7 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
     return json instanceof Response ? json : validate(json, schema);
   };
 
-  const respond = (result: Result, status: 200 | 201): Response => {
+  const respond = async (h: Handle, result: Result, status: 200 | 201): Promise<Response> => {
     if ("kind" in result && result.kind === "precondition_failed") {
       return problem(412, "precondition_failed", `la versión actual es ${result.current}`, {
         etag: `"${result.current}"`,
@@ -85,7 +112,9 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
       return problem(domainStatus(result.code), result.code, result.message);
     }
     const row = select(db, (result as { number: number }).number);
-    return taskResponse(status, taskBody(row), row.stream_version);
+    return readable(async () =>
+      taskResponse(status, await taskBody(h, snapshot(row)), row.stream_version),
+    );
   };
 
   /** El comando perdió la carrera contra otra escritura: 409, no 500. */
@@ -115,7 +144,7 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
           ifMatch: version,
           correlationId: c.get("requestId"),
         });
-        return respond(result, 200);
+        return respond(handle, result, 200);
       });
 
   return new Hono<AppEnv>()
@@ -133,7 +162,7 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
         const correlationId = c.get("requestId");
         const actor = c.get("actor");
         if (key === undefined || actor.kind !== "human") {
-          return respond(await handle(actor, command, { correlationId }), 201);
+          return respond(handle, await handle(actor, command, { correlationId }), 201);
         }
         let requestHash: string;
         try {
@@ -141,15 +170,17 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
         } catch {
           return problem(400, "invalid_json", "el cuerpo no es JSON canonicalizable");
         }
-        const replay = (saved: SavedResponse | undefined) => {
+        const replay = async (saved: SavedResponse | undefined) => {
           if (saved === undefined) return undefined;
           if (saved.request_hash !== requestHash) {
             return problem(422, "idempotency_key_reused", "la clave ya se usó con otro cuerpo");
           }
-          const { version } = JSON.parse(saved.response_body) as { version: number };
-          return taskResponse(saved.status, saved.response_body, version);
+          const snap = JSON.parse(saved.response_body) as Snapshot;
+          return readable(async () =>
+            taskResponse(saved.status, await taskBody(handle, snap), snap.version),
+          );
         };
-        const previous = replay(keys.find(actor.userId, key));
+        const previous = await replay(keys.find(actor.userId, key));
         if (previous !== undefined) return previous;
         try {
           const result = await handle(actor, command, {
@@ -161,19 +192,19 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
               const saved = {
                 request_hash: requestHash,
                 status: 201,
-                response_body: taskBody(row),
+                response_body: JSON.stringify(snapshot(row)),
               };
               keys.save(tx, actor.userId, key, saved);
             },
           });
-          return respond(result, 201);
+          return await respond(handle, result, 201);
         } catch (error) {
           // Una carrera con la misma clave rompe la PK. Solo si la clave existe es eso; si no, es
           // otra restricción y el error original sigue su camino.
           const code = (error as { code?: string }).code;
           const raced =
             code === "SQLITE_CONSTRAINT_PRIMARYKEY"
-              ? replay(keys.find(actor.userId, key))
+              ? await replay(keys.find(actor.userId, key))
               : undefined;
           if (raced !== undefined) return raced;
           throw error;

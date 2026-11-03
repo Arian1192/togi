@@ -5,7 +5,7 @@ import { EventParseError, toDomainEvent } from "./domain-event.ts";
 
 const blob = { hash: "hmac-sha256:abc", keyId: "key_1", dataClass: "task_text" };
 const created = {
-  title: "Añadir filtro",
+  title: blob,
   description: null,
   acceptanceCriteria: blob,
   risk: "low",
@@ -37,7 +37,7 @@ const rejection = (event: StoredEvent) =>
 test("convierte los eventos de tarea y de admin válidos", () => {
   const valid = [
     stored("task.created", created),
-    stored("task.edited", { title: "Otro título", description: null }),
+    stored("task.edited", { title: blob, description: null }),
     stored("task.submitted", {}),
     stored("task.rejected", { reason: { category: "scope", text: blob } }),
     stored(
@@ -70,7 +70,7 @@ test("rechaza un campo de más y uno de menos", () => {
   const { repo: _repo, ...sinRepo } = created;
   rejection(stored("task.created", sinRepo));
   rejection(stored("task.submitted", { extra: 1 }));
-  rejection(stored("task.edited", { title: "x", extra: 1 }));
+  rejection(stored("task.edited", { title: blob, extra: 1 }));
 });
 
 test("rechaza un valor fuera de lista", () => {
@@ -85,4 +85,9 @@ test("rechaza envoltorio inválido y stream que no corresponde al tipo", () => {
   rejection(stored("task.submitted", {}, { at: "ayer" }));
   rejection(stored("task.submitted", {}, { stream: "admin" }));
   rejection(stored("data.erased", { keyId: "k", taskId: 1, dataClass: "prompt", reason: "r" }));
+});
+
+test("rechaza un título en claro: va como BlobRef", () => {
+  rejection(stored("task.created", { ...created, title: "Añadir filtro" }));
+  rejection(stored("task.edited", { title: "Otro título" }));
 });

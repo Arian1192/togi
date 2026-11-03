@@ -21,7 +21,7 @@ const blob = (n: string): BlobRef => ({
 const create: TaskCommand = {
   ...meta,
   type: "create",
-  title: "Añadir filtro",
+  title: blob("t"),
   description: null,
   acceptanceCriteria: blob("ac"),
   risk: "low",
@@ -29,7 +29,7 @@ const create: TaskCommand = {
   baseBranch: "dev",
   source: { kind: "cli" },
 };
-const edit: TaskCommand = { ...meta, type: "edit", changes: { title: "Otro título" } };
+const edit: TaskCommand = { ...meta, type: "edit", changes: { title: blob("t2") } };
 const submit: TaskCommand = { ...meta, type: "submit" };
 const reject = (category: ReasonCategory = "scope"): TaskCommand => ({
   ...meta,
@@ -40,7 +40,7 @@ const reject = (category: ReasonCategory = "scope"): TaskCommand => ({
 const view = (state: TaskState, over: Partial<TaskView & { exists: true }> = {}): TaskView => ({
   exists: true,
   state,
-  title: "Añadir filtro",
+  title: blob("t"),
   description: null,
   acceptanceCriteria: blob("ac"),
   risk: "low",
@@ -145,14 +145,14 @@ test("evolve: created, edited, submitted", () => {
       ...meta,
       schemaVersion: 1,
       type: "task.edited",
-      payload: { title: "Nuevo", description: blob("d") },
+      payload: { title: blob("t3"), description: blob("d") },
     },
     { ...meta, schemaVersion: 1, type: "task.submitted", payload: {} },
   ];
   assert.deepEqual(events.reduce(evolve, NO_TASK), {
     exists: true,
     state: "planning",
-    title: "Nuevo",
+    title: blob("t3"),
     description: blob("d"),
     acceptanceCriteria: blob("ac"),
     risk: "low",

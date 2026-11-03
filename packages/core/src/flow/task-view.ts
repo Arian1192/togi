@@ -12,7 +12,7 @@ export type TaskView =
   | {
       exists: true;
       state: TaskState;
-      title: string;
+      title: BlobRef;
       description: BlobRef | null;
       acceptanceCriteria: BlobRef | null;
       risk: RiskLevel;

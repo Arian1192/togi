@@ -85,9 +85,9 @@ export type TaskSource =
       untrustedBody: BlobRef };  // entrada no fiable: nunca se mezcla con instrucciones
 
 export type TaskEvent =
-  | E<"task.created", { title: string; description: BlobRef | null; acceptanceCriteria: BlobRef | null;
+  | E<"task.created", { title: BlobRef; description: BlobRef | null; acceptanceCriteria: BlobRef | null;
                         risk: RiskLevel; repo: string; baseBranch: string; source: TaskSource }>
-  | E<"task.edited", Partial<{ title: string; description: BlobRef | null; acceptanceCriteria: BlobRef | null }>>
+  | E<"task.edited", Partial<{ title: BlobRef; description: BlobRef | null; acceptanceCriteria: BlobRef | null }>>
   | E<"task.submitted", {}>                                          // draft → planning
   | E<"task.risk_changed", { from: RiskLevel; to: RiskLevel; cause: "manual" | "diff"; paths: string[] }>
   | E<"session.started", SessionStarted>
@@ -183,7 +183,7 @@ Cuatro precisiones sobre el ADR-001:
 
 `decide` exige `reason` en todo `request_changes`, `reject` y `task.rejected`, y rechaza un `approve` en `plan_review` si el plan estima más de 300 líneas. En el modo equipo podrá imponer además que quien aprueba no sea quien creó la tarea.
 
-La descripción y el criterio de aceptación son `BlobRef | null`: el daemon no crea blob para un texto vacío y guarda `null`. Así `submit` sabe si hay criterio sin leer el blob, que el decider no puede descifrar porque `core` no tiene acceso a las claves.
+El título es un `BlobRef` obligatorio, nunca `null`: es el único texto que no puede faltar. La descripción y el criterio de aceptación son `BlobRef | null`: el daemon no crea blob para un texto vacío y guarda `null`. Así `submit` sabe si hay criterio sin leer el blob, que el decider no puede descifrar porque `core` no tiene acceso a las claves.
 
 ## Almacenamiento
 
@@ -236,7 +236,7 @@ CREATE TABLE agent_events (
 
 - **Cadena de hashes.** Los triggers evitan cambios accidentales; la cadena detecta los deliberados. Es global sobre `seq`, así que las escrituras se serializan, algo que togi ya hace. El JSON canónico sigue RFC 8785. `togi admin verify-log` recorre la cadena; en el modo equipo se publica periódicamente el último hash fuera del servidor.
 - **Trayectoria separada.** La regla 6 se mantiene: cada acción del agente queda en un log append-only. Va en `agent_events` porque una sesión genera miles de acciones que no cambian el estado de la tarea; el log de dominio solo registra el inicio y el fin de la sesión. Incluye las acciones denegadas por los hooks (ADR-003), materia prima del monitor de trayectoria.
-- **Proyecciones.** `tasks`, `plans`, `sessions`, `gate_runs`, `decisions`, `workspaces`, `shadow_agreement` y `unclassified_failures` se actualizan en la misma transacción que el `append`, así que la API nunca lee un estado distinto del log. `togi admin rebuild` las reconstruye desde cero.
+- **Proyecciones.** La proyección `tasks` guarda la referencia al blob del título, no el texto; la API lo descifra al responder, con `[borrado]` si su clave ya no existe y un error de integridad ante cualquier otro fallo. `tasks`, `plans`, `sessions`, `gate_runs`, `decisions`, `workspaces`, `shadow_agreement` y `unclassified_failures` se actualizan en la misma transacción que el `append`, así que la API nunca lee un estado distinto del log. `togi admin rebuild` las reconstruye desde cero.
 - **API.** Por el requisito nº 2, la API expone las proyecciones y emite `readAll` por SSE. La CLI nunca abre el SQLite.
 
 ## Datos personales y secretos
@@ -267,7 +267,7 @@ CREATE TABLE data_keys (          -- migración a la versión 2; sin triggers ap
 
 | Clase | Qué contiene | Retención propuesta |
 | --- | --- | --- |
-| `task_text` | Descripción, criterio de aceptación, enfoque del plan, motivos, hallazgos | Mientras exista la tarea |
+| `task_text` | Título, descripción, criterio de aceptación, enfoque del plan, motivos, hallazgos | Mientras exista la tarea |
 | `untrusted_input` | Cuerpo de issues y otras fuentes externas | 1 año |
 | `gate_evidence` | Salidas de typecheck, lint y tests | 1 año |
 | `prompt` | Prompt completo de cada sesión | 90 días |
@@ -290,10 +290,9 @@ Las retenciones son una propuesta propia, no salen de ninguna norma: se fijan co
 
 - Las reglas del flujo se prueban como funciones puras en `core`, sin base de datos, git ni agentes.
 - El trailer `Assisted-by` sale de `session.started`: `runtime.id` y `model`.
-- Cada payload lleva `schemaVersion`; los cambios de forma se resuelven con funciones de migración al leer, nunca reescribiendo el log.
+- Cada payload lleva `schemaVersion`; los cambios de forma se resuelven con funciones de migración al leer, nunca reescribiendo el log. El paso del título a `BlobRef` fue el último cambio de forma de un evento sin versión de esquema (aún no había logs reales): a partir de ahora, cualquier cambio sube `schemaVersion` y añade una migración al leer.
 - Riesgo: la clave maestra se pierde y con ella todos los blobs. Mitigación: copia de seguridad de la clave separada de la del SQLite.
 - Riesgo: el detector de secretos no detecta un formato. Mitigación: retención corta de trayectorias y prompts, y un borrado puntual con `togi admin erase`.
-- Limitación conocida y decisión pendiente: el título de una tarea (`task.created` y `task.edited`) se guarda en claro en el log inmutable y `erase` no puede borrarlo. Hay que decidir antes de cerrar la rebanada 1 si se cifra como los demás textos (clase `task_text`).
 - Lo que no resuelve este ADR, y queda en el backlog del modo equipo: cifrado del servidor, autenticación y autorización en la API, copias de seguridad, sincronización de relojes y gestión de proveedores de modelos.
 
 Qué entra en cada rebanada, sin cambiar el esquema:

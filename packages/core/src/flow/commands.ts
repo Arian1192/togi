@@ -13,7 +13,7 @@ export type TaskChanges = Extract<TaskEvent, { type: "task.edited" }>["payload"]
 export type TaskCommand =
   | (Meta & {
       type: "create";
-      title: string;
+      title: BlobRef;
       description: BlobRef | null;
       acceptanceCriteria: BlobRef | null;
       risk: RiskLevel;
