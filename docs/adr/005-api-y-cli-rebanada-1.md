@@ -48,10 +48,10 @@ Los comandos son `POST` sobre subrecursos de acción y cada uno corresponde a un
 
 Convenciones:
 
-- **Concurrencia optimista.** Los comandos sobre una tarea llevan `If-Match: <streamVersion>`; si la tarea cambió entre medias, `409`.
+- **Concurrencia optimista.** Los comandos sobre una tarea existente llevan `If-Match: <streamVersion>`, la versión que el cliente ha visto. Sin la cabecera, `428`. `If-Match: *` no se acepta (`400`): todo comando debe indicar la versión que vio. Si no coincide con la versión actual, `412` (estándar HTTP). El `409` queda para el conflicto entre la lectura y el append, cuando otra escritura gana la carrera. Las respuestas llevan `ETag` con la versión de la tarea.
 - **Idempotencia.** `POST /v1/tasks` acepta `Idempotency-Key`, para que un reintento de la CLI no cree dos tareas.
 - **Correlación.** El `X-Request-Id` se guarda como `correlationId` del evento.
-- **Errores en RFC 9457** (`application/problem+json`) con el `code` del `DomainError`: `400` validación, `401` sin token válido, `404`, `409` conflicto de versión, `422` regla del flujo (transición inválida, motivo obligatorio, falta el criterio de aceptación).
+- **Errores en RFC 9457** (`application/problem+json`) con el `code` del `DomainError`: `400` validación, `401` sin token válido, `404`, `409` conflicto entre lectura y append, `412` `If-Match` desactualizado, `422` regla del flujo (transición inválida, motivo obligatorio, falta el criterio de aceptación), `428` falta `If-Match`.
 
 El ADR-001 exige criterio de aceptación y nivel de riesgo para salir de `draft`, no para entrar. Por eso `POST /v1/tasks` admite crear la tarea sin criterio y es `submit` quien lo exige.
 
