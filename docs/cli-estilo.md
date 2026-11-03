@@ -136,19 +136,19 @@ Un `integrity_error` nunca se presenta como un fallo normal: va en rojo y recomi
 
 La CLI solo pregunta si está en una terminal interactiva; en un script, falta un dato o una confirmación y falla con código 2.
 
-**Editor.** `togi task new` sin descripción y `togi task edit N` sin flags abren `$EDITOR` con una plantilla. Las líneas con `#` se ignoran; guardar un fichero vacío cancela sin escribir nada.
+**Editor.** `togi task new` sin descripción y `togi task edit N` sin flags abren `$VISUAL` o `$EDITOR` con una plantilla. Las líneas que empiezan por `#togi` son comentarios o cabeceras de sección y se ignoran; el resto, incluidas las que empiezan por `#` o `##` (Markdown), es texto y se conserva. Guardar un fichero vacío cancela sin escribir nada. Un campo borrado lleva un comentario que lo indica y ningún texto; si lo dejas vacío, no se toca. Si algún texto actual tiene una línea que empieza por `#togi`, el editor no se abre: sale con 2 y sugiere los flags.
 
 ```
-# Tarea #12 · versión 3. Las líneas con # se ignoran.
-# Guarda el fichero vacío para cancelar.
+#togi Tarea #12 · versión 3. Las líneas que empiezan por #togi se ignoran.
+#togi Guarda el fichero vacío para cancelar.
 
-## Título
+#togi título
 Filtro por fecha en envíos
 
-## Descripción
+#togi descripción
 ...
 
-## Criterio de aceptación
+#togi criterio
 ...
 ```
 
