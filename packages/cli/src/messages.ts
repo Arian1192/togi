@@ -123,6 +123,7 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   task_created: (p) => ({
     text: `Creada ${task(p)} «${p.title ?? ""}» (riesgo ${t("risk", p.risk)}, ${p.state ?? "draft"})`,
   }),
+  task_submitted: (p) => ({ text: `Enviada ${task(p)} a ${p.state ?? "planning"}` }),
   task_missing_criteria: (p) => ({
     text: "Falta el criterio de aceptación",
     next: { label: "Añádelo con", command: edit(p) },

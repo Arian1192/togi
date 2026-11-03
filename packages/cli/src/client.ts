@@ -70,17 +70,25 @@ export function createClient(home: string) {
   };
   const api = hc<AppType>("http://togi", { fetch: guarded });
 
-  /** Devuelve el JSON de una respuesta correcta; si no, lanza el `CliError` del problem+json. */
-  async function checked<T>(res: Response, context: MessageParams = {}): Promise<T> {
+  /** Como `checked`, pero devuelve también las cabeceras (el `ETag` para `If-Match`). */
+  async function checkedWithHeaders<T>(
+    res: Response,
+    context: MessageParams = {},
+  ): Promise<{ body: T; headers: Headers }> {
     const body: unknown = await res.json().catch(() => null);
-    if (res.ok) return body as T;
+    if (res.ok) return { body: body as T, headers: res.headers };
     throw fromProblem(res.status, body, {
       ...context,
       requestId: trustedRequestId(requestId, res),
     });
   }
 
-  return { api, requestId, socket: p.socket, checked };
+  /** Devuelve el JSON de una respuesta correcta; si no, lanza el `CliError` del problem+json. */
+  async function checked<T>(res: Response, context: MessageParams = {}): Promise<T> {
+    return (await checkedWithHeaders<T>(res, context)).body;
+  }
+
+  return { api, requestId, socket: p.socket, checked, checkedWithHeaders };
 }
 
 export type Client = ReturnType<typeof createClient>;
