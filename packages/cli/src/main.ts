@@ -38,6 +38,7 @@ async function main(): Promise<number> {
           ? usageError("usage", { command: (error as Error).message })
           : null;
     if (cli === null) throw error;
+    if (cli.stdout !== undefined) process.stdout.write(cli.stdout);
     process.stderr.write(renderError(cli, errorOut(noColorFlag)));
     return cli.exitCode;
   }

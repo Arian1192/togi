@@ -8,6 +8,8 @@ export interface MessageParams {
   command?: string;
   suggestion?: string;
   pid?: number;
+  /** Número de evento del log. */
+  event?: number;
   socket?: string;
   /** Cola del log del daemon, ya sin caracteres de control. */
   detail?: string;
@@ -84,11 +86,18 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Un valor no es válido${p.field === undefined ? "" : ` (${p.field})`}.`,
     next: { label: "Mira el uso con", command: "togi <comando> --help" },
   }),
-  integrity_error: () => ({
-    text: "El log o un blob no supera la verificación.",
-    warning: "Puede indicar una manipulación.",
-    next: { label: "Verifícalo con", command: "togi admin verify-log" },
-  }),
+  integrity_error: (p) =>
+    p.event === undefined
+      ? {
+          text: "El log o un blob no supera la verificación.",
+          warning: "Puede indicar una manipulación.",
+          next: { label: "Verifícalo con", command: "togi admin verify-log" },
+        }
+      : {
+          text: `El evento #${p.event} del log no supera la verificación.`,
+          warning: "Puede indicar una manipulación. No sigas trabajando hasta revisarlo.",
+        },
+  log_verified: () => ({ text: "Log íntegro" }),
   daemon_started: (p) => ({ text: `Daemon arrancado · pid ${p.pid} · ${p.socket}` }),
   daemon_already_running: (p) => ({ text: `El daemon ya está en marcha · pid ${p.pid}` }),
   daemon_stopped: (p) => ({ text: `Daemon parado · pid ${p.pid}` }),
