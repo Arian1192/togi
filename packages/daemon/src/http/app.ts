@@ -36,9 +36,15 @@ export function createApp(
   return new Hono<AppEnv>()
     .use("*", requestId)
     .use("*", authenticated(db))
-    .get("/v1/health", (c) =>
-      c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION, pid: process.pid }),
-    )
+    .get("/v1/health", (c) => {
+      // Seq del último evento del log (0 si está vacío): `togi watch` conecta desde aquí.
+      const { lastSeq } = db
+        .prepare("SELECT COALESCE(MAX(seq), 0) AS lastSeq FROM events")
+        .get() as {
+        lastSeq: number;
+      };
+      return c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION, pid: process.pid, lastSeq });
+    })
     .route("/", taskRoutes(db, handle))
     .route("/", queryRoutes(db, reads, handle))
     .route("/", eventRoutes(reads))
