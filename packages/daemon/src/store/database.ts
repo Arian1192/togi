@@ -1,7 +1,7 @@
 import { closeSync, mkdirSync, openSync } from "node:fs";
 import { dirname } from "node:path";
 import Database from "better-sqlite3";
-import { rebuildTasks } from "../projections/tasks.ts";
+import { rebuildProjections } from "../projections/index.ts";
 import { SqliteEventStore } from "./event-store.ts";
 import { MIGRATIONS, REBUILD_PROJECTIONS, SCHEMA_V1_SQL, SCHEMA_VERSION } from "./schema.ts";
 
@@ -42,7 +42,7 @@ export function openEventDatabase(
           db.pragma(`user_version = ${target}`);
           needsRebuild ||= rebuild.has(target);
         }
-        if (needsRebuild) rebuildTasks(db, new SqliteEventStore(db));
+        if (needsRebuild) rebuildProjections(db, new SqliteEventStore(db));
       })();
     } catch (error) {
       db.close();

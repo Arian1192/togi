@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -99,10 +99,49 @@ CREATE TABLE idempotency_keys (
   8: `
 ALTER TABLE tasks ADD COLUMN has_criteria INTEGER NOT NULL DEFAULT 0;
 DELETE FROM tasks;`,
+  // Proyecciones de la planificación (ver projections/planning.ts). Sin triggers: se reconstruyen.
+  // Solo referencias a blobs (approach, reason): nunca el texto.
+  9: `
+CREATE TABLE plans (
+  task_number          INTEGER NOT NULL,
+  plan_version         INTEGER NOT NULL,
+  session_id           TEXT    NOT NULL,
+  base_sha             TEXT    NOT NULL,
+  files                TEXT    NOT NULL,
+  new_tests            TEXT    NOT NULL,
+  approach             TEXT    NOT NULL,
+  estimated_production INTEGER NOT NULL,
+  estimated_tests      INTEGER NOT NULL,
+  proposed_at          TEXT    NOT NULL,
+  PRIMARY KEY (task_number, plan_version)
+);
+CREATE TABLE sessions (
+  session_id  TEXT PRIMARY KEY,
+  task_number INTEGER NOT NULL,
+  role        TEXT    NOT NULL,
+  runtime     TEXT    NOT NULL,
+  model       TEXT    NOT NULL,
+  specialist  TEXT    NOT NULL,
+  state       TEXT    NOT NULL,
+  started_at  TEXT    NOT NULL,
+  ended_at    TEXT,
+  outcome     TEXT,
+  usage       TEXT
+);
+CREATE TABLE decisions (
+  seq          INTEGER PRIMARY KEY,
+  task_number  INTEGER NOT NULL,
+  gate         TEXT    NOT NULL,
+  verdict      TEXT    NOT NULL,
+  plan_version INTEGER NOT NULL,
+  actor        TEXT    NOT NULL,
+  reason       TEXT,
+  decided_at   TEXT    NOT NULL
+);`,
 };
 
 /**
  * Migraciones que dejan las proyecciones vacías o inválidas. Al abrir la base, si alguna de las
  * aplicadas está aquí, se reconstruyen desde el log dentro de la misma transacción.
  */
-export const REBUILD_PROJECTIONS: ReadonlySet<number> = new Set([7, 8]);
+export const REBUILD_PROJECTIONS: ReadonlySet<number> = new Set([7, 8, 9]);
