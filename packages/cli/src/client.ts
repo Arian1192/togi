@@ -44,6 +44,9 @@ export function socketFetch(socketPath: string, token: string, requestId: string
           );
         },
       );
+      // Abortar destruye la conexión: así `togi watch` termina con Ctrl+C aunque el stream no acabe.
+      if (req.signal.aborted) call.destroy();
+      else req.signal.addEventListener("abort", () => call.destroy(), { once: true });
       call.on("error", reject).end(body);
     });
   };
