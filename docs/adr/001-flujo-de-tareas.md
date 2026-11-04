@@ -60,6 +60,8 @@ El camino feliz va de `draft` a `merged`; las dos vueltas atrás (pedir cambios 
 1. **El plan es un contrato.** En `verifying`, un diff que toca ficheros ausentes del plan aprobado falla el gate.
 2. **Tests: añadir sí, modificar no.** El agente puede crear tests nuevos; los existentes son de solo lectura y no se pueden marcar como skip. Esto resuelve la tensión entre el principio 4 y la idea de usar agentes para reforzar la base de tests.
 3. **Límite de 300 líneas de diff por tarea.** Cifra propia, no sale de la evidencia; se ajusta con los datos del piloto. Un plan que estime más se parte en `plan_review`.
+
+   > **Nota (rebanada 2):** desde la rebanada 2, el límite del gate 1 sigue el ADR-007: 200 líneas de producción y 500 en total, con la estimación del plan separada en `{ production, tests }`. Sustituye a las 300 líneas de esta regla; `FlowPolicy.maxLines` pasa a `maxProductionLines` y `maxTotalLines`.
 4. **Máximo de 3 ciclos `building` → `verifying`.** Al tercer fallo la tarea pasa a `failed` y vuelve al humano: casi siempre indica una tarea mal escrita o demasiado grande.
 5. **El agente no se autoevalúa.** Su bucle interno en `building` es una ayuda; la única verificación que cuenta es la de `verifying`, ejecutada por togi en un entorno que el agente no controla.
 6. **Todo es un evento.** Cada cambio de estado, acción del agente, resultado de gate y decisión humana se registra en un log append-only. El estado de la tarea es una proyección de ese log.

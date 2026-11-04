@@ -4,6 +4,7 @@ import { ADMIN_STREAM } from "./admin.ts";
 import { DATA_CLASSES } from "./blob.ts";
 import type { AdminEvent, DomainEvent, TaskEvent } from "./events.ts";
 import { AGENT_ROLES } from "./ids.ts";
+import { PLAN_CHANGES, SESSION_OUTCOMES } from "./planning.ts";
 import { REASON_CATEGORIES, RISK_LEVELS } from "./task.ts";
 
 /** Evento almacenado que no es un `DomainEvent` válido; `seq` identifica cuál. */
@@ -68,6 +69,69 @@ const taskEdited = z.strictObject({
   acceptanceCriteria: nullableBlob.optional(),
 });
 
+const sessionId = z.templateLiteral(["ses_", z.string()]);
+const count = z.number().int().nonnegative();
+
+const MAX_PATH_LENGTH = 256;
+const hasControlChar = (text: string) =>
+  [...text].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
+
+/** Ruta que escribe un agente: relativa, dentro del repo y sin caracteres que confundan. */
+const repoPath = z
+  .string()
+  .min(1)
+  .max(MAX_PATH_LENGTH)
+  .refine((p) => !p.startsWith("/"), "la ruta debe ser relativa")
+  .refine((p) => !p.includes("\\"), "la ruta no admite barra invertida")
+  .refine((p) => !hasControlChar(p), "la ruta no admite caracteres de control")
+  .refine((p) => !p.split("/").includes(".."), 'la ruta no admite segmentos ".."');
+
+const sessionStarted = z.strictObject({
+  sessionId,
+  role: z.enum(AGENT_ROLES),
+  cycle: count.nullable(),
+  runtime: z.strictObject({ id: z.string(), version: z.string() }),
+  model: z.string(),
+  specialist: z.strictObject({
+    id: z.string(),
+    version: count,
+    hash: z.templateLiteral(["sha256:", z.string()]),
+  }),
+  workspaceId: z.templateLiteral(["wsp_", z.string()]).nullable(),
+  prompt: blobRef,
+  policy: blobRef,
+});
+const sessionEnded = z.strictObject({
+  sessionId,
+  outcome: z.enum(SESSION_OUTCOMES),
+  usage: z.strictObject({
+    inputTokens: count,
+    outputTokens: count,
+    estimatedCostUsd: z.number().nonnegative(),
+    durationMs: count,
+  }),
+  trajectoryEvents: count,
+});
+const planProposed = z.strictObject({
+  planVersion: z.number().int().positive(),
+  sessionId,
+  files: z.array(z.strictObject({ path: repoPath, change: z.enum(PLAN_CHANGES) })),
+  newTests: z.array(repoPath),
+  approach: blobRef,
+  estimatedLines: z.strictObject({ production: count, tests: count }),
+  baseSha: z.string().min(1),
+});
+const decisionBase = {
+  gate: z.literal("plan"),
+  mode: z.literal("binding"),
+  subject: z.strictObject({ planVersion: z.number().int().positive() }),
+};
+const decisionRecorded = z.discriminatedUnion("verdict", [
+  z.strictObject({ ...decisionBase, verdict: z.literal("approve") }),
+  z.strictObject({ ...decisionBase, verdict: z.literal("request_changes"), reason }),
+  z.strictObject({ ...decisionBase, verdict: z.literal("reject"), reason }),
+]);
+
 /** zod infiere `x?: T | undefined`; `exactOptionalPropertyTypes` pide añadirlo al tipo de core. */
 type WithUndefined<T> = { [K in keyof T]: T[K] | undefined };
 
@@ -88,6 +152,18 @@ const TASK_PAYLOADS = {
   "task.edited": taskEdited satisfies z.ZodType<WithUndefined<EditedPayload>>,
   "task.submitted": z.strictObject({}) satisfies z.ZodType<
     Extract<TaskEvent, { type: "task.submitted" }>["payload"]
+  >,
+  "session.started": sessionStarted satisfies z.ZodType<
+    Extract<TaskEvent, { type: "session.started" }>["payload"]
+  >,
+  "session.ended": sessionEnded satisfies z.ZodType<
+    Extract<TaskEvent, { type: "session.ended" }>["payload"]
+  >,
+  "plan.proposed": planProposed satisfies z.ZodType<
+    Extract<TaskEvent, { type: "plan.proposed" }>["payload"]
+  >,
+  "decision.recorded": decisionRecorded satisfies z.ZodType<
+    Extract<TaskEvent, { type: "decision.recorded" }>["payload"]
   >,
   "task.rejected": z.strictObject({ reason }) satisfies z.ZodType<
     Extract<TaskEvent, { type: "task.rejected" }>["payload"]

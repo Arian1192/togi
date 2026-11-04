@@ -20,7 +20,7 @@ import type Database from "better-sqlite3";
 import { applyToTasks } from "../projections/tasks.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
 
-const POLICY: FlowPolicy = { maxLines: 300, maxFailedCycles: 3 };
+const POLICY: FlowPolicy = { maxProductionLines: 200, maxTotalLines: 500, maxFailedCycles: 3 };
 
 /** Comando de create con los textos en claro; el handler los guarda como blobs. */
 export interface CreateTaskInput {

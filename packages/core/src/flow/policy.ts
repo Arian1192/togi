@@ -1,4 +1,5 @@
 export interface FlowPolicy {
-  maxLines: 300;
+  maxProductionLines: 200;
+  maxTotalLines: 500;
   maxFailedCycles: 3;
 }

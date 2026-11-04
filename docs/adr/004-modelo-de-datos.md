@@ -127,7 +127,8 @@ export interface Plan {
   files: { path: string; change: "add" | "modify" | "delete" }[];
   newTests: string[];
   approach: BlobRef;
-  estimatedLines: number;     // > 300 → se parte en plan_review
+  estimatedLines: { production: number; tests: number }; // pasa de los límites del ADR-007 → se parte
+  baseSha: string;            // commit sobre el que se planificó
 }
 
 export interface Workspace {
@@ -171,7 +172,7 @@ Las reglas del ADR-001 son un decider puro: `decide` valida un comando contra el
 export function evolve(view: TaskView, event: TaskEvent): TaskView;
 export function decide(view: TaskView, cmd: TaskCommand, policy: FlowPolicy): TaskEvent[] | DomainError;
 
-export interface FlowPolicy { maxLines: 300; maxFailedCycles: 3 }
+export interface FlowPolicy { maxProductionLines: 200; maxTotalLines: 500; maxFailedCycles: 3 }
 ```
 
 Cuatro precisiones sobre el ADR-001:
@@ -181,7 +182,7 @@ Cuatro precisiones sobre el ADR-001:
 3. **Una ejecución por gate.** El ADR-001 habla de una ejecución de gate por ciclo. Se registra un `GateRun` por cada gate dentro del ciclo y `verification.completed` los agrupa, para que cada gate tenga su evidencia y su duración.
 4. **Modo sombra.** Una decisión con `mode: "shadow"` se guarda pero no mueve la tarea. La proyección `shadow_agreement` compara, por nivel de riesgo, la decisión del revisor delegado con la vinculante y lleva la racha de coincidencias: de ahí sale el criterio de las 20 tareas seguidas.
 
-`decide` exige `reason` en todo `request_changes`, `reject` y `task.rejected`, y rechaza un `approve` en `plan_review` si el plan estima más de 300 líneas. En el modo equipo podrá imponer además que quien aprueba no sea quien creó la tarea.
+`decide` exige `reason` en todo `request_changes`, `reject` y `task.rejected`, y rechaza un `approve` en `plan_review` si el plan estima más de `maxProductionLines` líneas de producción o más de `maxTotalLines` en total (ADR-007). En el modo equipo podrá imponer además que quien aprueba no sea quien creó la tarea.
 
 El título es un `BlobRef` obligatorio, nunca `null`: es el único texto que no puede faltar. La descripción y el criterio de aceptación son `BlobRef | null`: el daemon no crea blob para un texto vacío y guarda `null`. Así `submit` sabe si hay criterio sin leer el blob, que el decider no puede descifrar porque `core` no tiene acceso a las claves.
 
