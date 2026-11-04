@@ -3,15 +3,19 @@ import {
   type BlobRef,
   type BlobStore,
   decide as coreDecide,
+  type DataClass,
   type DomainError,
   evolve,
   type FlowPolicy,
   type NewTaskEvent,
   NO_TASK,
+  type Plan,
   type ReasonCategory,
   type RiskLevel,
+  type SessionStarted,
   type StoredEvent,
   type TaskCommand,
+  type TaskEvent,
   type TaskSource,
   type TaskView,
   toDomainEvent,
@@ -19,6 +23,9 @@ import {
 import type Database from "better-sqlite3";
 import { applyProjections } from "../projections/index.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
+
+/** Marcador para comandos sobre una tarea inexistente: decide devuelve task_not_found antes de usarlo. */
+const NO_REF: BlobRef = { hash: "hmac-sha256:", keyId: "", dataClass: "task_text" };
 
 const POLICY: FlowPolicy = { maxProductionLines: 200, maxTotalLines: 500, maxFailedCycles: 3 };
 
@@ -55,7 +62,51 @@ export interface RejectTaskInput {
   text: string;
 }
 
-export type CommandInput = CreateTaskInput | EditTaskInput | SubmitTaskInput | RejectTaskInput;
+/** Sesión de planificación: el prompt y la política llegan en claro y se guardan como blobs `prompt`. */
+export interface StartSessionInput {
+  type: "startSession";
+  number: number;
+  session: Omit<SessionStarted, "prompt" | "policy"> & { prompt: string; policy: string };
+}
+
+export interface EndSessionInput {
+  type: "endSession";
+  number: number;
+  session: Extract<TaskEvent, { type: "session.ended" }>["payload"];
+}
+
+/** El enfoque llega en claro y se guarda como blob `task_text`. */
+export interface ProposePlanInput {
+  type: "proposePlan";
+  number: number;
+  plan: Omit<Plan, "planVersion" | "sessionId" | "approach"> & { approach: string };
+}
+
+export interface ApprovePlanInput {
+  type: "approvePlan";
+  number: number;
+  planVersion: number;
+}
+
+export interface PlanReasonInput {
+  type: "requestPlanChanges" | "rejectPlan";
+  number: number;
+  planVersion: number;
+  category: ReasonCategory;
+  text: string;
+}
+
+export type CommandInput =
+  | CreateTaskInput
+  | EditTaskInput
+  | SubmitTaskInput
+  | RejectTaskInput
+  | StartSessionInput
+  | EndSessionInput
+  | ProposePlanInput
+  | ApprovePlanInput
+  | PlanReasonInput;
+type ExistingTaskInput = Exclude<CommandInput, CreateTaskInput>;
 
 /** If-Match no coincide con la versión actual del stream. No se ha escrito nada. */
 export interface PreconditionFailed {
@@ -145,7 +196,7 @@ export function createHandler(deps: HandlerDeps) {
 
   const modify = async (
     actor: Actor,
-    cmd: EditTaskInput | SubmitTaskInput | RejectTaskInput,
+    cmd: ExistingTaskInput,
     opts: CommandOptions,
   ): Promise<HandleResult> => {
     const stream = `task:${cmd.number}`;
@@ -155,26 +206,61 @@ export function createHandler(deps: HandlerDeps) {
       return { kind: "precondition_failed", current: version };
     }
     const at = clock().toISOString();
-    // Sin tarea no se guardan blobs: decide devuelve task_not_found.
-    const blob = (text: string) =>
-      view.exists ? textBlob(text, cmd.number) : Promise.resolve(null);
-    let command: TaskCommand;
-    if (cmd.type === "edit") {
-      const changes: Extract<TaskCommand, { type: "edit" }>["changes"] = {};
-      if (cmd.title !== undefined && view.exists)
-        changes.title = await putText(cmd.title, cmd.number);
-      if (cmd.description !== undefined) changes.description = await blob(cmd.description);
-      if (cmd.acceptanceCriteria !== undefined) {
-        changes.acceptanceCriteria = await blob(cmd.acceptanceCriteria);
-      }
-      command = { type: "edit", actor, at, changes };
-    } else if (cmd.type === "submit") {
-      command = { type: "submit", actor, at };
-    } else {
+    // Se construye dos veces: en seco (marcadores, sin escribir blobs) y, si decide lo acepta, de
+    // verdad. Así un comando rechazado no deja blobs; sin tarea, decide da task_not_found.
+    const build = async (dry: boolean): Promise<TaskCommand> => {
+      const put = async (text: string, dataClass: DataClass = "task_text") =>
+        dry ? NO_REF : blobs.put(new TextEncoder().encode(text), dataClass, cmd.number);
       // Texto vacío => null: decide lo rechaza con su invalid_reason (y su precedencia).
-      const text = await blob(cmd.text);
-      command = { type: "reject", actor, at, reason: { category: cmd.category, text } };
-    }
+      const blob = async (text: string) => (text.trim() === "" ? null : put(text));
+      switch (cmd.type) {
+        case "edit": {
+          const changes: Extract<TaskCommand, { type: "edit" }>["changes"] = {};
+          if (cmd.title !== undefined) changes.title = await put(cmd.title);
+          if (cmd.description !== undefined) changes.description = await blob(cmd.description);
+          if (cmd.acceptanceCriteria !== undefined) {
+            changes.acceptanceCriteria = await blob(cmd.acceptanceCriteria);
+          }
+          return { type: "edit", actor, at, changes };
+        }
+        case "submit":
+          return { type: "submit", actor, at };
+        case "reject": {
+          const reason = { category: cmd.category, text: await blob(cmd.text) };
+          return { type: "reject", actor, at, reason };
+        }
+        case "startSession": {
+          const { prompt, policy, ...rest } = cmd.session;
+          const session = {
+            ...rest,
+            prompt: await put(prompt, "prompt"),
+            policy: await put(policy, "prompt"),
+          };
+          return { type: "startSession", actor, at, session };
+        }
+        case "endSession":
+          return { type: "endSession", actor, at, session: cmd.session };
+        case "proposePlan": {
+          const { approach, ...rest } = cmd.plan;
+          return {
+            type: "proposePlan",
+            actor,
+            at,
+            plan: { ...rest, approach: await put(approach) },
+          };
+        }
+        case "approvePlan":
+          return { type: "approvePlan", actor, at, planVersion: cmd.planVersion };
+        case "requestPlanChanges":
+        case "rejectPlan": {
+          const reason = { category: cmd.category, text: await blob(cmd.text) };
+          return { type: cmd.type, actor, at, planVersion: cmd.planVersion, reason };
+        }
+      }
+    };
+    const dry = decide(view, await build(true), POLICY);
+    if (!Array.isArray(dry)) return dry;
+    const command = await build(false);
     const decided = decide(view, command, POLICY);
     if (!Array.isArray(decided)) return decided;
     const events = store.appendWithin(
