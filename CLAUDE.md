@@ -13,3 +13,4 @@ o de plugins. En particular, en este repo:
 - Nunca se quitan, fusionan ni mueven tests para cumplir el límite de líneas. Si un PR no cabe, se
   parte el código con sus tests.O
 
+- Nunca quites, fusiones ni muevas tests para cumplir el límite de tamaño. Si un PR no cabe, se parte el código con sus tests.
