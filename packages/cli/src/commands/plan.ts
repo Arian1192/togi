@@ -1,0 +1,96 @@
+import { PLAN_LIMITS } from "@togi/core";
+import { createClient } from "../client.ts";
+import { CliError, usageError } from "../errors.ts";
+import { clean, oneLine, say } from "../format.ts";
+import type { Output } from "../output.ts";
+import type { Command } from "./index.ts";
+
+const NUMBER = /^[1-9]\d*$/;
+
+interface PlanSummary {
+  planVersion: number;
+  baseSha: string;
+  files: { path: string; change: string }[];
+  newTests: string[];
+  estimatedLines: { production: number; tests: number };
+}
+
+interface Plan extends PlanSummary {
+  approach: string;
+  approachErased: boolean;
+  previous: PlanSummary[];
+}
+
+const exceedsLimits = ({ production, tests }: PlanSummary["estimatedLines"]) =>
+  production > PLAN_LIMITS.maxProductionLines || production + tests > PLAN_LIMITS.maxTotalLines;
+
+/** Una versión del plan: la vigente con su enfoque, o una anterior, que no lo conserva. */
+function render(n: number, plan: PlanSummary, approach: string | null, out: Output): string {
+  const { production, tests } = plan.estimatedLines;
+  const lines = [
+    `${out.paint("accent", `#${n}`)}  plan · versión ${plan.planVersion}`,
+    `${" ".repeat(`#${n}`.length + 2)}base ${oneLine(plan.baseSha)} · ${say("plan_lines", { production, tests })}`,
+  ];
+  if (exceedsLimits(plan.estimatedLines)) {
+    const limit = `${PLAN_LIMITS.maxProductionLines} de producción, ${PLAN_LIMITS.maxTotalLines} en total`;
+    lines.push(out.mark("attention", say("plan_exceeds", { limit })));
+  }
+  lines.push("", say("section_plan_files"));
+  for (const f of plan.files) {
+    lines.push(`  ${say(`plan_change_${oneLine(f.change)}`).padEnd(10)} ${oneLine(f.path)}`);
+  }
+  lines.push("", say("section_plan_tests"));
+  if (plan.newTests.length === 0) lines.push(`  ${out.paint("muted", say("text_empty"))}`);
+  for (const t of plan.newTests) lines.push(`  ${oneLine(t)}`);
+  lines.push("", say("section_plan_approach"));
+  if (approach === null) lines.push(`  ${out.paint("muted", say("plan_older"))}`);
+  else for (const l of clean(approach).split("\n")) lines.push(`  ${l}`);
+  return `${lines.join("\n")}\n`;
+}
+
+const show: Command = {
+  summary: "Muestra el plan de una tarea.",
+  example: "togi plan show 12",
+  options: { version: { type: "string" } },
+  usage: `Uso: togi plan show <número> [--version <v>] [--json]
+
+Muestra el plan vigente: ficheros con su tipo de cambio, tests nuevos, enfoque, líneas
+estimadas, la rama base (sha) y la versión. Avisa si pasa de los límites (${PLAN_LIMITS.maxProductionLines} líneas de
+producción, ${PLAN_LIMITS.maxTotalLines} en total).
+Con --version se ve una versión anterior, sin enfoque: solo se conserva el de la vigente.
+
+Ejemplo:
+  togi plan show 12 --version 1
+`,
+  async run({ home, json, out, values, args }) {
+    const command = "togi plan show --help";
+    const n = args[0];
+    if (n === undefined)
+      throw usageError("missing_option", { field: "el número de tarea", command });
+    if (args.length > 1 || !NUMBER.test(n)) {
+      throw usageError("invalid_option", { field: "el número de tarea", command });
+    }
+    const wanted = values.version;
+    if (wanted !== undefined && (typeof wanted !== "string" || !NUMBER.test(wanted))) {
+      throw usageError("invalid_option", { field: "--version", command });
+    }
+    const client = createClient(home);
+    const plan = await client.checked<Plan>(
+      await client.api.v1.tasks[":n"].plan.$get({ param: { n } }),
+      { n: Number(n) },
+    );
+    const version = wanted === undefined ? plan.planVersion : Number(wanted);
+    if (version === plan.planVersion) {
+      if (json) return `${JSON.stringify(plan)}\n`;
+      return render(Number(n), plan, plan.approachErased ? say("text_erased") : plan.approach, out);
+    }
+    const older = plan.previous.find((p) => p.planVersion === version);
+    if (older === undefined) {
+      throw new CliError("plan_version_not_found", 7, { n: Number(n), version });
+    }
+    if (json) return `${JSON.stringify(older)}\n`;
+    return render(Number(n), older, null, out);
+  },
+};
+
+export const plan = { show };
