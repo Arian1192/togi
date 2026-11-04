@@ -80,6 +80,7 @@ test("el detalle devuelve los textos descifrados", async () => {
     createdAt: body.createdAt,
     updatedAt: body.updatedAt,
     version: 1,
+    planVersion: null,
     description: "descripción secreta",
     acceptanceCriteria: "criterio secreto",
     erased: { description: false, acceptanceCriteria: false },
