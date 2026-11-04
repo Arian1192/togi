@@ -43,6 +43,9 @@ function exitFor(status: number): ExitCode {
   return 1;
 }
 
+/** Códigos cuyo status HTTP no da su salida: repetir el comando no arregla un alta duplicada. */
+const EXIT_BY_CODE: Record<string, ExitCode> = { repo_already_registered: 3 };
+
 /** Un `code` de la red solo se acepta con esta forma: así no llegan caracteres de control a la terminal. */
 const SAFE_CODE = /^[a-z_]+$/;
 
@@ -50,7 +53,7 @@ const SAFE_CODE = /^[a-z_]+$/;
 export function fromProblem(status: number, body: unknown, context: ErrorContext): CliError {
   const code = (body as { code?: unknown } | null)?.code;
   const safe = typeof code === "string" && SAFE_CODE.test(code) ? code : `http_${status}`;
-  return new CliError(safe, exitFor(status), context, status);
+  return new CliError(safe, EXIT_BY_CODE[safe] ?? exitFor(status), context, status);
 }
 
 export const daemonUnavailable = (): CliError => new CliError("daemon_unavailable", 6);

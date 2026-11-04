@@ -3,6 +3,7 @@ import type { Output } from "../output.ts";
 import { admin } from "./admin.ts";
 import { daemon } from "./daemon.ts";
 import { plan } from "./plan.ts";
+import { repo } from "./repo.ts";
 import { status } from "./status.ts";
 import { task } from "./task.ts";
 import { watch } from "./watch.ts";
@@ -40,7 +41,13 @@ export interface Command {
 }
 
 /** Enrutado `recurso verbo`. */
-export const COMMANDS: Record<string, Record<string, Command>> = { admin, daemon, plan, task };
+export const COMMANDS: Record<string, Record<string, Command>> = {
+  admin,
+  daemon,
+  plan,
+  repo,
+  task,
+};
 
 /** Atajos de un verbo (`togi status`), sin recurso. */
 export const SHORTCUTS: Record<string, Command> = { status, watch };

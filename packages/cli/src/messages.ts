@@ -20,6 +20,9 @@ export interface MessageParams {
   production?: number;
   tests?: number;
   limit?: string;
+  /** owner/repo y ruta de un repo registrado. */
+  repo?: string;
+  path?: string;
 }
 
 export interface NextStep {
@@ -34,6 +37,13 @@ export interface Message {
   /** Aviso extra en la misma línea del mensaje. */
   warning?: string;
 }
+
+/** Sin caracteres de control: una ruta o un nombre no pueden mover la terminal. */
+const plain = (text: string | undefined, fallback: string): string =>
+  text === undefined ? fallback : text.replace(/\p{Cc}/gu, "");
+const repoName = (p: MessageParams) => plain(p.repo, "<owner/repo>");
+const repoPath = (p: MessageParams) => plain(p.path, "<ruta>");
+const listRepos = { label: "Mira los que hay con", command: "togi repo list" };
 
 const task = (p: MessageParams) => `#${p.n ?? "?"}`;
 const edit = (p: MessageParams) => `togi task edit ${p.n ?? "<número>"}`;
@@ -233,6 +243,36 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `La tarea ${task(p)} no tiene la versión ${p.version ?? "?"} del plan.`,
     next: { label: "Mira la vigente con", command: `togi plan show ${p.n ?? "<número>"}` },
   }),
+  repo_added: (p) => ({ text: `Registrado ${repoName(p)} → ${repoPath(p)}` }),
+  repo_removed: (p) => ({ text: `Dado de baja ${repoName(p)}` }),
+  repos_empty: () => ({
+    text: "No hay repos registrados.",
+    next: { label: "Registra uno con", command: "togi repo add <owner/repo> --path <ruta>" },
+  }),
+  path_not_found: (p) => ({
+    text: `La ruta ${repoPath(p)} no existe.`,
+    next: {
+      label: "Repite con una ruta válida",
+      command: "togi repo add <owner/repo> --path <ruta>",
+    },
+  }),
+  not_a_git_repo: (p) => ({
+    text: `${repoPath(p)} no es la raíz de un repo git.`,
+    next: { label: "Indica la carpeta que contiene .git" },
+  }),
+  remote_mismatch: (p) => ({
+    text: `Ningún remote de ${repoPath(p)} apunta a ${repoName(p)}.`,
+    next: { label: "Revisa los remotes con", command: "git -C <ruta> remote -v" },
+  }),
+  inside_togi_home: (p) => ({
+    text: `${repoPath(p)} está dentro del directorio de datos de togi.`,
+    next: { label: "Registra un clon fuera de él" },
+  }),
+  repo_already_registered: (p) => ({
+    text: `${repoName(p)} ya está registrado.`,
+    next: { label: "Míralo con", command: "togi repo list" },
+  }),
+  repo_not_found: (p) => ({ text: `${repoName(p)} no está registrado.`, next: listRepos }),
   usage: (p) => ({
     text: p.command ?? "Uso incorrecto.",
     next: { label: "Mira el uso con", command: "togi --help" },
