@@ -32,6 +32,12 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
       return view.exists ? { ...view, state: "planning" } : view;
     case "task.rejected":
       return view.exists ? { ...view, state: "rejected" } : view;
+    // Las transiciones de la planificación llegan con las reglas del gate 1.
+    case "session.started":
+    case "session.ended":
+    case "plan.proposed":
+    case "decision.recorded":
+      return view;
     default: {
       const unhandled: never = event;
       return unhandled;

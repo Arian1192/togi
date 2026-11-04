@@ -9,7 +9,7 @@ import { type DomainErrorCode, isDomainError } from "./errors.ts";
 import type { FlowPolicy } from "./policy.ts";
 import { evolve, type NewTaskEvent, NO_TASK, type TaskView } from "./task-view.ts";
 
-const policy: FlowPolicy = { maxLines: 300, maxFailedCycles: 3 };
+const policy: FlowPolicy = { maxProductionLines: 200, maxTotalLines: 500, maxFailedCycles: 3 };
 const actor: Actor = { kind: "human", userId: "usr_1" };
 const meta = { actor, at: "2026-11-03T10:00:00Z" };
 const blob = (n: string): BlobRef => ({

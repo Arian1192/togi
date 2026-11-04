@@ -18,7 +18,7 @@ test("reject con texto null devuelve invalid_reason", () => {
   const result = decide(
     view,
     { ...meta, type: "reject", reason: { category: "scope", text: null } },
-    { maxLines: 300, maxFailedCycles: 3 },
+    { maxProductionLines: 200, maxTotalLines: 500, maxFailedCycles: 3 },
   );
   assert.ok(!Array.isArray(result));
   assert.equal(result.code, "invalid_reason");

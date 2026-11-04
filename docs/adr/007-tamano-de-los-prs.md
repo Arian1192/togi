@@ -34,6 +34,8 @@ Las cifras de 200 y 500 son una propuesta basada en los PRs de la rebanada 1, no
 
 Esta decisión rige cómo se trabaja en este repo. El límite que el ADR-001 fija para las tareas que harán los agentes dentro de togi (`FlowPolicy.maxLines`) no cambia aquí: se decide en la rebanada 3, al construir el gate `diff_size`, probablemente con la misma forma de medir.
 
+> **Nota (rebanada 2):** el gate 1 adelanta una parte. Desde la rebanada 2, `FlowPolicy` usa `maxProductionLines: 200` y `maxTotalLines: 500`, y el plan estima por separado producción y tests. Queda para la rebanada 3 el gate `diff_size`, que mide el diff real.
+
 ## Alternativas descartadas
 
 | Alternativa | Por qué se descarta |

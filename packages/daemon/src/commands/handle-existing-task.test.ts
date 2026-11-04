@@ -127,7 +127,7 @@ test("reject con texto vacío devuelve el mismo invalid_reason que core", async 
       risk: "low",
     },
     { type: "reject", actor, at: "", reason: { category: "scope", text: null } },
-    { maxLines: 300, maxFailedCycles: 3 },
+    { maxProductionLines: 200, maxTotalLines: 500, maxFailedCycles: 3 },
   );
   assert.equal((result as DomainError).code, "invalid_reason");
   assert.deepEqual(result, fromCore);
