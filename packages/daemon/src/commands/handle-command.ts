@@ -17,7 +17,7 @@ import {
   toDomainEvent,
 } from "@togi/core";
 import type Database from "better-sqlite3";
-import { applyToTasks } from "../projections/tasks.ts";
+import { applyProjections } from "../projections/index.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
 
 const POLICY: FlowPolicy = { maxProductionLines: 200, maxTotalLines: 500, maxFailedCycles: 3 };
@@ -136,7 +136,7 @@ export function createHandler(deps: HandlerDeps) {
       0,
       correlate(decided as NewTaskEvent[], opts.correlationId),
       (stored, tx) => {
-        for (const event of stored) applyToTasks(tx, toDomainEvent(event));
+        for (const event of stored) applyProjections(tx, toDomainEvent(event));
         opts.onCommit?.(stored, tx);
       },
     );
@@ -182,7 +182,7 @@ export function createHandler(deps: HandlerDeps) {
       version,
       correlate(decided as NewTaskEvent[], opts.correlationId),
       (stored, tx) => {
-        for (const event of stored) applyToTasks(tx, toDomainEvent(event));
+        for (const event of stored) applyProjections(tx, toDomainEvent(event));
       },
     );
     return { number: cmd.number, events };
