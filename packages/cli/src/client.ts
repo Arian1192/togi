@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { request } from "node:http";
+import { Readable } from "node:stream";
 import { SAFE_ID } from "@togi/core";
 import type { AppType } from "@togi/daemon";
 import { paths } from "@togi/daemon/config";
@@ -26,17 +27,21 @@ export function socketFetch(socketPath: string, token: string, requestId: string
           headers: { ...headers, "x-request-id": requestId },
         },
         (res) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => {
-            const out = new Headers();
-            for (const [name, value] of Object.entries(res.headers)) {
-              if (typeof value === "string") out.set(name, value);
-            }
-            resolve(
-              new Response(Buffer.concat(chunks), { status: res.statusCode ?? 0, headers: out }),
-            );
-          });
+          // Se resuelve con las cabeceras y el cuerpo sigue llegando: un SSE no termina nunca.
+          // Un corte a mitad de respuesta rompe la lectura del cuerpo en vez de perderse.
+          const out = new Headers();
+          for (const [name, value] of Object.entries(res.headers)) {
+            if (typeof value === "string") out.set(name, value);
+          }
+          const status = res.statusCode ?? 0;
+          const noBody = status === 204 || status === 205 || status === 304;
+          if (noBody) res.resume();
+          resolve(
+            new Response(noBody ? null : (Readable.toWeb(res) as ReadableStream<Uint8Array>), {
+              status,
+              headers: out,
+            }),
+          );
         },
       );
       call.on("error", reject).end(body);
