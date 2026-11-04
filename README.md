@@ -2,7 +2,7 @@
 
 togi es una software factory local: agentes de código trabajan en un flujo con gates automáticos y aprobación humana en los puntos críticos. Su nombre viene del *togi* (研ぎ), el pulido de espadas japonés: no forja el código, lo afina y lo verifica por etapas hasta que está listo.
 
-> **Estado:** rebanada 1 en curso. Ya funcionan el daemon y todos los comandos de tareas: crear, consultar, editar, enviar y rechazar. Todavía no hay agentes: llegan en la rebanada 2.
+> **Estado:** rebanada 1 terminada. Funcionan el daemon y todos los comandos para gestionar tareas, seguir el log en directo y verificar que nadie lo ha manipulado. Todavía no hay agentes: llegan en la rebanada 2.
 
 ## Cómo funciona
 
@@ -82,10 +82,10 @@ Borrar un texto es destruir su clave de datos (`erase`). Tiene un límite: una c
 | `togi task submit <n>` | Envía la tarea a planificación |
 | `togi task reject <n> --category <categoría> --reason <texto> [--yes]` | Rechaza una tarea; pide confirmación |
 | `togi task edit <n> [--title …] [--description …] [--criteria …]` | Edita una tarea en `draft`; sin flags, abre `$EDITOR` |
+| `togi watch [--from-start]` | Sigue los eventos del log en directo; reconecta si el daemon se reinicia |
+| `togi admin verify-log` | Comprueba que el log no se ha manipulado |
 
 Todos aceptan `--json` y `--help`. Los códigos de salida y el formato de los mensajes están en [`docs/cli-estilo.md`](docs/cli-estilo.md).
-
-Pendientes en la rebanada 1: `togi watch` y `togi admin verify-log`.
 
 `togi task edit` sin flags abre `$VISUAL` o `$EDITOR` con una plantilla. Las líneas que empiezan por `#togi` son comentarios y cabeceras de sección; el resto, incluido el Markdown, es texto. Guardar el fichero vacío cancela. El editor se lanza sin shell, así que una ruta con espacios no funciona. El texto se edita en un fichero temporal privado que se borra al terminar, pero algunos editores guardan copias propias fuera de esa carpeta.
 
@@ -104,17 +104,18 @@ El monorepo tiene tres paquetes:
 | `packages/core` | Modelo, reglas del flujo y cadena de hashes. Sin infraestructura |
 | `packages/daemon` | Event store en SQLite, cifrado, proyecciones y API |
 | `packages/cli` | La CLI `togi` |
+| `packages/e2e` | El test de extremo a extremo, que usa togi como una persona |
 
 Cómo se trabaja en este repo:
 
-- Un objetivo por PR, idealmente de menos de 300 líneas, con un solo commit.
+- Un objetivo por PR, con un solo commit. Como máximo 200 líneas de producción y 500 en total, medidas con `node tools/diff-size.mjs` ([ADR-007](docs/adr/007-tamano-de-los-prs.md)). Nunca se quitan tests para cumplir el límite.
 - Se mergea solo por rebase, para conservar el trailer `Assisted-by` en `main`.
 - Los agentes siguen [`AGENTS.md`](AGENTS.md) y [`CLAUDE.md`](CLAUDE.md).
-- El plan de trabajo actual está en [`docs/plan-rebanada-1.md`](docs/plan-rebanada-1.md).
+- El plan de la rebanada 1, ya completado, está en [`docs/plan-rebanada-1.md`](docs/plan-rebanada-1.md).
 
 ## Documentación
 
 - [`docs/contexto.md`](docs/contexto.md): investigación y decisiones del proyecto.
-- [`docs/adr/`](docs/adr/): ADR-001 (flujo de tareas), 002 (monorepo), 003 (runtime de agentes), 004 (modelo de datos), 005 (API y CLI), 006 (cambio de nombre).
+- [`docs/adr/`](docs/adr/): ADR-001 (flujo de tareas), 002 (monorepo), 003 (runtime de agentes), 004 (modelo de datos), 005 (API y CLI), 006 (cambio de nombre), 007 (tamaño de los PRs).
 - [`docs/cli-estilo.md`](docs/cli-estilo.md): guía de estilo de la CLI.
-- [`docs/plan-rebanada-1.md`](docs/plan-rebanada-1.md): plan de la rebanada 1.
+- [`docs/plan-rebanada-1.md`](docs/plan-rebanada-1.md): plan de la rebanada 1, completado.
