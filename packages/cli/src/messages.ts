@@ -139,6 +139,28 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   }),
   task_submitted: (p) => ({ text: `Enviada ${task(p)} a ${p.state ?? "planning"}` }),
   task_rejected: (p) => ({ text: `Rechazada ${task(p)}` }),
+  plan_approved: (p) => ({ text: `Aprobado el plan de ${task(p)} · ${p.state ?? "building"}` }),
+  plan_changes_requested: (p) => ({
+    text: `Pedidos cambios sobre el plan de ${task(p)} · vuelve a planning`,
+  }),
+  plan_rejected: (p) => ({ text: `Rechazado el plan de ${task(p)}: la tarea queda cerrada` }),
+  plan_reject_confirm: (p) => ({
+    text: `¿Rechazar el plan de ${task(p)} «${p.title ?? ""}»? Es definitivo: la tarea queda cerrada. [s/N]`,
+  }),
+  plan_changed: (p) => ({
+    text: `El plan de ${task(p)} cambió antes de que se registrara tu decisión; no se ha guardado nada.`,
+    next: {
+      label: "Léelo de nuevo antes de decidir",
+      command: `togi plan show ${p.n ?? "<número>"}`,
+    },
+  }),
+  plan_exceeds_limits: (p) => ({
+    text: `El plan de ${task(p)} supera los límites de tamaño y no se puede aprobar.`,
+    next: {
+      label: "Pide cambios con",
+      command: `togi plan request-changes ${p.n ?? "<número>"} --help`,
+    },
+  }),
   task_edited: (p) => ({ text: `Editada ${task(p)}` }),
   edit_no_changes: (p) => ({ text: `La tarea ${task(p)} ya tiene esos valores: no hay cambios.` }),
   edit_needs_flags: (p) => ({
