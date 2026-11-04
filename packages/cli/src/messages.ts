@@ -15,6 +15,11 @@ export interface MessageParams {
   detail?: string;
   title?: string;
   risk?: string;
+  /** Versión de un plan. */
+  version?: number;
+  production?: number;
+  tests?: number;
+  limit?: string;
 }
 
 export interface NextStep {
@@ -185,6 +190,27 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   }),
   status_rejected: (p) => ({ text: `${p.n} ${p.n === 1 ? "rechazada" : "rechazadas"}` }),
   status_merged: (p) => ({ text: `${p.n} ${p.n === 1 ? "fusionada" : "fusionadas"}` }),
+  section_plan_files: () => ({ text: "Ficheros" }),
+  section_plan_tests: () => ({ text: "Tests nuevos" }),
+  section_plan_approach: () => ({ text: "Enfoque" }),
+  plan_change_add: () => ({ text: "añadir" }),
+  plan_change_modify: () => ({ text: "modificar" }),
+  plan_change_delete: () => ({ text: "borrar" }),
+  plan_lines: (p) => ({
+    text: `~${p.production} líneas de producción · ~${p.tests} de tests (estimadas)`,
+  }),
+  plan_exceeds: (p) => ({
+    text: `Supera los límites (${p.limit}): no se puede aprobar; pide cambios o rechaza.`,
+  }),
+  plan_older: () => ({ text: "Enfoque no disponible en versiones anteriores." }),
+  plan_not_found: (p) => ({
+    text: `La tarea ${task(p)} no tiene plan.`,
+    next: { label: "Mira el estado con", command: showTask(p) },
+  }),
+  plan_version_not_found: (p) => ({
+    text: `La tarea ${task(p)} no tiene la versión ${p.version ?? "?"} del plan.`,
+    next: { label: "Mira la vigente con", command: `togi plan show ${p.n ?? "<número>"}` },
+  }),
   usage: (p) => ({
     text: p.command ?? "Uso incorrecto.",
     next: { label: "Mira el uso con", command: "togi --help" },

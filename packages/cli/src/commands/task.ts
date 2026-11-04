@@ -27,6 +27,7 @@ interface Detail {
   repo: string;
   baseBranch: string;
   version: number;
+  planVersion: number | null;
   description: string | null;
   acceptanceCriteria: string | null;
   erased: { description: boolean; acceptanceCriteria: boolean };
@@ -157,7 +158,9 @@ Ejemplo:
     });
     if (json) return `${JSON.stringify(t)}\n`;
     const risk = say(`risk_${t.risk}`);
-    const meta = `${t.state} · riesgo ${risk} · ${t.repo} → ${t.baseBranch} · versión ${t.version}`;
+    const meta = `${t.state} · riesgo ${risk} · ${t.repo} → ${t.baseBranch} · versión ${t.version}${
+      t.planVersion === null ? "" : ` · plan v${t.planVersion}`
+    }`;
     return `${[
       `${out.paint("accent", `#${t.number}`)}  ${
         t.titleErased || t.title === null ? out.paint("muted", say("text_erased")) : clean(t.title)
