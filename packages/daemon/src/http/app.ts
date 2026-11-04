@@ -9,6 +9,7 @@ import type { createHandler } from "../commands/handle-command.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { adminRoutes } from "./admin.ts";
 import { eventRoutes } from "./events.ts";
+import { planRoutes } from "./plans.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
 import { taskRoutes } from "./tasks.ts";
@@ -47,6 +48,7 @@ export function createApp(
     })
     .route("/", taskRoutes(db, handle))
     .route("/", queryRoutes(db, reads, handle))
+    .route("/", planRoutes(db, reads, handle))
     .route("/", eventRoutes(reads))
     .route("/", adminRoutes(reads));
 }

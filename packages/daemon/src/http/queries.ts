@@ -160,6 +160,7 @@ export function queryRoutes(
           createdAt: dates.created_at,
           updatedAt: dates.updated_at,
           version,
+          planVersion: view.planning?.planVersion || null,
           description: description.text,
           acceptanceCriteria: criteria.text,
           erased: { description: description.erased, acceptanceCriteria: criteria.erased },

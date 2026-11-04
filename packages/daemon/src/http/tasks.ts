@@ -159,93 +159,134 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
         return respond(handle, result, 200);
       });
 
-  return new Hono<AppEnv>()
-    .post("/v1/tasks", (c) =>
-      guard(async (handle) => {
-        const key = c.req.header("idempotency-key");
-        if (key !== undefined && !SAFE_ID.test(key)) {
-          return problem(400, "invalid_idempotency_key", "Idempotency-Key no tiene formato seguro");
-        }
-        const json = await readJson(c);
-        if (json instanceof Response) return json;
-        const input = validate(json, CreateTask);
-        if (input instanceof Response) return input;
-        const command = { type: "create", ...input, source: { kind: "cli" } } as const;
-        const correlationId = c.get("requestId");
-        const actor = c.get("actor");
-        if (key === undefined || actor.kind !== "human") {
-          return respond(handle, await handle(actor, command, { correlationId }), 201);
-        }
-        let requestHash: string;
-        try {
-          requestHash = hashBody(json);
-        } catch {
-          return problem(400, "invalid_json", "el cuerpo no es JSON canonicalizable");
-        }
-        const replay = async (saved: SavedResponse | undefined) => {
-          if (saved === undefined) return undefined;
-          if (saved.request_hash !== requestHash) {
-            return problem(422, "idempotency_key_reused", "la clave ya se usó con otro cuerpo");
+  // La decisión recae siempre sobre el último plan; If-Match protege de un plan nuevo intermedio.
+  const latestPlan = db.prepare(
+    "SELECT COALESCE(MAX(plan_version), 0) AS v FROM plans WHERE task_number = ?",
+  );
+  const planVersion = (number: number) => (latestPlan.get(number) as { v: number }).v;
+
+  return (
+    new Hono<AppEnv>()
+      .post("/v1/tasks", (c) =>
+        guard(async (handle) => {
+          const key = c.req.header("idempotency-key");
+          if (key !== undefined && !SAFE_ID.test(key)) {
+            return problem(
+              400,
+              "invalid_idempotency_key",
+              "Idempotency-Key no tiene formato seguro",
+            );
           }
-          const snap = JSON.parse(saved.response_body) as Snapshot;
-          return readable(async () =>
-            taskResponse(saved.status, await taskBody(handle, snap), snap.version),
-          );
-        };
-        const previous = await replay(keys.find(actor.userId, key));
-        if (previous !== undefined) return previous;
-        try {
-          const result = await handle(actor, command, {
-            correlationId,
-            // Misma transacción que la tarea: la clave y su respuesta nacen o se revierten juntas.
-            onCommit: (stored, tx) => {
-              const stream = stored[0]?.stream ?? "";
-              const row = select(tx, Number(stream.slice("task:".length)));
-              const saved = {
-                request_hash: requestHash,
-                status: 201,
-                response_body: JSON.stringify(snapshot(row)),
-              };
-              keys.save(tx, actor.userId, key, saved);
-            },
-          });
-          return await respond(handle, result, 201);
-        } catch (error) {
-          // Una carrera con la misma clave rompe la PK. Solo si la clave existe es eso; si no, es
-          // otra restricción y el error original sigue su camino.
-          const code = (error as { code?: string }).code;
-          const raced =
-            code === "SQLITE_CONSTRAINT_PRIMARYKEY"
-              ? await replay(keys.find(actor.userId, key))
-              : undefined;
-          if (raced !== undefined) return raced;
-          throw error;
-        }
-      }),
-    )
-    .patch(
-      "/v1/tasks/:n",
-      existing(EditTask, (number, input) => ({
-        type: "edit",
-        number,
-        ...(input.title === undefined ? {} : { title: input.title }),
-        ...(input.description === undefined ? {} : { description: input.description }),
-        ...(input.acceptanceCriteria === undefined
-          ? {}
-          : { acceptanceCriteria: input.acceptanceCriteria }),
-      })),
-    )
-    .post(
-      "/v1/tasks/:n/submit",
-      existing(null, (number) => ({ type: "submit", number })),
-    )
-    .post(
-      "/v1/tasks/:n/reject",
-      existing(RejectTask, (number, { reason }) => ({
-        type: "reject",
-        number,
-        category: reason.category,
-        text: reason.text,
-      })),
-    );
+          const json = await readJson(c);
+          if (json instanceof Response) return json;
+          const input = validate(json, CreateTask);
+          if (input instanceof Response) return input;
+          const command = { type: "create", ...input, source: { kind: "cli" } } as const;
+          const correlationId = c.get("requestId");
+          const actor = c.get("actor");
+          if (key === undefined || actor.kind !== "human") {
+            return respond(handle, await handle(actor, command, { correlationId }), 201);
+          }
+          let requestHash: string;
+          try {
+            requestHash = hashBody(json);
+          } catch {
+            return problem(400, "invalid_json", "el cuerpo no es JSON canonicalizable");
+          }
+          const replay = async (saved: SavedResponse | undefined) => {
+            if (saved === undefined) return undefined;
+            if (saved.request_hash !== requestHash) {
+              return problem(422, "idempotency_key_reused", "la clave ya se usó con otro cuerpo");
+            }
+            const snap = JSON.parse(saved.response_body) as Snapshot;
+            return readable(async () =>
+              taskResponse(saved.status, await taskBody(handle, snap), snap.version),
+            );
+          };
+          const previous = await replay(keys.find(actor.userId, key));
+          if (previous !== undefined) return previous;
+          try {
+            const result = await handle(actor, command, {
+              correlationId,
+              // Misma transacción que la tarea: la clave y su respuesta nacen o se revierten juntas.
+              onCommit: (stored, tx) => {
+                const stream = stored[0]?.stream ?? "";
+                const row = select(tx, Number(stream.slice("task:".length)));
+                const saved = {
+                  request_hash: requestHash,
+                  status: 201,
+                  response_body: JSON.stringify(snapshot(row)),
+                };
+                keys.save(tx, actor.userId, key, saved);
+              },
+            });
+            return await respond(handle, result, 201);
+          } catch (error) {
+            // Una carrera con la misma clave rompe la PK. Solo si la clave existe es eso; si no, es
+            // otra restricción y el error original sigue su camino.
+            const code = (error as { code?: string }).code;
+            const raced =
+              code === "SQLITE_CONSTRAINT_PRIMARYKEY"
+                ? await replay(keys.find(actor.userId, key))
+                : undefined;
+            if (raced !== undefined) return raced;
+            throw error;
+          }
+        }),
+      )
+      .patch(
+        "/v1/tasks/:n",
+        existing(EditTask, (number, input) => ({
+          type: "edit",
+          number,
+          ...(input.title === undefined ? {} : { title: input.title }),
+          ...(input.description === undefined ? {} : { description: input.description }),
+          ...(input.acceptanceCriteria === undefined
+            ? {}
+            : { acceptanceCriteria: input.acceptanceCriteria }),
+        })),
+      )
+      .post(
+        "/v1/tasks/:n/submit",
+        existing(null, (number) => ({ type: "submit", number })),
+      )
+      .post(
+        "/v1/tasks/:n/reject",
+        existing(RejectTask, (number, { reason }) => ({
+          type: "reject",
+          number,
+          category: reason.category,
+          text: reason.text,
+        })),
+      )
+      .post(
+        "/v1/tasks/:n/plan/approve",
+        existing(null, (number) => ({
+          type: "approvePlan",
+          number,
+          planVersion: planVersion(number),
+        })),
+      )
+      // Mismo cuerpo que reject: motivo con categoría.
+      .post(
+        "/v1/tasks/:n/plan/request-changes",
+        existing(RejectTask, (number, { reason }) => ({
+          type: "requestPlanChanges",
+          number,
+          planVersion: planVersion(number),
+          category: reason.category,
+          text: reason.text,
+        })),
+      )
+      .post(
+        "/v1/tasks/:n/plan/reject",
+        existing(RejectTask, (number, { reason }) => ({
+          type: "rejectPlan",
+          number,
+          planVersion: planVersion(number),
+          category: reason.category,
+          text: reason.text,
+        })),
+      )
+  );
 }
