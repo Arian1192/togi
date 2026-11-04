@@ -14,3 +14,4 @@ o de plugins. En particular, en este repo:
   parte el código con sus tests.O
 
 - Nunca quites, fusiones ni muevas tests para cumplir el límite de tamaño. Si un PR no cabe, se parte el código con sus tests.
+- Un test se omite siempre: el del Llavero real de macOS, que necesita TOGI_TEST_REAL_KEYCHAIN=1. No hace falta comprobarlo.
