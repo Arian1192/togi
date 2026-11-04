@@ -206,11 +206,12 @@ Tarea: PR 8 de docs/plan-rebanada-2.md — feat(daemon): copia de solo lectura d
 Lee antes: AGENTS.md y docs/adr/008 (punto 1).
 
 Objetivo: preparar el repo que leerá el planificador.
-- Para cada sesión, un git worktree desacoplado en la rama base de la tarea, dentro de
+- Para cada sesión, una copia exportada con git archive de la rama base de la tarea (no un
+  git worktree: su checkout ejecutaría los hooks del repo en el daemon, fuera del sandbox), dentro de
   TOGI_HOME/workspaces/<sesión>, sin tocar la carpeta de trabajo del usuario.
 - Devuelve la ruta y el baseSha. Se borra siempre al terminar la sesión, también si falla.
 - Los comandos de git se lanzan sin shell, con argumentos validados.
-- Tests: el worktree contiene la rama base y no los cambios sin commitear del clon; se borra tras la
+- Tests: la copia contiene la rama base y no los cambios sin commitear del clon; se borra tras la
   sesión; un nombre de rama inexistente da un error claro.
 
 Fuera de alcance: el sandbox.
