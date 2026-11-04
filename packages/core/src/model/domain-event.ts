@@ -38,11 +38,14 @@ const source = z.discriminatedUnion("kind", [
   }),
 ]);
 
+/** Identificador de sesión (`ses_…`). Quien lo use como ruta debe además comprobar su contenido. */
+export const SessionIdSchema = z.templateLiteral(["ses_", z.string()]);
+
 const actor = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("human"), userId: z.templateLiteral(["usr_", z.string()]) }),
   z.strictObject({
     kind: z.literal("agent"),
-    sessionId: z.templateLiteral(["ses_", z.string()]),
+    sessionId: SessionIdSchema,
     role: z.enum(AGENT_ROLES),
   }),
   z.strictObject({
@@ -69,7 +72,7 @@ const taskEdited = z.strictObject({
   acceptanceCriteria: nullableBlob.optional(),
 });
 
-const sessionId = z.templateLiteral(["ses_", z.string()]);
+const sessionId = SessionIdSchema;
 const count = z.number().int().nonnegative();
 
 const MAX_PATH_LENGTH = 256;
