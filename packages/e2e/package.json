@@ -1,0 +1,12 @@
+{
+  "name": "@togi/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@togi/cli": "workspace:*",
+    "@togi/daemon": "workspace:*"
+  }
+}
