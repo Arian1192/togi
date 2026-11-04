@@ -81,6 +81,30 @@ Criterio de aceptación
 
 Un texto destruido con `erase` se muestra como `[borrado]`, en gris, nunca como vacío.
 
+**`togi plan show 12`**: el plan vigente. Si pasa de los límites del ADR-007, lo avisa bajo la cabecera y no se puede aprobar. `--version 1` muestra una versión anterior, sin enfoque.
+
+```
+#12  plan · versión 2
+     base 3f9a1c0 · ~120 líneas de producción · ~260 de tests (estimadas)
+
+Ficheros
+  modificar  src/shipments/list.ts
+  añadir     src/shipments/date-range.ts
+
+Tests nuevos
+  src/shipments/date-range.test.ts
+
+Enfoque
+  Filtrar en el repositorio y exponer el rango como parámetros de la consulta.
+```
+
+**`togi plan approve|request-changes|reject 12`**: deciden sobre el plan vigente. `reject` pide confirmación como `task reject` y cierra la tarea.
+
+```
+$ togi plan approve 12
+✓ Aprobado el plan de #12 · building
+```
+
 **`togi daemon start`**:
 
 ```
@@ -126,6 +150,8 @@ El mensaje sale del `code` del problem+json, nunca del texto libre de la respues
 | `invalid_state` (422) | Esta acción no es posible en el estado actual. | `togi task show N` |
 | `invalid_reason` (422) | El rechazo necesita un motivo con texto. | `--reason` |
 | `precondition_failed` (412) | La tarea cambió mientras la editabas. | Repetir el comando: la CLI relee la versión |
+| `plan_changed` (412 en una decisión de plan) | El plan cambió antes de que se registrara tu decisión. | `togi plan show N`, y decidir de nuevo |
+| `plan_exceeds_limits` (422) | El plan supera los límites y no se puede aprobar. | `togi plan request-changes N` o `reject` |
 | `version_conflict` (409) | Otra escritura llegó a la vez. | Repetir el comando |
 | `validation_error` (400) | Un valor no es válido, con el campo concreto. | `togi <comando> --help` |
 | `integrity_error` (500) | El log o un blob no supera la verificación. | `togi admin verify-log` |
@@ -159,6 +185,8 @@ Filtro por fecha en envíos
 Si respondes que no (o dejas la respuesta vacía), la CLI imprime «Cancelado. No se ha cambiado nada.» y sale con 0: cancelar no es un error.
 
 **Concurrencia.** La CLI lee la versión con el detalle de la tarea y la envía en `If-Match`. Ante un 412 no reintenta sola, porque sobrescribiría un cambio que no has visto: muestra el error y tú repites el comando.
+
+**Decisiones de un plan.** La CLI envía en `If-Match` el `ETag` de `GET /plan`. Aquí la regla es distinta: un 412 en `plan approve`, `request-changes` o `reject` significa que el plan (o la tarea) cambió, y la decisión se tomó sobre algo que ya no existe. Se muestra `plan_changed`, no se guarda nada y la salida es 4. **Hay que volver a leer el plan con `togi plan show` antes de decidir; nunca repetir el comando**, porque repetirlo aprobaría o rechazaría un plan que no has visto.
 
 **Progreso.** Un spinner solo si la operación tarda más de 300 ms y hay terminal, como en `togi daemon start`.
 

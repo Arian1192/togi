@@ -4,6 +4,7 @@ import { CliError, usageError } from "../errors.ts";
 import { clean, oneLine, say } from "../format.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
+import { decisions } from "./plan-decide.ts";
 
 const NUMBER = /^[1-9]\d*$/;
 
@@ -93,4 +94,4 @@ Ejemplo:
   },
 };
 
-export const plan = { show };
+export const plan = { show, ...decisions };
