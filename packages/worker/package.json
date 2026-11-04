@@ -1,0 +1,15 @@
+{
+  "name": "@togi/worker",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sandbox-runtime": "0.0.81",
+    "@togi/core": "workspace:*"
+  }
+}
