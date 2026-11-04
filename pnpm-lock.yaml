@@ -213,6 +213,15 @@ importers:
         specifier: 9.6.0
         version: 9.6.0
 
+  packages/e2e:
+    dependencies:
+      '@togi/cli':
+        specifier: workspace:*
+        version: link:../cli
+      '@togi/daemon':
+        specifier: workspace:*
+        version: link:../daemon
+
 packages:
 
   '@biomejs/biome@2.5.15':
