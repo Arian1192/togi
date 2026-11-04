@@ -10,6 +10,8 @@ async function main(): Promise<number> {
   const errorOut = (noColorFlag: boolean) =>
     createOutput({ env, isTTY: process.stderr.isTTY === true, noColorFlag });
   const argv = process.argv.slice(2);
+  const abort = new AbortController();
+  for (const name of ["SIGINT", "SIGTERM"] as const) process.once(name, () => abort.abort());
   const noColorFlag = argv.includes("--no-color");
   try {
     const parsed = parseCommandLine(argv, COMMANDS, SHORTCUTS);
@@ -26,6 +28,8 @@ async function main(): Promise<number> {
         values: parsed.values,
         args: parsed.args,
         interactive: process.stdin.isTTY === true && process.stderr.isTTY === true,
+        write: (text) => void process.stdout.write(text),
+        signal: abort.signal,
         confirm: (question) => confirm(question, { input: process.stdin, output: process.stderr }),
       }),
     );

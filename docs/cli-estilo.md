@@ -162,12 +162,12 @@ Si respondes que no (o dejas la respuesta vacía), la CLI imprime «Cancelado. N
 
 **Progreso.** Un spinner solo si la operación tarda más de 300 ms y hay terminal, como en `togi daemon start`.
 
-**`togi watch`**: una línea por evento, en directo, con hora, número de evento, tipo y actor. Ctrl+C sale; al reconectar continúa desde el último evento visto.
+**`togi watch`**: una línea por evento, en directo, con hora, número de evento, tipo, tarea y actor. Por defecto muestra solo los eventos nuevos; `--from-start` reproduce antes todo el historial. El actor es el identificador que lleva el evento (`usr_…`), porque el log no guarda nombres. Ctrl+C sale; al reconectar continúa desde el último evento visto.
 
 ```
-14:02:11  #41  task.created    #16  Arian
-14:05:37  #42  task.edited     #16  Arian
-14:06:02  #43  task.submitted  #16  Arian
+14:02:11  #41  task.created    #16  usr_3f9a1c07d2e84b56a0c1e9d7b2f48a63
+14:05:37  #42  task.edited     #16  usr_3f9a1c07d2e84b56a0c1e9d7b2f48a63
+14:06:02  #43  task.submitted  #16  usr_3f9a1c07d2e84b56a0c1e9d7b2f48a63
 ```
 
 ## Salida para máquinas

@@ -4,6 +4,7 @@ import { admin } from "./admin.ts";
 import { daemon } from "./daemon.ts";
 import { status } from "./status.ts";
 import { task } from "./task.ts";
+import { watch } from "./watch.ts";
 
 export type Options = NonNullable<ParseArgsConfig["options"]>;
 
@@ -17,6 +18,10 @@ export interface RunContext {
   args: string[];
   /** ¿Hay una terminal interactiva (stdin y stderr)? Solo entonces se puede preguntar. */
   interactive: boolean;
+  /** Escribe en stdout según llega, para los comandos que no terminan (`togi watch`). */
+  write(text: string): void;
+  /** Se aborta con Ctrl+C (SIGINT) o SIGTERM. */
+  signal: AbortSignal;
   /** Hace una pregunta de sí/no por stderr. */
   confirm(question: string): Promise<boolean>;
 }
@@ -37,4 +42,4 @@ export interface Command {
 export const COMMANDS: Record<string, Record<string, Command>> = { admin, daemon, task };
 
 /** Atajos de un verbo (`togi status`), sin recurso. */
-export const SHORTCUTS: Record<string, Command> = { status };
+export const SHORTCUTS: Record<string, Command> = { status, watch };
