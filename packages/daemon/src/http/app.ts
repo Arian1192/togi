@@ -12,6 +12,7 @@ import { eventRoutes } from "./events.ts";
 import { planRoutes } from "./plans.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
+import { repoRoutes } from "./repos.ts";
 import { taskRoutes } from "./tasks.ts";
 
 const DAEMON_VERSION =
@@ -32,6 +33,8 @@ export function createApp(
   db: Database.Database,
   handle?: ReturnType<typeof createHandler>,
   reads?: ReadDeps,
+  /** Directorio de datos de togi: el registro de repos rechaza rutas dentro de él. */
+  home?: string,
 ) {
   // Rutas encadenadas: `hc` solo infiere los tipos de lo que se encadena aquí.
   return new Hono<AppEnv>()
@@ -49,6 +52,7 @@ export function createApp(
     .route("/", taskRoutes(db, handle))
     .route("/", queryRoutes(db, reads, handle))
     .route("/", planRoutes(db, reads, handle))
+    .route("/", repoRoutes(db, home))
     .route("/", eventRoutes(reads))
     .route("/", adminRoutes(reads));
 }

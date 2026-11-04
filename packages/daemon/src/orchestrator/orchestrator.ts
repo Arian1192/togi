@@ -34,6 +34,9 @@ export function createOrchestrator({ db, store, handle, planner }: OrchestratorD
   let draining: Promise<void> | undefined;
   let unsubscribe: (() => void) | undefined;
 
+  const registered = db.prepare(
+    "SELECT 1 FROM repos r JOIN tasks t ON r.repo = t.repo WHERE t.number = ?",
+  );
   const fail = (what: string, result: unknown) => {
     console.error(`orquestador: ${what}: ${JSON.stringify(result)}`);
   };
@@ -70,6 +73,12 @@ export function createOrchestrator({ db, store, handle, planner }: OrchestratorD
     if (!("events" in started))
       return fail(`no se inició la sesión de la tarea ${number}`, started);
 
+    // El repo de la tarea tiene que estar registrado (togi repo add). El motivo aún no cabe en
+    // session.ended: solo se registra en el log del daemon.
+    if (registered.get(number) === undefined) {
+      fail(`la tarea ${number} no se planifica`, "repo_not_registered");
+      return endSession(number, sessionId, false, NO_USAGE);
+    }
     let ok = false;
     let usage = NO_USAGE;
     try {

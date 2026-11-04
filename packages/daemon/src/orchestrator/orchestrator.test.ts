@@ -56,6 +56,7 @@ beforeEach(async () => {
     await loadOrCreateMasterKey(selectKeychain({ home, env: { TOGI_KEYCHAIN: "file" } })),
   );
   handle = createHandler({ db, store, blobs: new FileBlobStore(p.blobs, keys) });
+  db.prepare("INSERT INTO repos (repo, path, added_at) VALUES ('r', '/clon/r', 'now')").run();
 });
 afterEach(() => {
   db.close();
@@ -180,5 +181,31 @@ test("al arrancar, una sesión abierta se cierra como failed y la tarea sin sesi
   assert.equal(stateOf(n), "plan_review");
   assert.equal(stateOf(m), "plan_review");
   assert.equal(planner.calls.length, 2);
+  await orq.close();
+});
+
+test("un repo sin registrar cierra la sesión como failed sin llamar al planificador", async () => {
+  const planner = new FakePlanner();
+  const orq = setup(planner);
+  orq.start();
+  db.prepare("DELETE FROM repos").run();
+  const n = await create();
+  await submit(n);
+  await orq.idle();
+  assert.equal(stateOf(n), "planning");
+  assert.deepEqual(sessions(n), [{ state: "ended", outcome: "failed" }]);
+  assert.equal(planner.calls.length, 0);
+  await orq.close();
+});
+
+test("el repo registrado con otras mayúsculas también vale", async () => {
+  const orq = setup(new FakePlanner());
+  orq.start();
+  db.prepare("DELETE FROM repos").run();
+  db.prepare("INSERT INTO repos (repo, path, added_at) VALUES ('R', '/clon/r', 'now')").run();
+  const n = await create();
+  await submit(n);
+  await orq.idle();
+  assert.equal(stateOf(n), "plan_review");
   await orq.close();
 });

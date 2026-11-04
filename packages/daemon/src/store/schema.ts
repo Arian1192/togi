@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -137,6 +137,13 @@ CREATE TABLE decisions (
   actor        TEXT    NOT NULL,
   reason       TEXT,
   decided_at   TEXT    NOT NULL
+);`,
+  // Repos registrados: configuración del usuario, no una proyección. owner/repo no distingue mayúsculas.
+  10: `
+CREATE TABLE repos (
+  repo     TEXT PRIMARY KEY COLLATE NOCASE,
+  path     TEXT NOT NULL,
+  added_at TEXT NOT NULL
 );`,
 };
 
