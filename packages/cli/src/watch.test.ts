@@ -7,6 +7,8 @@ import { test } from "node:test";
 import { paths } from "@togi/daemon/config";
 import { startDaemon } from "../../daemon/src/start.ts";
 import { openEventDatabase } from "../../daemon/src/store/database.ts";
+import { runWatch } from "./commands/watch.ts";
+import type { CliError } from "./errors.ts";
 import { runCli } from "./testing/run-cli.ts";
 import { type RunningCli, spawnCli } from "./testing/spawn-cli.ts";
 
@@ -144,12 +146,28 @@ const CONTROL = /[\u0000-\u0009\u000b-\u001f\u007f]/;
 
 test("los campos del evento no llevan caracteres de control a la terminal; si se corta, sale con 6", () =>
   withFakeDaemon(async (home) => {
-    for (const flags of [[], ["--json"]]) {
-      const r = await runCli(["watch", ...flags], home);
-      assert.equal(r.code, 6, r.stderr);
-      assert.ok(r.stdout.endsWith("\n") && r.stdout.length > 10, JSON.stringify(r.stdout));
-      assert.doesNotMatch(r.stdout, CONTROL, flags.join(" "));
+    const timing = { initialMs: 5, maxMs: 20, giveUpMs: 100 };
+    const watchOnce = async (json: boolean): Promise<string> => {
+      let out = "";
+      const error = await runWatch(
+        {
+          home,
+          json,
+          values: {},
+          args: [],
+          write: (text) => {
+            out += text;
+          },
+          signal: new AbortController().signal,
+        },
+        timing,
+      ).catch((e: CliError) => e);
+      assert.equal((error as CliError).exitCode, 6);
+      assert.ok(out.endsWith("\n") && out.length > 10, JSON.stringify(out));
+      return out;
+    };
+    for (const json of [false, true]) {
+      assert.doesNotMatch(await watchOnce(json), CONTROL, `json=${json}`);
     }
-    const r = await runCli(["watch"], home);
-    assert.match(r.stdout, /#1 {2}\?\s+#5 {2}\?/);
+    assert.match(await watchOnce(false), /#1 {2}\?\s+#5 {2}\?/);
   }));

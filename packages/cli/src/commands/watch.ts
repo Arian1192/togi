@@ -1,7 +1,13 @@
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
-import { eventStream, lastSeq, type WatchedEvent } from "../event-stream.ts";
-import type { Command } from "./index.ts";
+import {
+  type Backoff,
+  DEFAULT_BACKOFF,
+  lastSeq,
+  reconnectingStream,
+  type WatchedEvent,
+} from "../event-stream.ts";
+import type { Command, RunContext } from "./index.ts";
 
 /** Solo estos caracteres llegan a la terminal desde un campo del evento; el resto es `?`. */
 const SAFE = /^[A-Za-z0-9_.:-]+$/;
@@ -38,24 +44,38 @@ Muestra los eventos nuevos según se escriben: hora, número de evento, tipo, ta
 
   --from-start  Reproduce primero todo el historial.
 
-Si se corta la conexión con el daemon, sale con 6.
+Si se corta la conexión, reconecta y sigue sin repetir ni perder eventos; si pasan 30 s sin
+lograrlo, sale con 6.
 
 Ejemplo:
   togi watch
 `,
-  async run({ home, json, values, args, write, signal }) {
-    if (args.length > 0) {
-      throw usageError("invalid_option", {
-        field: "un argumento",
-        detail: "togi watch no admite ninguno",
-        command: "togi watch --help",
-      });
-    }
-    const client = createClient(home);
-    const after = values["from-start"] === true ? undefined : await lastSeq(client);
-    for await (const event of eventStream(client, after, signal)) {
-      write(json ? `${JSON.stringify(event)}\n` : formatEvent(event));
-    }
-    return "";
-  },
+  run: (ctx) => runWatch(ctx),
 };
+
+/** El cuerpo de `togi watch`; los tiempos de reconexión son un parámetro para poder probarlo. */
+export async function runWatch(
+  {
+    home,
+    json,
+    values,
+    args,
+    write,
+    signal,
+  }: Pick<RunContext, "home" | "json" | "values" | "args" | "write" | "signal">,
+  backoff: Backoff = DEFAULT_BACKOFF,
+): Promise<string> {
+  if (args.length > 0) {
+    throw usageError("invalid_option", {
+      field: "un argumento",
+      detail: "togi watch no admite ninguno",
+      command: "togi watch --help",
+    });
+  }
+  const client = createClient(home);
+  const after = values["from-start"] === true ? undefined : await lastSeq(client);
+  for await (const event of reconnectingStream(client, after, signal, backoff)) {
+    write(json ? `${JSON.stringify(event)}\n` : formatEvent(event));
+  }
+  return "";
+}
