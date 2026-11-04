@@ -25,7 +25,7 @@ export async function startDaemon(
     const orchestrator = createOrchestrator({ db, store, handle, planner: options.planner });
     await orchestrator.recover();
     orchestrator.start();
-    const server = await listen(createApp(db, handle, { store, blobs }).fetch, p.socket);
+    const server = await listen(createApp(db, handle, { store, blobs }, home).fetch, p.socket);
     return {
       userId,
       db,

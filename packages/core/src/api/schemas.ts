@@ -29,6 +29,9 @@ export const CreateTask = z.object({
   baseBranch: baseBranch.default("dev"),
 });
 
+/** `path` absoluto: el daemon no conoce el directorio desde el que trabaja la CLI. */
+export const RegisterRepo = z.object({ repo, path: z.string().regex(/^\/.+/) });
+
 export const EditTask = z
   .object({
     title: title.optional(),
@@ -44,5 +47,6 @@ export const RejectTask = z.object({
 });
 
 export type CreateTask = z.infer<typeof CreateTask>;
+export type RegisterRepo = z.infer<typeof RegisterRepo>;
 export type EditTask = z.infer<typeof EditTask>;
 export type RejectTask = z.infer<typeof RejectTask>;
