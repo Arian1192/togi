@@ -44,7 +44,12 @@ test("status muestra el pid que devuelve /v1/health", async () => {
 
 test("--json: stdout es JSON de la API y sin daemon el error va a stderr", async () => {
   const ok = await runCli(["daemon", "status", "--json"], home);
-  assert.deepEqual(Object.keys(JSON.parse(ok.stdout)).sort(), ["daemon", "pid", "schema"]);
+  assert.deepEqual(Object.keys(JSON.parse(ok.stdout)).sort(), [
+    "daemon",
+    "lastSeq",
+    "pid",
+    "schema",
+  ]);
   const fail = await runCli(["daemon", "status", "--json"], join(root, "vacio"));
   assert.equal(fail.stdout, "");
   assert.equal(fail.code, 6);

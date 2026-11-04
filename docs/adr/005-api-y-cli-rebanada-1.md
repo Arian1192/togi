@@ -44,7 +44,7 @@ Los comandos son `POST` sobre subrecursos de acción y cada uno corresponde a un
 | `GET /v1/tasks/:n/events` | Eventos de dominio de la tarea | `200` |
 | `GET /v1/events` | SSE de `readAll`; reanuda desde `Last-Event-ID` (= `seq`) | stream |
 | `POST /v1/admin/verify-log` | Recorre la cadena de hashes | `200` con `ok` o `brokenAt` |
-| `GET /v1/health` | Versión del daemon y del esquema | `200` |
+| `GET /v1/health` | Versión del daemon, del esquema y `lastSeq` (seq del último evento del log, `0` si está vacío) | `200` |
 
 Convenciones:
 
