@@ -44,6 +44,7 @@ export async function* eventStream(
   client: Client,
   after: number | undefined,
   signal: AbortSignal,
+  onOpen?: () => void,
 ): AsyncGenerator<WatchedEvent> {
   try {
     const res = await client.api.v1.events.$get(
@@ -54,6 +55,7 @@ export async function* eventStream(
     );
     if (!res.ok) await client.checked(res);
     if (res.body === null) throw daemonUnavailable();
+    onOpen?.();
     for await (const message of parseSse(res.body)) {
       const seq = Number(message.id);
       const context = { requestId: client.requestId, ...(Number.isInteger(seq) && { event: seq }) };
@@ -68,7 +70,8 @@ export async function* eventStream(
     }
   } catch (error) {
     if (signal.aborted) return;
-    throw error;
+    // Un corte a mitad del cuerpo llega como error de red, no como CliError.
+    throw error instanceof CliError ? error : daemonUnavailable();
   }
   if (!signal.aborted) throw daemonUnavailable();
 }
@@ -78,5 +81,68 @@ function parseJson(text: string): unknown {
     return JSON.parse(text);
   } catch {
     return undefined;
+  }
+}
+
+/** Esperas de la reconexión, en ms: la primera, el tope y cuánto sin conectar antes de rendirse. */
+export interface Backoff {
+  initialMs: number;
+  maxMs: number;
+  giveUpMs: number;
+}
+
+export const DEFAULT_BACKOFF: Backoff = { initialMs: 250, maxMs: 5_000, giveUpMs: 30_000 };
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener("abort", done);
+  });
+}
+
+/**
+ * Como `eventStream`, pero si la conexión se corta reconecta con `Last-Event-ID` = el último `seq`
+ * entregado, con espera creciente (se duplica hasta `maxMs`) y descartando los `seq` ya vistos. Si
+ * pasan `giveUpMs` sin lograr conectar, lanza «daemon no disponible» (6). Otros errores no se
+ * reintentan.
+ */
+export async function* reconnectingStream(
+  client: Client,
+  after: number | undefined,
+  signal: AbortSignal,
+  backoff: Backoff = DEFAULT_BACKOFF,
+): AsyncGenerator<WatchedEvent> {
+  let last = after;
+  let delay = backoff.initialMs;
+  let since = Date.now();
+  while (!signal.aborted) {
+    let openedAt: number | undefined;
+    let delivered = false;
+    try {
+      for await (const event of eventStream(client, last, signal, () => {
+        openedAt = Date.now();
+      })) {
+        if (last !== undefined && event.seq <= last) continue;
+        last = event.seq;
+        delivered = true;
+        yield event;
+      }
+      return;
+    } catch (error) {
+      if (!(error instanceof CliError) || error.exitCode !== 6) throw error;
+    }
+    // Una conexión que sirvió algo o aguantó un rato cuenta como lograda; una que cae al instante, no.
+    if (openedAt !== undefined && (delivered || Date.now() - openedAt >= backoff.maxMs)) {
+      delay = backoff.initialMs;
+      since = Date.now();
+    }
+    if (Date.now() - since >= backoff.giveUpMs) throw daemonUnavailable();
+    await sleep(delay, signal);
+    delay = Math.min(delay * 2, backoff.maxMs);
   }
 }

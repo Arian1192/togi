@@ -36,6 +36,9 @@ export function socketFetch(socketPath: string, token: string, requestId: string
           const status = res.statusCode ?? 0;
           const noBody = status === 204 || status === 205 || status === 304;
           if (noBody) res.resume();
+          // Si el daemon cae a mitad, el error ya llega a quien lee el cuerpo; sin este oyente,
+          // además, Node lo lanza como excepción sin capturar.
+          res.on("error", () => undefined);
           resolve(
             new Response(noBody ? null : (Readable.toWeb(res) as ReadableStream<Uint8Array>), {
               status,
