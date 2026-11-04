@@ -7,6 +7,13 @@ export const DOMAIN_ERROR_CODES = [
   "missing_risk",
   "invalid_reason",
   "empty_edit",
+  "session_already_active",
+  "no_active_session",
+  "not_session_actor",
+  "actor_not_allowed",
+  "stale_plan_version",
+  "plan_exceeds_limits",
+  "invalid_session_role",
 ] as const;
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];
 

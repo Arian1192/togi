@@ -182,7 +182,7 @@ Cuatro precisiones sobre el ADR-001:
 3. **Una ejecución por gate.** El ADR-001 habla de una ejecución de gate por ciclo. Se registra un `GateRun` por cada gate dentro del ciclo y `verification.completed` los agrupa, para que cada gate tenga su evidencia y su duración.
 4. **Modo sombra.** Una decisión con `mode: "shadow"` se guarda pero no mueve la tarea. La proyección `shadow_agreement` compara, por nivel de riesgo, la decisión del revisor delegado con la vinculante y lleva la racha de coincidencias: de ahí sale el criterio de las 20 tareas seguidas.
 
-`decide` exige `reason` en todo `request_changes`, `reject` y `task.rejected`, y rechaza un `approve` en `plan_review` si el plan estima más de `maxProductionLines` líneas de producción o más de `maxTotalLines` en total (ADR-007). En el modo equipo podrá imponer además que quien aprueba no sea quien creó la tarea.
+`decide` aplica los límites de `FlowPolicy` del ADR-007 y exige `reason` en todo `request_changes`, `reject` y `task.rejected`, y rechaza un `approve` en `plan_review` si el plan estima más de `maxProductionLines` líneas de producción o más de `maxTotalLines` en total (ADR-007). En el modo equipo podrá imponer además que quien aprueba no sea quien creó la tarea.
 
 El título es un `BlobRef` obligatorio, nunca `null`: es el único texto que no puede faltar. La descripción y el criterio de aceptación son `BlobRef | null`: el daemon no crea blob para un texto vacío y guarda `null`. Así `submit` sabe si hay criterio sin leer el blob, que el decider no puede descifrar porque `core` no tiene acceso a las claves.
 
