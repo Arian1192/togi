@@ -1,6 +1,6 @@
 import type { BlobRef, DataClass } from "./blob.ts";
-import type { Actor, SessionId, TaskId } from "./ids.ts";
-import type { Plan, PlanDecision, SessionOutcome, SessionStarted, Usage } from "./planning.ts";
+import type { Actor, TaskId } from "./ids.ts";
+import type { Plan, PlanDecision, SessionEnded, SessionStarted } from "./planning.ts";
 import type { Reason, RiskLevel, TaskSource } from "./task.ts";
 
 export interface EventEnvelope<T extends string, P> {
@@ -40,10 +40,7 @@ export type TaskEvent =
     >
   | E<"task.submitted", Record<string, never>>
   | E<"session.started", SessionStarted>
-  | E<
-      "session.ended",
-      { sessionId: SessionId; outcome: SessionOutcome; usage: Usage; trajectoryEvents: number }
-    >
+  | E<"session.ended", SessionEnded>
   | E<"plan.proposed", Plan>
   | E<"decision.recorded", PlanDecision>
   | E<"task.rejected", { reason: Reason }>;

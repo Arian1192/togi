@@ -70,7 +70,10 @@ test("convierte los eventos de planificación válidos", () => {
     ["decision.recorded", withReason("reject")],
   ];
   for (const [type, payload] of valid) {
-    assert.deepEqual(toDomainEvent(stored(type, payload)).payload, payload);
+    // El payload de session.ended sin motivo es v1: al leerlo se migra con failureReason: null.
+    const expected =
+      type === "session.ended" ? { ...(payload as object), failureReason: null } : payload;
+    assert.deepEqual(toDomainEvent(stored(type, payload)).payload, expected);
   }
 });
 

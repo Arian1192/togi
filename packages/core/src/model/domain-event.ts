@@ -4,7 +4,7 @@ import { ADMIN_STREAM } from "./admin.ts";
 import { DATA_CLASSES } from "./blob.ts";
 import type { AdminEvent, DomainEvent, TaskEvent } from "./events.ts";
 import { AGENT_ROLES } from "./ids.ts";
-import { PLAN_CHANGES, SESSION_OUTCOMES } from "./planning.ts";
+import { FAILURE_REASONS, PLAN_CHANGES, SESSION_OUTCOMES } from "./planning.ts";
 import { REASON_CATEGORIES, RISK_LEVELS } from "./task.ts";
 
 /** Evento almacenado que no es un `DomainEvent` válido; `seq` identifica cuál. */
@@ -104,7 +104,8 @@ const sessionStarted = z.strictObject({
   prompt: blobRef,
   policy: blobRef,
 });
-const sessionEnded = z.strictObject({
+// session.ended v1: sin motivo del fallo. Los eventos ya guardados lo conservan; se migran al leer.
+const sessionEndedV1 = z.strictObject({
   sessionId,
   outcome: z.enum(SESSION_OUTCOMES),
   usage: z.strictObject({
@@ -115,6 +116,23 @@ const sessionEnded = z.strictObject({
   }),
   trajectoryEvents: count,
 });
+const sessionEnded = sessionEndedV1.extend({ failureReason: z.enum(FAILURE_REASONS).nullable() });
+
+/**
+ * Un fallo lleva siempre su motivo y una sesión completada nunca. Se exige a los eventos escritos en
+ * v2 y a los comandos nuevos (el decider usa la misma regla). Un v1 migrado puede ser un fallo sin
+ * motivo: no se escribió con esta regla y sigue siendo válido.
+ */
+export const failureReasonProblem = (e: {
+  outcome: string;
+  failureReason: string | null | undefined;
+}): string | undefined => {
+  const missing = (e.outcome === "failed" || e.outcome === "timeout") && !e.failureReason;
+  if (missing) return `una sesión ${e.outcome} necesita motivo`;
+  if (e.outcome === "completed" && e.failureReason) return "una sesión completada no lleva motivo";
+  return undefined;
+};
+
 const planProposed = z.strictObject({
   planVersion: z.number().int().positive(),
   sessionId,
@@ -185,7 +203,22 @@ export const taskEditedKeysMatchCore: SameKeys<z.output<typeof taskEdited>, Edit
 
 const PAYLOADS: Record<string, z.ZodType> = { ...TASK_PAYLOADS, ...ADMIN_PAYLOADS };
 
-const envelope = z.strictObject({ schemaVersion: z.literal(1), actor, at: z.iso.datetime() });
+/** Versión vigente de cada tipo (ADR-004); el resto va en 1. Un cambio de forma sube la suya y añade su migración. */
+export const EVENT_SCHEMA_VERSIONS: Readonly<Record<string, number>> = { "session.ended": 2 };
+export const schemaVersionOf = (type: string): number => EVENT_SCHEMA_VERSIONS[type] ?? 1;
+
+/** Migraciones al leer: de la versión indicada a la siguiente. El log nunca se reescribe. */
+const MIGRATIONS: Record<string, Record<number, (payload: unknown) => unknown>> = {
+  "session.ended": {
+    1: (payload) => ({ ...(sessionEndedV1.parse(payload) as object), failureReason: null }),
+  },
+};
+
+const envelope = z.strictObject({
+  schemaVersion: z.number().int().positive(),
+  actor,
+  at: z.iso.datetime(),
+});
 
 /** Convierte un evento leído del store en un `DomainEvent`, validando tipo, envoltorio y payload. */
 export function toDomainEvent(stored: StoredEvent): DomainEvent {
@@ -199,9 +232,31 @@ export function toDomainEvent(stored: StoredEvent): DomainEvent {
     at: stored.at,
   });
   if (!meta.success) throw new EventParseError(stored.seq, z.prettifyError(meta.error));
-  const payload = payloadSchema.safeParse(stored.payload);
+  const current = schemaVersionOf(stored.type);
+  if (meta.data.schemaVersion < 1 || meta.data.schemaVersion > current) {
+    throw new EventParseError(
+      stored.seq,
+      `${stored.type}: schemaVersion ${meta.data.schemaVersion} no admitida (vigente: ${current})`,
+    );
+  }
+  let migrated: unknown = stored.payload;
+  try {
+    for (let v = meta.data.schemaVersion; v < current; v++) {
+      migrated = MIGRATIONS[stored.type]?.[v]?.(migrated);
+    }
+  } catch (error) {
+    const why = error instanceof z.ZodError ? z.prettifyError(error) : String(error);
+    throw new EventParseError(stored.seq, `${stored.type}: ${why}`);
+  }
+  const payload = payloadSchema.safeParse(migrated);
   if (!payload.success) {
     throw new EventParseError(stored.seq, `${stored.type}: ${z.prettifyError(payload.error)}`);
+  }
+  if (stored.type === "session.ended" && stored.schemaVersion === current) {
+    const problem = failureReasonProblem(
+      payload.data as { outcome: string; failureReason: string | null },
+    );
+    if (problem) throw new EventParseError(stored.seq, `${stored.type}: ${problem}`);
   }
   if (stored.type in ADMIN_PAYLOADS !== (stored.stream === ADMIN_STREAM)) {
     throw new EventParseError(stored.seq, `${stored.type} no pertenece al stream ${stored.stream}`);
@@ -211,7 +266,8 @@ export function toDomainEvent(stored: StoredEvent): DomainEvent {
     stream: stored.stream,
     streamVersion: stored.streamVersion,
     type: stored.type,
-    schemaVersion: meta.data.schemaVersion,
+    // Migrado, tiene la forma vigente; el hash (integridad) se calcula siempre sobre lo guardado.
+    schemaVersion: current,
     actor: meta.data.actor,
     at: meta.data.at,
     ...(stored.correlationId === undefined ? {} : { correlationId: stored.correlationId }),

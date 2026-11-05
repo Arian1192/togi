@@ -1,3 +1,4 @@
+import { failureReasonProblem, schemaVersionOf } from "../model/domain-event.ts";
 import { REASON_CATEGORIES, type TaskState } from "../model/task.ts";
 import type { TaskCommand } from "./commands.ts";
 import { type DomainError, domainError } from "./errors.ts";
@@ -70,7 +71,18 @@ export function decide(
       if (planning.activeSession !== cmd.session.sessionId) {
         return domainError("not_session_actor", "no es la sesión activa");
       }
-      return [{ ...meta, type: "session.ended", payload: cmd.session }];
+      const failureReason = cmd.session.failureReason ?? null;
+      // Misma regla que la lectura de un v2: nunca se genera un evento que el esquema rechace.
+      const problem = failureReasonProblem({ outcome: cmd.session.outcome, failureReason });
+      if (problem) return domainError("missing_failure_reason", problem);
+      return [
+        {
+          ...meta,
+          schemaVersion: schemaVersionOf("session.ended"),
+          type: "session.ended",
+          payload: { ...cmd.session, failureReason },
+        },
+      ];
     }
     case "proposePlan": {
       if (cmd.actor.kind !== "agent") return notAllowed("agent");

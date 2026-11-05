@@ -92,7 +92,8 @@ export type TaskEvent =
   | E<"task.risk_changed", { from: RiskLevel; to: RiskLevel; cause: "manual" | "diff"; paths: string[] }>
   | E<"session.started", SessionStarted>
   | E<"session.ended", { sessionId: SessionId; outcome: "completed" | "failed" | "cancelled" | "timeout";
-                         usage: Usage; trajectoryEvents: number }>
+                         usage: Usage; trajectoryEvents: number;
+                         failureReason: FailureReason | null }>   // schemaVersion 2
   | E<"plan.proposed", Plan>                                         // planning → plan_review
   | E<"workspace.created", Workspace>
   | E<"build.submitted", { cycle: number; headSha: string }>         // building → verifying
@@ -292,6 +293,9 @@ Las retenciones son una propuesta propia, no salen de ninguna norma: se fijan co
 - Las reglas del flujo se prueban como funciones puras en `core`, sin base de datos, git ni agentes.
 - El trailer `Assisted-by` sale de `session.started`: `runtime.id` y `model`.
 - Cada payload lleva `schemaVersion`; los cambios de forma se resuelven con funciones de migración al leer, nunca reescribiendo el log. El paso del título a `BlobRef` fue el último cambio de forma de un evento sin versión de esquema (aún no había logs reales): a partir de ahora, cualquier cambio sube `schemaVersion` y añade una migración al leer.
+  - La versión es por tipo de evento: `session.ended` va en 2 y el resto en 1. Un evento con una versión mayor que la vigente se rechaza.
+  - Primer caso, `session.ended` v2: añade `failureReason`, un código de una lista cerrada en `core` (nunca texto libre: un código no puede contener datos personales ni secretos). Los v1 siguen en el log tal cual se guardaron y se migran al leer con `failureReason: null`; por eso un `failed` sin motivo es válido si es v1. La regla estricta (todo `failed` o `timeout` lleva motivo, un `completed` no) se exige a los v2 y a los comandos nuevos.
+  - La migración solo da forma al evento leído: la integridad (la cadena de hashes) se calcula siempre sobre el evento guardado, nunca sobre el migrado.
 - Riesgo: la clave maestra se pierde y con ella todos los blobs. Mitigación: copia de seguridad de la clave separada de la del SQLite.
 - Riesgo: el detector de secretos no detecta un formato. Mitigación: retención corta de trayectorias y prompts, y un borrado puntual con `togi admin erase`.
 - Lo que no resuelve este ADR, y queda en el backlog del modo equipo: cifrado del servidor, autenticación y autorización en la API, copias de seguridad, sincronización de relojes y gestión de proveedores de modelos.

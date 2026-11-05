@@ -65,7 +65,15 @@ const startSession = (actor: Actor = system) =>
 const endSession = (outcome = "completed", id: SessionId = SES, actor: Actor = system) =>
   cmd(actor, {
     type: "endSession",
-    session: { sessionId: id, outcome, usage, trajectoryEvents: 0 },
+    session: {
+      sessionId: id,
+      outcome,
+      usage,
+      trajectoryEvents: 0,
+      ...(outcome === "failed" || outcome === "timeout"
+        ? { failureReason: outcome === "timeout" ? "timeout" : "agent_failed" }
+        : {}),
+    },
   });
 const propose = (actor = agent(), est = lines(10, 20)) =>
   cmd(actor, { type: "proposePlan", plan: plan(est) });

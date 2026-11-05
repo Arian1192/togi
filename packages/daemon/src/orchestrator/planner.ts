@@ -1,4 +1,4 @@
-import type { Plan, SessionStarted, Usage } from "@togi/core";
+import type { FailureReason, Plan, SessionStarted, Usage } from "@togi/core";
 
 /** Lo que el orquestador pide: la tarea y la versión del plan que toca producir. */
 export interface PlanRequest {
@@ -12,7 +12,8 @@ export type PlanOutcome =
       plan: Omit<Plan, "planVersion" | "sessionId" | "approach"> & { approach: string };
       usage: Usage;
     }
-  | { ok: false; reason: string; usage: Usage };
+  /** `reason` es texto para el log del daemon; `code` es lo que queda en `session.ended`. */
+  | { ok: false; reason: string; code?: FailureReason; usage: Usage };
 
 /** Quién planifica: lo que la sesión registra de él y cómo produce un plan. */
 export interface Planner {
