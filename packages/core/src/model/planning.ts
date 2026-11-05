@@ -21,6 +21,7 @@ export const FAILURE_REASONS = [
   "daemon_restarted",
   "max_turns_exceeded",
   "budget_exceeded",
+  "sandbox_unavailable",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 

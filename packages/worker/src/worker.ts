@@ -81,6 +81,9 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
       outcome = result.timedOut ? "timeout" : result.exitCode === 0 ? "completed" : "failed";
       if (outcome === "failed") failureReason = stopReason(order.sessionId, result.stdout);
     } catch {
+      // Un agente que falla devuelve un código de salida; lo que lanza es el sandbox, que no pudo
+      // arrancar (plataforma no soportada, especificación rechazada). Nunca se ejecuta sin él.
+      failureReason = "sandbox_unavailable";
     } finally {
       // sin detalle: el mensaje de un error puede llevar la credencial
       if (order.credential) delete env[order.credential.name];
