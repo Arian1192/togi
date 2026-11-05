@@ -95,7 +95,11 @@ export class AgentEventStore {
     return rows.map(toEvent);
   }
 
-  /** Recorre la cadena de cada sesión; en la primera rota, dice cuál y dónde. */
+  /**
+   * Recorre la cadena de cada sesión y la cruza con el log de dominio: una sesión con
+   * `session.ended` debe tener exactamente `trajectoryEvents` eventos. Así se detectan un final
+   * truncado y una sesión borrada entera. `brokenAt` es el primer evento que falta o sobra.
+   */
   verify(): AgentVerdict {
     const sessions = this.#db
       .prepare("SELECT DISTINCT session_id FROM agent_events ORDER BY session_id")
@@ -103,6 +107,19 @@ export class AgentEventStore {
     for (const { session_id } of sessions) {
       const verdict = verifyAgentChain(this.readSession(session_id));
       if (!verdict.ok) return { ...verdict, session: session_id };
+    }
+    const ended = this.#db
+      .prepare(
+        `SELECT json_extract(payload, '$.sessionId') AS session,
+                json_extract(payload, '$.trajectoryEvents') AS expected
+         FROM events WHERE type = 'session.ended' ORDER BY seq`,
+      )
+      .all() as { session: string; expected: number }[];
+    const count = this.#db.prepare("SELECT COUNT(*) AS n FROM agent_events WHERE session_id = ?");
+    for (const { session, expected } of ended) {
+      const actual = (count.get(session) as { n: number }).n;
+      if (actual !== expected)
+        return { ok: false, brokenAt: Math.min(actual, expected) + 1, session };
     }
     return { ok: true };
   }

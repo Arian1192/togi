@@ -12,6 +12,7 @@ import { DataKeyring } from "../keys/data-keys.ts";
 import { loadOrCreateMasterKey } from "../keys/master-key.ts";
 import { selectKeychain } from "../keys/select-keychain.ts";
 import { openEventDatabase } from "../store/database.ts";
+import { SqliteEventStore } from "../store/event-store.ts";
 import { AgentEventStore } from "./agent-event-store.ts";
 
 const SECRET = ["sk-ant-", "api03-", "q".repeat(40)].join("");
@@ -115,4 +116,58 @@ test("escrituras concurrentes a una sesión producen una cadena sin huecos", asy
     Array.from({ length: 25 }, (_, i) => i + 1),
   );
   assert.deepEqual(store.verify(), { ok: true });
+});
+
+/** Registra en el log de dominio que la sesión terminó con `n` eventos de trayectoria. */
+async function ended(sessionId: string, n: number): Promise<void> {
+  await new SqliteEventStore(db).append(`task:${sessionId}`, 0, [
+    {
+      type: "session.ended",
+      schemaVersion: 1,
+      actor: { kind: "system", component: "adapter:test" },
+      at: "2026-11-05T10:00:00.000Z",
+      payload: {
+        sessionId,
+        outcome: "completed",
+        usage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, durationMs: 0 },
+        trajectoryEvents: n,
+      },
+    },
+  ]);
+}
+
+test("una sesión terminada con el número de eventos que registró es íntegra", async () => {
+  for (let i = 0; i < 3; i++) await store.append("ses_a", 1, "message", { i });
+  await ended("ses_a", 3);
+  assert.deepEqual(store.verify(), { ok: true });
+});
+
+test("una sesión sin session.ended no se cruza (aún puede estar en curso)", async () => {
+  await store.append("ses_a", 1, "message", {});
+  await ended("ses_b", 0);
+  assert.deepEqual(store.verify(), { ok: true });
+});
+
+test("un final truncado se detecta: faltan eventos que el log de dominio contó", async () => {
+  for (let i = 0; i < 4; i++) await store.append("ses_a", 1, "message", { i });
+  await ended("ses_a", 4);
+  db.exec("DROP TRIGGER agent_events_no_delete");
+  db.prepare("DELETE FROM agent_events WHERE seq > 2").run();
+  // La cadena que queda es íntegra; solo el cruce lo delata. Falta el evento 3.
+  assert.deepEqual(store.verify(), { ok: false, brokenAt: 3, session: "ses_a" });
+});
+
+test("una sesión borrada entera se detecta", async () => {
+  for (let i = 0; i < 2; i++) await store.append("ses_a", 1, "message", { i });
+  await ended("ses_a", 2);
+  db.exec("DROP TRIGGER agent_events_no_delete");
+  db.prepare("DELETE FROM agent_events WHERE session_id = 'ses_a'").run();
+  assert.deepEqual(store.verify(), { ok: false, brokenAt: 1, session: "ses_a" });
+});
+
+test("eventos añadidos después de session.ended también se detectan", async () => {
+  for (let i = 0; i < 2; i++) await store.append("ses_a", 1, "message", { i });
+  await ended("ses_a", 2);
+  await store.append("ses_a", 1, "message", { tarde: true });
+  assert.deepEqual(store.verify(), { ok: false, brokenAt: 3, session: "ses_a" });
 });

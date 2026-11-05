@@ -13,6 +13,7 @@ import { loadOrCreateMasterKey } from "../keys/master-key.ts";
 import { selectKeychain } from "../keys/select-keychain.ts";
 import { openEventDatabase } from "../store/database.ts";
 import { SqliteEventStore } from "../store/event-store.ts";
+import { AgentEventStore } from "../trajectory/agent-event-store.ts";
 import { createApp } from "./app.ts";
 
 let home: string;
@@ -38,7 +39,11 @@ beforeEach(async () => {
   const keys = new DataKeyring(db, await loadOrCreateMasterKey(keychain));
   store = new SqliteEventStore(db);
   const blobs = new FileBlobStore(p.blobs, keys);
-  app = createApp(db, createHandler({ db, store, blobs }), { store, blobs });
+  app = createApp(db, createHandler({ db, store, blobs }), {
+    store,
+    blobs,
+    agentEvents: new AgentEventStore(db, blobs),
+  });
 });
 afterEach(() => {
   db.close();
