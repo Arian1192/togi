@@ -26,5 +26,11 @@ export interface SandboxResult {
 }
 
 export interface Sandbox {
-  run(spec: SandboxSpec, argv: readonly string[], input?: string): Promise<SandboxResult>;
+  /** `signal` cancela la ejecución: se mata todo lo que creó, igual que con el tope de tiempo. */
+  run(
+    spec: SandboxSpec,
+    argv: readonly string[],
+    input?: string,
+    signal?: AbortSignal,
+  ): Promise<SandboxResult>;
 }
