@@ -75,7 +75,11 @@ export class SrtSandbox implements Sandbox {
     try {
       const wrapped = await this.#manager.wrapWithSandboxArgv(argv.map(quote).join(" "));
       const env: Record<string, string> = {};
+      // El valor real de una credencial enmascarada no entra en el entorno del hijo: srt lo lee del
+      // entorno de este proceso y pone el marcador en el comando envuelto.
+      const masked = new Set(spec.credentials.map((c) => c.name));
       for (const name of spec.allowedEnv) {
+        if (masked.has(name)) continue;
         const value = process.env[name];
         if (value !== undefined) env[name] = value;
       }
