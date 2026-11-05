@@ -17,3 +17,5 @@ o de plugins. En particular, en este repo:
 - Un test se omite siempre: el del Llavero real de macOS, que necesita TOGI_TEST_REAL_KEYCHAIN=1. No hace falta comprobarlo.
 - Crea y modifica ficheros con la herramienta de edición, nunca con comandos de shell como cat <<EOF.
 - Aplica biome check --write solo a los ficheros que crees o modifiques, nunca a todo el repo.
+- Cada rama sale de main actualizado, nunca de otra rama de trabajo.
+- Los PRs se mergean solo con tools/merge-pr.sh, que exige los tres jobs en verde.
