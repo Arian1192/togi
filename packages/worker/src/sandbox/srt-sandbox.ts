@@ -1,5 +1,6 @@
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import { homedir } from "node:os";
+import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { SandboxManager, type SandboxRuntimeConfig } from "@anthropic-ai/sandbox-runtime";
 import type { Sandbox, SandboxResult, SandboxSpec } from "@togi/core";
@@ -42,7 +43,8 @@ export class SrtSandbox implements Sandbox {
     this.#home = opts.home ?? homedir();
     this.#runtimePaths = opts.runtimePaths;
     this.#manager = opts.manager ?? SandboxManager;
-    this.#newReaper = opts.reaper ?? ((dir) => new Reaper(dir));
+    this.#newReaper =
+      opts.reaper ?? ((dir) => new Reaper(dir, process.platform, join(this.#togiHome, "run")));
   }
 
   run(
