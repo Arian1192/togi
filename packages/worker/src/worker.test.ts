@@ -196,3 +196,41 @@ test("al cerrarse la entrada, cancela la sesión en curso y termina", async () =
   assert.equal(aborted, true);
   assert.equal((w.messages().at(-1) as { outcome: string }).outcome, "cancelled");
 });
+
+const partial = [
+  JSON.stringify({ kind: "tool_call", payload: { tool: "Read" } }),
+  JSON.stringify({ kind: "message", payload: "a medias" }),
+].join("\n");
+
+test("por tope de tiempo, los eventos que el agente ya escribió llegan antes del resultado", async () => {
+  const w = start(async () => done({ stdout: partial, timedOut: true, exitCode: null }));
+  w.send(order({ credential: null }));
+  w.end();
+  await w.finished;
+  const m = w.messages();
+  assert.deepEqual(
+    m.filter((x) => x.type === "event").map((x) => (x as { kind: string }).kind),
+    ["tool_call", "message"],
+  );
+  assert.equal((m.at(-1) as { outcome: string }).outcome, "timeout");
+});
+
+test("por cancelación, los eventos que el agente ya escribió llegan antes del resultado", async () => {
+  const w = start(
+    (_s, _a, _i, signal) =>
+      new Promise((resolve) =>
+        signal?.addEventListener("abort", () => resolve(done({ stdout: partial, exitCode: null }))),
+      ),
+  );
+  w.send(order({ credential: null }));
+  await tick();
+  w.send({ type: "cancel" });
+  w.end();
+  await w.finished;
+  const m = w.messages();
+  assert.deepEqual(
+    m.filter((x) => x.type === "event").map((x) => (x as { kind: string }).kind),
+    ["tool_call", "message"],
+  );
+  assert.equal((m.at(-1) as { outcome: string }).outcome, "cancelled");
+});
