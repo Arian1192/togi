@@ -47,6 +47,11 @@ export const FromWorker = z.discriminatedUnion("type", [
     outcome: z.enum(SESSION_OUTCOMES),
     exitCode: z.number().int().nullable(),
     durationMs: z.number().int().nonnegative(),
+    /**
+     * Por qué paró el agente. Texto libre a propósito: un código fuera de FAILURE_REASONS no debe
+     * invalidar el mensaje entero; el daemon lo normaliza a `agent_failed`.
+     */
+    failureReason: z.string().optional(),
   }),
   z.strictObject({ type: z.literal("heartbeat") }),
   /** Mensaje fijo, nunca un eco de lo recibido: lo recibido puede llevar la credencial. */
