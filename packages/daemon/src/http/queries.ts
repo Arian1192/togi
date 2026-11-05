@@ -12,6 +12,7 @@ import {
 import type Database from "better-sqlite3";
 import { Hono } from "hono";
 import type { SqliteEventStore } from "../store/event-store.ts";
+import type { AgentEventStore } from "../trajectory/agent-event-store.ts";
 import type { AppEnv } from "./app.ts";
 import { problem } from "./problem.ts";
 import { NUMBER } from "./tasks.ts";
@@ -20,6 +21,8 @@ import { type TextReader, titleReader } from "./title.ts";
 export interface ReadDeps {
   store: SqliteEventStore;
   blobs: BlobStore;
+  /** Trayectoria de los agentes: `verify-log` también recorre sus cadenas. */
+  agentEvents?: AgentEventStore;
   /** Intervalo del latido del SSE; 15 s por defecto. */
   heartbeatMs?: number;
 }
