@@ -19,7 +19,7 @@ checks=$(gh pr checks "$pr" --json name,state)
 for name in "${REQUIRED[@]}"; do
   state=$(jq -r --arg n "$name" '.[] | select(.name == $n) | .state' <<<"$checks")
   if [[ "$state" != "SUCCESS" ]]; then
-    echo "✗ El job «$name» del PR #$pr no está en verde (${state:-no existe}). No se mergea."
+    echo "✗ El job «${name}» del PR #$pr no está en verde (${state:-no existe}). No se mergea."
     exit 1
   fi
 done
