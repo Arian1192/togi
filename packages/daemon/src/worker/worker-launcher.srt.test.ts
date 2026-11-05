@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, type TestContext, test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import type { SessionOrder } from "@togi/core";
 import type Database from "better-sqlite3";
 import { scanArgv } from "../../../worker/src/sandbox/testing/probes.ts";
@@ -107,7 +107,7 @@ test("control positivo: con la credencial en el entorno inicial, el barrido la e
  * El agente se escapa con setsid ejecutando `command`. El daemon mata al trabajador con SIGKILL
  * (graceMs 0: sin dejarle limpiar) y la sesión siguiente, de 6 s, debe eliminar al escapado al empezar.
  */
-async function nextSessionReapsEscaped(command: string[], t: TestContext) {
+async function nextSessionReapsEscaped(command: string[]) {
   const pidFile = join(work(), "scratch", "escaped.pid");
   const script = `/usr/bin/perl -MPOSIX -e 'exit 0 if fork; POSIX::setsid(); open F, ">", $ARGV[0]; print F $$; close F; exec @ARGV[1..$#ARGV]' "$@" </dev/null >/dev/null 2>&1; sleep 60`;
   const killer = createWorkerLauncher({ agentEvents, workerEntry: ENTRY, graceMs: 0 });
@@ -120,7 +120,7 @@ async function nextSessionReapsEscaped(command: string[], t: TestContext) {
   abort.abort();
   assert.equal((await first).outcome, "cancelled");
   await wait(200);
-  if (!alive(escaped)) return t.skip("el escapado no sobrevivió al SIGKILL: nada que comprobar");
+  assert.ok(alive(escaped), "el escapado no sobrevivió al SIGKILL del trabajador");
 
   const launcher = createWorkerLauncher({ agentEvents, workerEntry: ENTRY });
   let finished = false;
@@ -141,14 +141,13 @@ test(
   {
     skip,
   },
-  (t) => nextSessionReapsEscaped([process.execPath, "-e", "setTimeout(()=>{},60000)"], t),
+  () => nextSessionReapsEscaped([process.execPath, "-e", "setTimeout(()=>{},60000)"]),
 );
 
 test(
   "tras SIGKILL al trabajador, la sesión siguiente elimina a un escapado de Apple (sleep)",
   {
     skip,
-    todo: "Reaper: ps -E no ve el entorno de los binarios de Apple y las marcas solo viven en la memoria del trabajador muerto; el arreglo (marcas en TOGI_HOME/run) va en un PR del worker antes del PR 16",
   },
-  (t) => nextSessionReapsEscaped(["sleep", "60"], t),
+  () => nextSessionReapsEscaped(["sleep", "60"]),
 );
