@@ -19,3 +19,4 @@ o de plugins. En particular, en este repo:
 - Aplica biome check --write solo a los ficheros que crees o modifiques, nunca a todo el repo.
 - Cada rama sale de main actualizado, nunca de otra rama de trabajo.
 - Los PRs se mergean solo con tools/merge-pr.sh, que exige los tres jobs en verde.
+- Antes de abrir o actualizar un PR, confirma con git status que no queda nada sin commit.
