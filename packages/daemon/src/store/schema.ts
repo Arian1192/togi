@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 10;
+export const SCHEMA_VERSION = 11;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -145,6 +145,8 @@ CREATE TABLE repos (
   path     TEXT NOT NULL,
   added_at TEXT NOT NULL
 );`,
+  // Código del fallo de una sesión (session.ended v2). NULL en las que terminaron antes, o sin fallo.
+  11: "ALTER TABLE sessions ADD COLUMN failure_reason TEXT;",
 };
 
 /**
