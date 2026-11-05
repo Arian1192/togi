@@ -143,13 +143,17 @@ export const failureReasonProblem = (e: {
   return undefined;
 };
 
-const planProposed = z.strictObject({
-  planVersion: z.number().int().positive(),
-  sessionId,
+/** Lo que describe un plan, igual en el evento y en la salida del agente (que aún no tiene blobs). */
+export const planContentShape = {
   files: z.array(z.strictObject({ path: repoPath, change: z.enum(PLAN_CHANGES) })),
   newTests: z.array(repoPath),
-  approach: blobRef,
   estimatedLines: z.strictObject({ production: count, tests: count }),
+};
+const planProposed = z.strictObject({
+  ...planContentShape,
+  planVersion: z.number().int().positive(),
+  sessionId,
+  approach: blobRef,
   baseSha: z.string().min(1),
 });
 const decisionBase = {
