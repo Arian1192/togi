@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { bootstrap } from "./auth/bootstrap.ts";
 import { FileBlobStore } from "./blobs/file-blob-store.ts";
+import { RedactingBlobStore } from "./blobs/redacting-blob-store.ts";
 import { createHandler } from "./commands/handle-command.ts";
 import { paths } from "./config/app.ts";
 import { agentCredentials } from "./credentials/agent-credential.ts";
@@ -21,7 +23,12 @@ export async function startDaemon(
   const { db, masterKey, userId } = await bootstrap(home, env);
   try {
     const p = paths(home);
-    const blobs = new FileBlobStore(p.blobs, new DataKeyring(db, masterKey));
+    // El token de togi nunca debe acabar en un prompt ni en una trayectoria.
+    const token = readFileSync(p.credentials, "utf8").trim();
+    const blobs = new RedactingBlobStore(
+      new FileBlobStore(p.blobs, new DataKeyring(db, masterKey)),
+      [token],
+    );
     const store = new SqliteEventStore(db);
     const handle = createHandler({ db, store, blobs });
     const orchestrator = createOrchestrator({ db, store, handle, planner: options.planner });
@@ -40,6 +47,7 @@ export async function startDaemon(
     return {
       userId,
       db,
+      blobs,
       async close() {
         await server.close();
         await orchestrator.close();
