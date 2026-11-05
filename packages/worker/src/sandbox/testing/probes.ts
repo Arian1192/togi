@@ -183,7 +183,6 @@ export const probes: readonly Probe[] = [
     id: "escapar-del-tope",
     title: "un proceso con setsid no sobrevive a la ejecución",
     expect: "DENIED",
-    todo: "SrtSandbox mata el grupo de procesos, y setsid saca al proceso del grupo (docs/research/2026-11-conformidad-sandbox.md)",
     argv: (s) =>
       sh(
         `/usr/bin/perl -MPOSIX -e 'exit 0 if fork; POSIX::setsid(); open F, ">", $ARGV[0]; print F $$; close F; exec "sleep", "60"' "$1" </dev/null >/dev/null 2>&1; for i in 1 2 3 4 5 6 7 8 9 10; do [ -s "$1" ] && break; sleep 0.1; done`,

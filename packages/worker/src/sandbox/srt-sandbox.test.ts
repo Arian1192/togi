@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import type { SandboxSpec } from "@togi/core";
+import type { RunReaper } from "./reap.ts";
 import { SandboxSpecError } from "./srt-config.ts";
 import { type SrtManager, SrtSandbox } from "./srt-sandbox.ts";
 
@@ -46,8 +47,23 @@ function fakeManager(log: string[] = [], delayMs = 0): SrtManager & { configs: u
   };
 }
 
+/** Limpieza simulada: estos tests prueban SrtSandbox, no la limpieza (reap.test.ts, solo macOS). */
+const fakeReaper = (): RunReaper => ({
+  env: {},
+  fd: "ignore",
+  async begin() {},
+  watch() {},
+  async sweep() {},
+});
+
 const sandbox = (manager: SrtManager) =>
-  new SrtSandbox({ togiHome, runtimePaths: [], home: join(root, "home"), manager });
+  new SrtSandbox({
+    togiHome,
+    runtimePaths: [],
+    home: join(root, "home"),
+    manager,
+    reaper: fakeReaper,
+  });
 
 test("el hijo recibe solo las variables permitidas, con HOME y TMPDIR en writeDir", async () => {
   process.env.TOGI_TEST_SECRET = "no-debe-llegar";
