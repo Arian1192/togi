@@ -1,5 +1,5 @@
 import { PLAN_LIMITS } from "@togi/core";
-import { createClient } from "../client.ts";
+import { type Client, createClient } from "../client.ts";
 import { CliError, usageError } from "../errors.ts";
 import { clean, oneLine, say } from "../format.ts";
 import type { Output } from "../output.ts";
@@ -22,11 +22,36 @@ interface Plan extends PlanSummary {
   previous: PlanSummary[];
 }
 
+interface SessionSummary {
+  sessionId: string;
+  outcome: string | null;
+  failureReason: string | null;
+}
+
+/** La última sesión de la tarea, si terminó mal con motivo. No consultarla nunca rompe `plan show`. */
+async function failedSession(client: Client, n: string): Promise<SessionSummary | undefined> {
+  try {
+    const { sessions } = await client.checked<{ sessions: SessionSummary[] }>(
+      await client.api.v1.tasks[":n"].sessions.$get({ param: { n } }),
+    );
+    const last = sessions.at(-1);
+    return last?.failureReason ? last : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const exceedsLimits = ({ production, tests }: PlanSummary["estimatedLines"]) =>
   production > PLAN_LIMITS.maxProductionLines || production + tests > PLAN_LIMITS.maxTotalLines;
 
 /** Una versión del plan: la vigente con su enfoque, o una anterior, que no lo conserva. */
-function render(n: number, plan: PlanSummary, approach: string | null, out: Output): string {
+function render(
+  n: number,
+  plan: PlanSummary,
+  approach: string | null,
+  out: Output,
+  failed?: SessionSummary,
+): string {
   const { production, tests } = plan.estimatedLines;
   const lines = [
     `${out.paint("accent", `#${n}`)}  plan · versión ${plan.planVersion}`,
@@ -46,6 +71,11 @@ function render(n: number, plan: PlanSummary, approach: string | null, out: Outp
   lines.push("", say("section_plan_approach"));
   if (approach === null) lines.push(`  ${out.paint("muted", say("plan_older"))}`);
   else for (const l of clean(approach).split("\n")) lines.push(`  ${l}`);
+  if (failed)
+    lines.push(
+      "",
+      out.mark("attention", say("last_session_failed", { reason: failed.failureReason ?? "" })),
+    );
   return `${lines.join("\n")}\n`;
 }
 
@@ -76,14 +106,35 @@ Ejemplo:
       throw usageError("invalid_option", { field: "--version", command });
     }
     const client = createClient(home);
-    const plan = await client.checked<Plan>(
-      await client.api.v1.tasks[":n"].plan.$get({ param: { n } }),
-      { n: Number(n) },
-    );
+    let plan: Plan;
+    try {
+      plan = await client.checked<Plan>(
+        await client.api.v1.tasks[":n"].plan.$get({ param: { n } }),
+        { n: Number(n) },
+      );
+    } catch (error) {
+      // Sin plan, lo útil es saber por qué la última sesión terminó mal.
+      const failed =
+        error instanceof CliError &&
+        error.code === "plan_not_found" &&
+        (await failedSession(client, n));
+      if (error instanceof CliError && failed) {
+        throw new CliError(
+          error.code,
+          error.exitCode,
+          { ...error.context, reason: failed.failureReason ?? "" },
+          error.status,
+          error.stdout,
+        );
+      }
+      throw error;
+    }
     const version = wanted === undefined ? plan.planVersion : Number(wanted);
     if (version === plan.planVersion) {
-      if (json) return `${JSON.stringify(plan)}\n`;
-      return render(Number(n), plan, plan.approachErased ? say("text_erased") : plan.approach, out);
+      const failed = await failedSession(client, n);
+      if (json) return `${JSON.stringify({ ...plan, lastSession: failed ?? null })}\n`;
+      const approach = plan.approachErased ? say("text_erased") : plan.approach;
+      return render(Number(n), plan, approach, out, failed);
     }
     const older = plan.previous.find((p) => p.planVersion === version);
     if (older === undefined) {

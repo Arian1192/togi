@@ -19,6 +19,8 @@ export interface MessageParams {
   risk?: string;
   /** Versión de un plan. */
   version?: number;
+  /** Código de `FailureReason` de la última sesión; un código desconocido se muestra tal cual. */
+  reason?: string;
   production?: number;
   tests?: number;
   limit?: string;
@@ -48,6 +50,11 @@ const repoPath = (p: MessageParams) => plain(p.path, "<ruta>");
 const listRepos = { label: "Mira los que hay con", command: "togi repo list" };
 
 const task = (p: MessageParams) => `#${p.n ?? "?"}`;
+/** Línea con el porqué de la última sesión fallida, si se conoce. */
+const lastSession = (p: MessageParams) =>
+  p.reason === undefined
+    ? ""
+    : `\nÚltima sesión: ${plain(MESSAGES[`failure_reason_${p.reason}`]?.({}).text ?? p.reason, "?")}.`;
 const edit = (p: MessageParams) => `togi task edit ${p.n ?? "<número>"}`;
 const showTask = (p: MessageParams) => `togi task show ${p.n ?? "<número>"}`;
 
@@ -242,8 +249,22 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Supera los límites (${p.limit}): no se puede aprobar; pide cambios o rechaza.`,
   }),
   plan_older: () => ({ text: "Enfoque no disponible en versiones anteriores." }),
+  last_session_failed: (p) => ({ text: lastSession(p).trim() }),
+  failure_reason_repo_not_registered: () => ({
+    text: "el repo de la tarea no está registrado (usa togi repo add)",
+  }),
+  failure_reason_timeout: () => ({ text: "se agotó el tiempo de la sesión" }),
+  failure_reason_worker_died: () => ({ text: "el trabajador murió antes de terminar" }),
+  failure_reason_invalid_plan: () => ({ text: "el plan que propuso el agente no era válido" }),
+  failure_reason_planner_error: () => ({ text: "el planificador falló con un error inesperado" }),
+  failure_reason_planner_failed: () => ({ text: "el planificador no logró proponer un plan" }),
+  failure_reason_trajectory_write_failed: () => ({
+    text: "no se pudo registrar la trayectoria del agente",
+  }),
+  failure_reason_agent_failed: () => ({ text: "el agente terminó con error" }),
+  failure_reason_daemon_restarted: () => ({ text: "el daemon se reinició durante la sesión" }),
   plan_not_found: (p) => ({
-    text: `La tarea ${task(p)} no tiene plan.`,
+    text: `La tarea ${task(p)} no tiene plan.${lastSession(p)}`,
     next: { label: "Mira el estado con", command: showTask(p) },
   }),
   plan_version_not_found: (p) => ({
