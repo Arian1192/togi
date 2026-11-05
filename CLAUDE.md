@@ -15,3 +15,5 @@ o de plugins. En particular, en este repo:
 
 - Nunca quites, fusiones ni muevas tests para cumplir el límite de tamaño. Si un PR no cabe, se parte el código con sus tests.
 - Un test se omite siempre: el del Llavero real de macOS, que necesita TOGI_TEST_REAL_KEYCHAIN=1. No hace falta comprobarlo.
+- Crea y modifica ficheros con la herramienta de edición, nunca con comandos de shell como cat <<EOF.
+- Aplica biome check --write solo a los ficheros que crees o modifiques, nunca a todo el repo.
