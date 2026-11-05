@@ -7,6 +7,8 @@ import type { ReadDeps } from "./queries.ts";
 export function adminRoutes(reads: ReadDeps | undefined) {
   return new Hono<AppEnv>().post("/v1/admin/verify-log", async (c) => {
     if (reads === undefined) return problem(503, "not_configured", "consultas no disponibles");
-    return c.json(await reads.store.verify());
+    const events = await reads.store.verify();
+    if (!events.ok || reads.agentEvents === undefined) return c.json(events);
+    return c.json(reads.agentEvents.verify());
   });
 }

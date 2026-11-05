@@ -10,6 +10,8 @@ export interface MessageParams {
   pid?: number;
   /** Número de evento del log. */
   event?: number;
+  /** Sesión de agente cuya trayectoria no supera la verificación. */
+  session?: string;
   socket?: string;
   /** Cola del log del daemon, ya sin caracteres de control. */
   detail?: string;
@@ -102,16 +104,21 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     next: { label: "Mira el uso con", command: "togi <comando> --help" },
   }),
   integrity_error: (p) =>
-    p.event === undefined
+    p.event !== undefined && p.session !== undefined
       ? {
-          text: "El log o un blob no supera la verificación.",
-          warning: "Puede indicar una manipulación.",
-          next: { label: "Verifícalo con", command: "togi admin verify-log" },
-        }
-      : {
-          text: `El evento #${p.event} del log no supera la verificación.`,
+          text: `El evento #${p.event} de la trayectoria de la sesión ${plain(p.session, "?")} no supera la verificación.`,
           warning: "Puede indicar una manipulación. No sigas trabajando hasta revisarlo.",
-        },
+        }
+      : p.event === undefined
+        ? {
+            text: "El log o un blob no supera la verificación.",
+            warning: "Puede indicar una manipulación.",
+            next: { label: "Verifícalo con", command: "togi admin verify-log" },
+          }
+        : {
+            text: `El evento #${p.event} del log no supera la verificación.`,
+            warning: "Puede indicar una manipulación. No sigas trabajando hasta revisarlo.",
+          },
   log_verified: () => ({ text: "Log íntegro" }),
   daemon_started: (p) => ({ text: `Daemon arrancado · pid ${p.pid} · ${p.socket}` }),
   daemon_already_running: (p) => ({ text: `El daemon ya está en marcha · pid ${p.pid}` }),

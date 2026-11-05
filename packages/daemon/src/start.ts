@@ -12,6 +12,7 @@ import { selectSecretStore } from "./keys/select-keychain.ts";
 import { createOrchestrator } from "./orchestrator/orchestrator.ts";
 import type { Planner } from "./orchestrator/planner.ts";
 import { SqliteEventStore } from "./store/event-store.ts";
+import { AgentEventStore } from "./trajectory/agent-event-store.ts";
 
 /** Arranca el daemon: primer arranque idempotente y API en el socket Unix. */
 export async function startDaemon(
@@ -30,6 +31,7 @@ export async function startDaemon(
       [token],
     );
     const store = new SqliteEventStore(db);
+    const agentEvents = new AgentEventStore(db, blobs);
     const handle = createHandler({ db, store, blobs });
     const orchestrator = createOrchestrator({ db, store, handle, planner: options.planner });
     await orchestrator.recover();
@@ -38,7 +40,7 @@ export async function startDaemon(
       createApp(
         db,
         handle,
-        { store, blobs },
+        { store, blobs, agentEvents },
         home,
         agentCredentials(selectSecretStore({ home, env })),
       ).fetch,
@@ -48,6 +50,7 @@ export async function startDaemon(
       userId,
       db,
       blobs,
+      agentEvents,
       async close() {
         await server.close();
         await orchestrator.close();

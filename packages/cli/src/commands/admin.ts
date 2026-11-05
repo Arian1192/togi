@@ -3,7 +3,7 @@ import { CliError, usageError } from "../errors.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Command } from "./index.ts";
 
-type Verdict = { ok: true } | { ok: false; brokenAt: number };
+type Verdict = { ok: true } | { ok: false; brokenAt: number; session?: string };
 
 const verifyLog: Command = {
   summary: "Verifica la cadena de hashes del log de eventos.",
@@ -27,7 +27,11 @@ Ejemplo:
     const verdict = await client.checked<Verdict>(await client.api.v1.admin["verify-log"].$post());
     const body = `${JSON.stringify(verdict)}\n`;
     if (!verdict.ok) {
-      const context = { event: verdict.brokenAt, requestId: client.requestId };
+      const context = {
+        event: verdict.brokenAt,
+        ...(verdict.session === undefined ? {} : { session: verdict.session }),
+        requestId: client.requestId,
+      };
       throw new CliError("integrity_error", 1, context, undefined, json ? body : undefined);
     }
     if (json) return body;
