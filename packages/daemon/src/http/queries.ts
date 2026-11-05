@@ -3,6 +3,7 @@ import {
   type DomainEvent,
   EventParseError,
   evolve,
+  isTaskEvent,
   NO_TASK,
   TASK_STATES,
   type TaskState,
@@ -134,7 +135,7 @@ export function queryRoutes(
         const loaded = await loadEvents(reads.store, param);
         version = loaded.version;
         for (const event of loaded.events) {
-          if (event.type !== "data.erased") view = evolve(view, event);
+          if (isTaskEvent(event)) view = evolve(view, event);
         }
       } catch (e) {
         const res = corrupt(e);

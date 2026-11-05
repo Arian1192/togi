@@ -2,10 +2,20 @@ import { z } from "zod";
 import type { StoredEvent } from "../ports/event-store.ts";
 import { ADMIN_STREAM } from "./admin.ts";
 import { DATA_CLASSES } from "./blob.ts";
-import type { AdminEvent, DomainEvent, TaskEvent } from "./events.ts";
+import type { AdminEvent, DomainEvent, SpecialistEvent, TaskEvent } from "./events.ts";
 import { AGENT_ROLES } from "./ids.ts";
 import { FAILURE_REASONS, PLAN_CHANGES, SESSION_OUTCOMES } from "./planning.ts";
+import {
+  SPECIALIST_STREAM_PREFIX,
+  SpecialistSchema,
+  specialistHash,
+  specialistStream,
+} from "./specialist.ts";
 import { REASON_CATEGORIES, RISK_LEVELS } from "./task.ts";
+
+/** Los eventos del stream de una tarea; el resto (administración, catálogo) no mueven su vista. */
+export const isTaskEvent = (event: DomainEvent): event is TaskEvent =>
+  event.type !== "data.erased" && event.type !== "specialist.version_published";
 
 /** Evento almacenado que no es un `DomainEvent` válido; `seq` identifica cuál. */
 export class EventParseError extends Error {
@@ -51,7 +61,7 @@ const actor = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("system"),
     component: z.union([
-      z.enum(["gates", "integrator", "merger"]),
+      z.enum(["gates", "integrator", "merger", "catalog"]),
       z.templateLiteral(["adapter:", z.string()]),
     ]),
   }),
@@ -201,7 +211,18 @@ const ADMIN_PAYLOADS = {
 
 export const taskEditedKeysMatchCore: SameKeys<z.output<typeof taskEdited>, EditedPayload> = true;
 
-const PAYLOADS: Record<string, z.ZodType> = { ...TASK_PAYLOADS, ...ADMIN_PAYLOADS };
+const SPECIALIST_PAYLOADS = {
+  "specialist.version_published": z.strictObject({
+    specialist: SpecialistSchema,
+    hash: z.templateLiteral(["sha256:", z.string()]),
+  }) satisfies z.ZodType<SpecialistEvent["payload"]>,
+};
+
+const PAYLOADS: Record<string, z.ZodType> = {
+  ...TASK_PAYLOADS,
+  ...ADMIN_PAYLOADS,
+  ...SPECIALIST_PAYLOADS,
+};
 
 /** Versión vigente de cada tipo (ADR-004); el resto va en 1. Un cambio de forma sube la suya y añade su migración. */
 export const EVENT_SCHEMA_VERSIONS: Readonly<Record<string, number>> = { "session.ended": 2 };
@@ -257,6 +278,21 @@ export function toDomainEvent(stored: StoredEvent): DomainEvent {
       payload.data as { outcome: string; failureReason: string | null },
     );
     if (problem) throw new EventParseError(stored.seq, `${stored.type}: ${problem}`);
+  }
+  const published = stored.type === "specialist.version_published";
+  if (published) {
+    const { specialist, hash } = payload.data as SpecialistEvent["payload"];
+    if (stored.stream !== specialistStream(specialist.id)) {
+      throw new EventParseError(
+        stored.seq,
+        `${stored.type} no pertenece al stream ${stored.stream}`,
+      );
+    }
+    if (hash !== specialistHash(specialist)) {
+      throw new EventParseError(stored.seq, `${stored.type}: el hash no corresponde al contenido`);
+    }
+  } else if (stored.stream.startsWith(SPECIALIST_STREAM_PREFIX)) {
+    throw new EventParseError(stored.seq, `${stored.type} no pertenece al stream ${stored.stream}`);
   }
   if (stored.type in ADMIN_PAYLOADS !== (stored.stream === ADMIN_STREAM)) {
     throw new EventParseError(stored.seq, `${stored.type} no pertenece al stream ${stored.stream}`);

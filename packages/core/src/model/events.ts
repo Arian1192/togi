@@ -1,6 +1,7 @@
 import type { BlobRef, DataClass } from "./blob.ts";
 import type { Actor, TaskId } from "./ids.ts";
 import type { Plan, PlanDecision, SessionEnded, SessionStarted } from "./planning.ts";
+import type { Specialist, SpecialistHash } from "./specialist.ts";
 import type { Reason, RiskLevel, TaskSource } from "./task.ts";
 
 export interface EventEnvelope<T extends string, P> {
@@ -52,4 +53,10 @@ export type AdminEvent = E<
   { keyId: string; taskId: TaskId; dataClass: DataClass; reason: string }
 >;
 
-export type DomainEvent = TaskEvent | AdminEvent;
+/** Stream `specialist:<id>`: cada versión publicada, con su contenido completo y su hash. */
+export type SpecialistEvent = E<
+  "specialist.version_published",
+  { specialist: Specialist; hash: SpecialistHash }
+>;
+
+export type DomainEvent = TaskEvent | AdminEvent | SpecialistEvent;

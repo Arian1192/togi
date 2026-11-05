@@ -29,6 +29,7 @@ const TASK_STREAM = /^task:(\d+)$/;
 /** Aplica un evento a la tabla. Síncrono: se llama dentro de la transacción del append. */
 export function applyToTasks(db: Database.Database, event: DomainEvent): void {
   if (event.type === "data.erased") return; // admin: no cambia nada
+  if (event.type === "specialist.version_published") return; // catálogo: no es una tarea
   const match = TASK_STREAM.exec(event.stream);
   if (match === null)
     throw new Error(`${event.type} en un stream que no es de tarea: ${event.stream}`);

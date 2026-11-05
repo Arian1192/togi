@@ -7,6 +7,7 @@ import {
   type DomainError,
   evolve,
   type FlowPolicy,
+  isTaskEvent,
   type NewTaskEvent,
   NO_TASK,
   type Plan,
@@ -152,7 +153,7 @@ export function createHandler(deps: HandlerDeps) {
     let version = 0;
     for await (const stored of store.readStream(stream)) {
       const event = toDomainEvent(stored);
-      if (event.type !== "data.erased") view = evolve(view, event);
+      if (isTaskEvent(event)) view = evolve(view, event);
       version = stored.streamVersion;
     }
     return { view, version };
