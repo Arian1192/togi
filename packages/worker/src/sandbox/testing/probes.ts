@@ -57,7 +57,44 @@ export const KEY_NAME = "TOGI_CONFORMANCE_KEY";
 const API = "api.anthropic.com";
 const NET = "sin conexión a Internet: el control positivo falla";
 
+/**
+ * Lee el entorno inicial (KERN_PROCARGS2) de todos los PID posibles y busca la credencial. Desde el
+ * sandbox solo son legibles el propio proceso y sus antecesores (el trabajador entre ellos); no se
+ * fía del listado de procesos, que el sandbox recorta. Con ERROR no prueba nada: no pudo leer ni su
+ * entorno ni el de su padre, y el suite lo trata como fallo. La aguja llega en dos mitades en el
+ * argv, así que el propio proceso no la contiene entera.
+ */
+const SCAN_ENVIRONMENTS = [
+  "import ctypes, os, sys",
+  "libc = ctypes.CDLL('/usr/lib/libc.dylib')",
+  "needle = (sys.argv[1] + sys.argv[2]).encode()",
+  "def args_of(pid):",
+  "    mib = (ctypes.c_int * 3)(1, 49, pid)",
+  "    size = ctypes.c_size_t(0)",
+  "    if libc.sysctl(mib, 3, None, ctypes.byref(size), None, 0) != 0: return None",
+  "    buf = ctypes.create_string_buffer(size.value)",
+  "    if libc.sysctl(mib, 3, buf, ctypes.byref(size), None, 0) != 0: return None",
+  "    return buf.raw[:size.value]",
+  "if args_of(os.getpid()) is None or args_of(os.getppid()) is None: print('ERROR'); sys.exit(0)",
+  "found = any(needle in (args_of(p) or b'') for p in range(1, 100000))",
+  "print('ALLOWED' if found else 'DENIED')",
+].join("\n");
+
+/** El argv de un agente que busca `needle` en el entorno inicial de los procesos que puede leer. */
+export const scanArgv = (needle: string): string[] => {
+  const half = Math.floor(needle.length / 2);
+  return ["/usr/bin/python3", "-c", SCAN_ENVIRONMENTS, needle.slice(0, half), needle.slice(half)];
+};
+const scanFor = (s: Scene) => scanArgv(`${KEY_NAME}=${s.fakeKey}`);
+
 export const probes: readonly Probe[] = [
+  {
+    id: "credencial-entorno-ajeno",
+    title: "leer la credencial real del entorno de otros procesos (antecesores y trabajador)",
+    expect: "DENIED",
+    argv: scanFor,
+    spec: () => masked,
+  },
   {
     id: "secretos",
     title: "leer secretos falsos de la carpeta personal",
