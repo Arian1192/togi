@@ -11,6 +11,7 @@ import { loadOrCreateMasterKey } from "../../keys/master-key.ts";
 import { selectKeychain } from "../../keys/select-keychain.ts";
 import { openEventDatabase } from "../../store/database.ts";
 import { SqliteEventStore } from "../../store/event-store.ts";
+import { AgentEventStore } from "../../trajectory/agent-event-store.ts";
 import { createApp } from "../app.ts";
 
 export const TOKEN = "tok-de-prueba";
@@ -31,7 +32,7 @@ export async function planFixture() {
   const store = new SqliteEventStore(db);
   const blobs = new FileBlobStore(p.blobs, keys);
   const handle = createHandler({ db, store, blobs });
-  const app = createApp(db, handle, { store, blobs });
+  const app = createApp(db, handle, { store, blobs, agentEvents: new AgentEventStore(db, blobs) });
   await handle(human, {
     type: "create",
     title: "Filtro",

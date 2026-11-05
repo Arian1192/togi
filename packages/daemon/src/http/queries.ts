@@ -21,8 +21,8 @@ import { type TextReader, titleReader } from "./title.ts";
 export interface ReadDeps {
   store: SqliteEventStore;
   blobs: BlobStore;
-  /** Trayectoria de los agentes: `verify-log` también recorre sus cadenas. */
-  agentEvents?: AgentEventStore;
+  /** Trayectoria de los agentes: `verify-log` nunca da ok sin mirarla. */
+  agentEvents: AgentEventStore;
   /** Intervalo del latido del SSE; 15 s por defecto. */
   heartbeatMs?: number;
 }
