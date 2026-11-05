@@ -38,6 +38,23 @@ function* events(sessionId: string, stdout: string): Generator<FromWorker> {
   }
 }
 
+/** `usage.stop` del agente → motivo de parada. `ok` y lo desconocido no llevan motivo propio. */
+const STOP_REASONS: Record<string, string> = {
+  max_turns: "max_turns_exceeded",
+  max_budget: "budget_exceeded",
+  error: "agent_failed",
+};
+
+function stopReason(sessionId: string, stdout: string): string | undefined {
+  let reason: string | undefined;
+  for (const event of events(sessionId, stdout)) {
+    if (event.type !== "event" || event.kind !== "usage") continue;
+    const stop = (event.payload as { stop?: unknown } | null)?.stop;
+    reason = typeof stop === "string" ? STOP_REASONS[stop] : undefined;
+  }
+  return reason;
+}
+
 /**
  * El trabajador (ADR-008 §4): una sesión a la vez, mensajes JSON por línea. La credencial llega
  * en la orden de la sesión, vive en memoria y está en el entorno solo mientras srt la usa. Los
@@ -53,6 +70,7 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
     const beat = setInterval(() => send({ type: "heartbeat" }), deps.heartbeatMs ?? 5000);
     let outcome: "completed" | "failed" | "timeout" | "cancelled" = "failed";
     let exitCode: number | null = null;
+    let failureReason: string | undefined;
     try {
       if (order.credential) env[order.credential.name] = order.credential.secret;
       const result: SandboxResult = await deps
@@ -61,6 +79,7 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
       for (const event of events(order.sessionId, result.stdout)) send(event);
       exitCode = result.exitCode;
       outcome = result.timedOut ? "timeout" : result.exitCode === 0 ? "completed" : "failed";
+      if (outcome === "failed") failureReason = stopReason(order.sessionId, result.stdout);
     } catch {
     } finally {
       // sin detalle: el mensaje de un error puede llevar la credencial
@@ -74,6 +93,7 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
       outcome,
       exitCode,
       durationMs: Date.now() - started,
+      ...(outcome === "failed" && failureReason !== undefined ? { failureReason } : {}),
     });
   }
 

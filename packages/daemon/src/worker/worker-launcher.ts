@@ -2,11 +2,13 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import {
   encodeLine,
+  FAILURE_REASONS,
   type FailureReason,
   FromWorker,
   type SessionOrder,
   type SessionOutcome,
   type TaskId,
+  type Usage,
 } from "@togi/core";
 import { redact } from "../redaction/redact.ts";
 import type { AgentEventStore } from "../trajectory/agent-event-store.ts";
@@ -36,6 +38,10 @@ export interface LaunchResult {
   trajectoryEvents: number;
   /** Motivo para `session.ended`: `null` si completó o se canceló. */
   failureReason: FailureReason | null;
+  /** Uso real: suma de los eventos `usage` del agente, con la duración del lanzamiento. */
+  usage: Usage;
+  /** Texto del último evento `message` del agente: su respuesta final. */
+  finalText: string | null;
   /** Últimas líneas de stderr del trabajador, ya limpias de secretos. */
   diagnostics: string;
 }
@@ -44,6 +50,20 @@ const allowlisted = (): Record<string, string> =>
   Object.fromEntries(
     ENV_ALLOWLIST.flatMap((k) => (process.env[k] === undefined ? [] : [[k, process.env[k]]])),
   );
+
+const textOf = (payload: unknown): string | null => {
+  const text = (payload as { text?: unknown } | null)?.text;
+  return typeof text === "string" ? text : null;
+};
+
+const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0);
+
+function addUsage(total: Usage, payload: unknown): void {
+  const p = (payload ?? {}) as Record<string, unknown>;
+  total.inputTokens += num(p.inputTokens);
+  total.outputTokens += num(p.outputTokens);
+  total.estimatedCostUsd += num(p.costUsd);
+}
 
 /**
  * Lanza el trabajador como hijo, le pasa la sesión por la entrada estándar y escribe sus eventos con
@@ -86,6 +106,8 @@ export function createWorkerLauncher(deps: WorkerLauncherDeps) {
 
       let result: Extract<FromWorker, { type: "result" }> | undefined;
       let count = 0;
+      const usage: Usage = { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, durationMs: 0 };
+      let finalText: string | null = null;
       let writeFailed = false;
       let queue = Promise.resolve(); // un evento tras otro: la cadena de hashes no admite carreras
       const stdout = createInterface({ input: child.stdout });
@@ -106,6 +128,8 @@ export function createWorkerLauncher(deps: WorkerLauncherDeps) {
             try {
               await deps.agentEvents.append(order.sessionId, taskId, message.kind, message.payload);
               count++;
+              if (message.kind === "message") finalText = textOf(message.payload) ?? finalText;
+              if (message.kind === "usage") addUsage(usage, message.payload);
             } catch {
               writeFailed = true;
             }
@@ -144,12 +168,14 @@ export function createWorkerLauncher(deps: WorkerLauncherDeps) {
               ? "trajectory_write_failed"
               : result === undefined
                 ? "worker_died"
-                : "agent_failed";
+                : (FAILURE_REASONS.find((c) => c === result?.failureReason) ?? "agent_failed");
       return {
         outcome,
         failureReason,
         exitCode: result?.exitCode ?? null,
         durationMs: Date.now() - started,
+        usage: { ...usage, durationMs: Date.now() - started },
+        finalText,
         trajectoryEvents: count,
         diagnostics: redact(tail.join("\n"), secrets),
       };
