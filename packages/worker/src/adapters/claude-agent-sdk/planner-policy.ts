@@ -1,5 +1,7 @@
+import { ROLE_TOOLS } from "@togi/core";
+
 /** Lectura, búsqueda y listado de ficheros: nada de Bash, escritura ni web (ADR-003, `planning`). */
-export const PLANNER_TOOLS = ["Read", "Glob", "Grep"] as const;
+export const PLANNER_TOOLS = ROLE_TOOLS.planner;
 
 export interface AgentLine {
   kind: "tool_call" | "tool_result" | "message" | "denied" | "usage";

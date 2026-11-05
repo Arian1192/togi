@@ -13,4 +13,7 @@ export type AgentRole = (typeof AGENT_ROLES)[number];
 export type Actor =
   | { kind: "human"; userId: UserId }
   | { kind: "agent"; sessionId: SessionId; role: AgentRole }
-  | { kind: "system"; component: "gates" | "integrator" | "merger" | `adapter:${string}` };
+  | {
+      kind: "system";
+      component: "gates" | "integrator" | "merger" | "catalog" | `adapter:${string}`;
+    };
