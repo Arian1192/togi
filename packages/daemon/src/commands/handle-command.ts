@@ -12,10 +12,10 @@ import {
   type Plan,
   type ReasonCategory,
   type RiskLevel,
+  type SessionEndedInput,
   type SessionStarted,
   type StoredEvent,
   type TaskCommand,
-  type TaskEvent,
   type TaskSource,
   type TaskView,
   toDomainEvent,
@@ -72,7 +72,7 @@ export interface StartSessionInput {
 export interface EndSessionInput {
   type: "endSession";
   number: number;
-  session: Extract<TaskEvent, { type: "session.ended" }>["payload"];
+  session: SessionEndedInput;
 }
 
 /** El enfoque llega en claro y se guarda como blob `task_text`. */

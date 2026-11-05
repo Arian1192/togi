@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import type { Actor, SessionId, StoredEvent, Usage } from "@togi/core";
+import {
+  type Actor,
+  EventParseError,
+  FAILURE_REASONS,
+  type FailureReason,
+  type SessionId,
+  type StoredEvent,
+  type Usage,
+} from "@togi/core";
 import type Database from "better-sqlite3";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
@@ -41,11 +49,23 @@ export function createOrchestrator({ db, store, handle, planner }: OrchestratorD
     console.error(`orquestador: ${what}: ${JSON.stringify(result)}`);
   };
 
-  const endSession = async (number: number, sessionId: SessionId, ok: boolean, usage: Usage) => {
+  /** `failure` es el motivo si la sesión falló; `null` si completó. */
+  const endSession = async (
+    number: number,
+    sessionId: SessionId,
+    failure: FailureReason | null,
+    usage: Usage,
+  ) => {
     const ended = await handle(system, {
       type: "endSession",
       number,
-      session: { sessionId, outcome: ok ? "completed" : "failed", usage, trajectoryEvents: 0 },
+      session: {
+        sessionId,
+        outcome: failure === null ? "completed" : "failed",
+        usage,
+        trajectoryEvents: 0,
+        failureReason: failure,
+      },
     });
     if (!("events" in ended)) fail(`no se cerró la sesión ${sessionId}`, ended);
   };
@@ -77,25 +97,37 @@ export function createOrchestrator({ db, store, handle, planner }: OrchestratorD
     // session.ended: solo se registra en el log del daemon.
     if (registered.get(number) === undefined) {
       fail(`la tarea ${number} no se planifica`, "repo_not_registered");
-      return endSession(number, sessionId, false, NO_USAGE);
+      return endSession(number, sessionId, "repo_not_registered", NO_USAGE);
     }
-    let ok = false;
+    let failure: FailureReason | null = "planner_failed";
     let usage = NO_USAGE;
     try {
       const outcome = await planner.plan({ taskNumber: number, planVersion });
       usage = outcome.usage;
       if (outcome.ok) {
         const agent: Actor = { kind: "agent", sessionId, role: "planner" };
-        const proposed = await handle(agent, { type: "proposePlan", number, plan: outcome.plan });
-        ok = "events" in proposed;
-        if (!ok) fail(`plan rechazado en la tarea ${number}`, proposed);
+        // Un plan que no cumple el esquema (ruta insegura, por ejemplo) lanza EventParseError: es un
+        // plan inválido, no un fallo del planificador. Cualquier otro error sube al catch de abajo.
+        const proposed = await handle(agent, {
+          type: "proposePlan",
+          number,
+          plan: outcome.plan,
+        }).catch((error: unknown) => {
+          if (error instanceof EventParseError) return error;
+          throw error;
+        });
+        failure = "events" in proposed ? null : "invalid_plan";
+        if (failure) fail(`plan rechazado en la tarea ${number}`, String(proposed));
       } else {
+        // Un código fuera de la lista cerrada (un adaptador que se salta el tipo) nunca llega al evento.
+        failure = FAILURE_REASONS.find((c) => c === outcome.code) ?? "planner_failed";
         fail(`el planificador falló en la tarea ${number}`, outcome.reason);
       }
     } catch (error) {
+      failure = "planner_error";
       fail(`el planificador lanzó en la tarea ${number}`, String(error));
     }
-    await endSession(number, sessionId, ok, usage);
+    await endSession(number, sessionId, failure, usage);
   };
 
   const drain = async () => {
@@ -137,7 +169,8 @@ export function createOrchestrator({ db, store, handle, planner }: OrchestratorD
       const open = db
         .prepare("SELECT session_id, task_number FROM sessions WHERE state = 'active'")
         .all() as { session_id: SessionId; task_number: number }[];
-      for (const row of open) await endSession(row.task_number, row.session_id, false, NO_USAGE);
+      for (const row of open)
+        await endSession(row.task_number, row.session_id, "daemon_restarted", NO_USAGE);
       const waiting = db
         .prepare("SELECT number FROM tasks WHERE state = 'planning' ORDER BY number")
         .all() as { number: number }[];

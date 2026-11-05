@@ -14,6 +14,7 @@ export const DOMAIN_ERROR_CODES = [
   "stale_plan_version",
   "plan_exceeds_limits",
   "invalid_session_role",
+  "missing_failure_reason",
 ] as const;
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];
 
