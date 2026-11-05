@@ -35,7 +35,12 @@ export interface Probe {
   control?: boolean;
   /** Fallo conocido: la sonda se ejecuta como `todo` de node:test, con su causa. */
   todo?: string;
+  /** Tope de tiempo de toda la sonda (control, sandbox y resultado); por defecto PROBE_TIMEOUT_MS. */
+  timeoutMs?: number;
 }
+
+/** Cubre el control (20 s) y la ejecución en el sandbox (20 s) con margen. */
+export const PROBE_TIMEOUT_MS = 60_000;
 
 const sh = (script: string, ...args: string[]) => ["/bin/sh", "-c", script, "sh", ...args];
 const yes = `&& echo ALLOWED || echo DENIED`;
@@ -60,23 +65,52 @@ const NET = "sin conexión a Internet: el control positivo falla";
 /**
  * Lee el entorno inicial (KERN_PROCARGS2) de todos los PID posibles y busca la credencial. Desde el
  * sandbox solo son legibles el propio proceso y sus antecesores (el trabajador entre ellos); no se
- * fía del listado de procesos, que el sandbox recorta. Con ERROR no prueba nada: no pudo leer ni su
- * entorno ni el de su padre, y el suite lo trata como fallo. La aguja llega en dos mitades en el
- * argv, así que el propio proceso no la contiene entera.
+ * fía del listado de procesos, que el sandbox recorta. Cada consulta tiene un tope de 0,5 s y un
+ * proceso que no responde se ignora, salvo un antecesor: si no se pudo consultar alguno (o la
+ * cadena de padres, o se agotó el tope global de 15 s) imprime ERROR y no prueba nada; el suite lo
+ * trata como fallo. La aguja llega en dos mitades en el argv, así que el propio proceso no la
+ * contiene entera.
  */
 const SCAN_ENVIRONMENTS = [
-  "import ctypes, os, sys",
+  "import ctypes, os, signal, sys, time",
   "libc = ctypes.CDLL('/usr/lib/libc.dylib')",
   "needle = (sys.argv[1] + sys.argv[2]).encode()",
-  "def args_of(pid):",
-  "    mib = (ctypes.c_int * 3)(1, 49, pid)",
-  "    size = ctypes.c_size_t(0)",
-  "    if libc.sysctl(mib, 3, None, ctypes.byref(size), None, 0) != 0: return None",
-  "    buf = ctypes.create_string_buffer(size.value)",
-  "    if libc.sysctl(mib, 3, buf, ctypes.byref(size), None, 0) != 0: return None",
-  "    return buf.raw[:size.value]",
-  "if args_of(os.getpid()) is None or args_of(os.getppid()) is None: print('ERROR'); sys.exit(0)",
-  "found = any(needle in (args_of(p) or b'') for p in range(1, 100000))",
+  "class Slow(Exception): pass",
+  "def on_alarm(*_): raise Slow()",
+  "signal.signal(signal.SIGALRM, on_alarm)",
+  "def query(*ids):",
+  "    mib = (ctypes.c_int * len(ids))(*ids)",
+  "    try:",
+  "        signal.setitimer(signal.ITIMER_REAL, 0.5)",
+  "        size = ctypes.c_size_t(0)",
+  "        if libc.sysctl(mib, len(ids), None, ctypes.byref(size), None, 0) != 0: return None",
+  "        buf = ctypes.create_string_buffer(size.value)",
+  "        if libc.sysctl(mib, len(ids), buf, ctypes.byref(size), None, 0) != 0: return None",
+  "        return buf.raw[:size.value]",
+  "    except Slow: return None",
+  "    finally: signal.setitimer(signal.ITIMER_REAL, 0)",
+  "def args_of(pid): return query(1, 49, pid)",
+  "def parent_of(pid):",
+  "    info = query(1, 14, 1, pid)",
+  "    return int.from_bytes(info[560:564], 'little') if info and len(info) >= 564 else None",
+  "def fail(why): print('ERROR ' + why); sys.exit(0)",
+  "deadline = time.monotonic() + 15",
+  "me = os.getpid()",
+  "if parent_of(me) != os.getppid(): fail('no se pudo leer la cadena de padres')",
+  "chain, pid = [], me",
+  "while pid > 1:",
+  "    chain.append(pid)",
+  "    pid = parent_of(pid)",
+  "    if pid is None: fail('no se pudo leer la cadena de padres')",
+  "found = False",
+  "for pid in chain:",
+  "    data = args_of(pid)",
+  "    if data is None: fail('antecesor %d sin consultar' % pid)",
+  "    found = found or needle in data",
+  "for pid in range(2, 100000):",
+  "    if found: break",
+  "    if time.monotonic() > deadline: fail('tope global agotado')",
+  "    found = needle in (args_of(pid) or b'')",
   "print('ALLOWED' if found else 'DENIED')",
 ].join("\n");
 

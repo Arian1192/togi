@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import type { Sandbox, SandboxSpec } from "@togi/core";
-import { control, ENV_NAME, KEY_NAME, probes, type Scene } from "./probes.ts";
+import { control, ENV_NAME, KEY_NAME, PROBE_TIMEOUT_MS, probes, type Scene } from "./probes.ts";
 
 export type Classification = "bloqueada" | "inaccesible-por-diseño";
 
@@ -122,7 +122,8 @@ export function runConformance(name: string, opts: ConformanceOptions): void {
       const needsKeychain = probe.id === "llavero";
       const skip =
         needsKeychain && process.platform !== "darwin" ? "el Llavero solo existe en macOS" : false;
-      test(`${kind}: ${probe.title} [${probe.id}]`, { todo: probe.todo }, async (t) => {
+      const timeout = probe.timeoutMs ?? PROBE_TIMEOUT_MS;
+      test(`${kind}: ${probe.title} [${probe.id}]`, { todo: probe.todo, timeout }, async (t) => {
         if (skip || (needsKeychain && !keychainOk)) return t.skip(skip || "Llavero no disponible");
         const argv = probe.argv(scene);
         const finish = async (stdout: string) =>
