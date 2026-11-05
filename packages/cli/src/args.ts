@@ -78,7 +78,8 @@ export function parseCommandLine(
   if (probe.values.help === true || resource === undefined) {
     return { kind: "help", text: command?.usage ?? help(commands, resource, shortcuts) };
   }
-  const typed = `togi ${probe.positionals.join(" ")}`;
+  // En `auth` un positional podría ser el secreto: no se repite.
+  const typed = resource === "auth" ? "togi auth" : `togi ${probe.positionals.join(" ")}`;
   if (verbs === undefined && shortcut === undefined) {
     const suggestion = closest(resource, [...Object.keys(commands), ...Object.keys(shortcuts)]);
     throw usageError("unknown_command", {

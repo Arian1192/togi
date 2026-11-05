@@ -273,6 +273,31 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     next: { label: "Míralo con", command: "togi repo list" },
   }),
   repo_not_found: (p) => ({ text: `${repoName(p)} no está registrado.`, next: listRepos }),
+  auth_api_key_saved: () => ({ text: "Clave de API guardada · modo api-key" }),
+  auth_subscription_saved: () => ({ text: "Token de suscripción guardado · modo subscription" }),
+  auth_status_api_key: () => ({ text: "Modo activo: clave de API" }),
+  auth_status_subscription: () => ({ text: "Modo activo: suscripción" }),
+  auth_status_none: () => ({
+    text: "Sin credencial del agente.",
+    next: { label: "Guarda una con", command: "togi auth set-api-key" },
+  }),
+  credentials_inconsistent: () => ({
+    text: "Quedan las credenciales de los dos modos y no se elige ninguno.",
+    next: { label: "Repite el cambio con", command: "togi auth set-api-key" },
+  }),
+  secret_empty: (p) => ({
+    text: "No ha llegado ningún secreto por la entrada estándar.",
+    next: { label: "Mira el uso con", command: p.command ?? "togi auth --help" },
+  }),
+  secret_too_long: (p) => ({
+    text: "El secreto es demasiado largo.",
+    next: { label: "Mira el uso con", command: p.command ?? "togi auth --help" },
+  }),
+  secret_input_refused: () => ({
+    text: "Esta terminal no puede ocultar lo que escribes, así que no se lee el secreto.",
+    next: { label: "Pásalo por tubería", command: "pbpaste | togi auth set-api-key" },
+  }),
+  secret_cancelled: () => ({ text: "Cancelado. No se ha guardado nada." }),
   usage: (p) => ({
     text: p.command ?? "Uso incorrecto.",
     next: { label: "Mira el uso con", command: "togi --help" },
