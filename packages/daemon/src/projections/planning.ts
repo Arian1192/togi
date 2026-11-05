@@ -61,9 +61,9 @@ export function applyToPlanning(db: Database.Database, event: DomainEvent): void
       const s = event.payload;
       const result = db
         .prepare(
-          "UPDATE sessions SET state = 'ended', ended_at = ?, outcome = ?, usage = ? WHERE session_id = ?",
+          "UPDATE sessions SET state = 'ended', ended_at = ?, outcome = ?, usage = ?, failure_reason = ? WHERE session_id = ?",
         )
-        .run(event.at, s.outcome, JSON.stringify(s.usage), s.sessionId);
+        .run(event.at, s.outcome, JSON.stringify(s.usage), s.failureReason, s.sessionId);
       if (result.changes === 0) throw new Error(`session.ended sin sesión ${s.sessionId}`);
       return;
     }

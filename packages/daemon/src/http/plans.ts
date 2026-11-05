@@ -29,6 +29,7 @@ interface SessionRow {
   ended_at: string | null;
   outcome: string | null;
   usage: string | null;
+  failure_reason: string | null;
 }
 
 const ERASED = "[borrado]";
@@ -103,6 +104,7 @@ export function planRoutes(
           startedAt: s.started_at,
           endedAt: s.ended_at,
           outcome: s.outcome,
+          failureReason: s.failure_reason,
           usage: s.usage === null ? null : (JSON.parse(s.usage) as unknown),
         })),
       });

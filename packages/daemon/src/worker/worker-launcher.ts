@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import {
   encodeLine,
+  type FailureReason,
   FromWorker,
   type SessionOrder,
   type SessionOutcome,
@@ -33,6 +34,8 @@ export interface LaunchResult {
   durationMs: number;
   /** Eventos escritos en el agent-event-store: el valor que va en `session.ended`. */
   trajectoryEvents: number;
+  /** Motivo para `session.ended`: `null` si completó o se canceló. */
+  failureReason: FailureReason | null;
   /** Últimas líneas de stderr del trabajador, ya limpias de secretos. */
   diagnostics: string;
 }
@@ -132,8 +135,19 @@ export function createWorkerLauncher(deps: WorkerLauncherDeps) {
       }
       const outcome: SessionOutcome =
         stopped ?? (writeFailed || result === undefined ? "failed" : result.outcome);
+      const failureReason: FailureReason | null =
+        outcome === "completed" || outcome === "cancelled"
+          ? null
+          : outcome === "timeout"
+            ? "timeout"
+            : writeFailed
+              ? "trajectory_write_failed"
+              : result === undefined
+                ? "worker_died"
+                : "agent_failed";
       return {
         outcome,
+        failureReason,
         exitCode: result?.exitCode ?? null,
         durationMs: Date.now() - started,
         trajectoryEvents: count,
