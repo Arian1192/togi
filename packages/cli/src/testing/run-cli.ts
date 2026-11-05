@@ -14,6 +14,8 @@ export function runCli(
   args: string[],
   home: string,
   env: Record<string, string> = {},
+  /** Lo que recibe la entrada estándar; sin él, queda abierta como hasta ahora. */
+  input?: string,
 ): Promise<CliResult> {
   const base: Record<string, string | undefined> = {
     ...process.env,
@@ -24,7 +26,7 @@ export function runCli(
   delete base.NO_COLOR;
   delete base.FORCE_COLOR;
   return new Promise((resolve) => {
-    execFile(
+    const child = execFile(
       process.execPath,
       [BIN, ...args],
       { env: { ...base, ...env } },
@@ -36,5 +38,6 @@ export function runCli(
         });
       },
     );
+    if (input !== undefined) child.stdin?.end(input);
   });
 }

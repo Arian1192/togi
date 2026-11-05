@@ -1,6 +1,7 @@
 import type { ParseArgsConfig } from "node:util";
 import type { Output } from "../output.ts";
 import { admin } from "./admin.ts";
+import { auth } from "./auth.ts";
 import { daemon } from "./daemon.ts";
 import { plan } from "./plan.ts";
 import { repo } from "./repo.ts";
@@ -26,6 +27,8 @@ export interface RunContext {
   signal: AbortSignal;
   /** Hace una pregunta de sí/no por stderr. */
   confirm(question: string): Promise<boolean>;
+  /** Lee un secreto por la entrada estándar (tubería o terminal sin eco). Nunca de argumentos ni entorno. */
+  readSecret(prompt: string, command: string): Promise<string>;
 }
 
 export interface Command {
@@ -43,6 +46,7 @@ export interface Command {
 /** Enrutado `recurso verbo`. */
 export const COMMANDS: Record<string, Record<string, Command>> = {
   admin,
+  auth,
   daemon,
   plan,
   repo,

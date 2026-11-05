@@ -4,6 +4,7 @@ import { COMMANDS, SHORTCUTS } from "./commands/index.ts";
 import { confirm } from "./confirm.ts";
 import { CliError, renderError, usageError } from "./errors.ts";
 import { createOutput } from "./output.ts";
+import { readSecret } from "./secret-input.ts";
 
 async function main(): Promise<number> {
   const env = process.env;
@@ -31,6 +32,8 @@ async function main(): Promise<number> {
         write: (text) => void process.stdout.write(text),
         signal: abort.signal,
         confirm: (question) => confirm(question, { input: process.stdin, output: process.stderr }),
+        readSecret: (prompt, command) =>
+          readSecret({ input: process.stdin, output: process.stderr }, prompt, command),
       }),
     );
     return 0;
@@ -39,7 +42,10 @@ async function main(): Promise<number> {
       error instanceof CliError
         ? error
         : (error as NodeJS.ErrnoException).code?.startsWith("ERR_PARSE_ARGS")
-          ? usageError("usage", { command: (error as Error).message })
+          ? // El mensaje de parseArgs repite el flag tal cual: en `auth` podría ser el secreto.
+            usageError("usage", {
+              command: argv[0] === "auth" ? "togi auth --help" : (error as Error).message,
+            })
           : null;
     if (cli === null) throw error;
     if (cli.stdout !== undefined) process.stdout.write(cli.stdout);
