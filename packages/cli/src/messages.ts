@@ -263,6 +263,8 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   }),
   failure_reason_agent_failed: () => ({ text: "el agente terminó con error" }),
   failure_reason_daemon_restarted: () => ({ text: "el daemon se reinició durante la sesión" }),
+  failure_reason_max_turns_exceeded: () => ({ text: "el agente agotó su tope de turnos" }),
+  failure_reason_budget_exceeded: () => ({ text: "el agente agotó su tope de coste" }),
   plan_not_found: (p) => ({
     text: `La tarea ${task(p)} no tiene plan.${lastSession(p)}`,
     next: { label: "Mira el estado con", command: showTask(p) },

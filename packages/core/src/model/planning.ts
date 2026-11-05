@@ -19,6 +19,8 @@ export const FAILURE_REASONS = [
   "trajectory_write_failed",
   "agent_failed",
   "daemon_restarted",
+  "max_turns_exceeded",
+  "budget_exceeded",
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
