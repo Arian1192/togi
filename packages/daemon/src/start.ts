@@ -2,9 +2,11 @@ import { bootstrap } from "./auth/bootstrap.ts";
 import { FileBlobStore } from "./blobs/file-blob-store.ts";
 import { createHandler } from "./commands/handle-command.ts";
 import { paths } from "./config/app.ts";
+import { agentCredentials } from "./credentials/agent-credential.ts";
 import { createApp } from "./http/app.ts";
 import { listen } from "./http/listen.ts";
 import { DataKeyring } from "./keys/data-keys.ts";
+import { selectSecretStore } from "./keys/select-keychain.ts";
 import { createOrchestrator } from "./orchestrator/orchestrator.ts";
 import type { Planner } from "./orchestrator/planner.ts";
 import { SqliteEventStore } from "./store/event-store.ts";
@@ -25,7 +27,16 @@ export async function startDaemon(
     const orchestrator = createOrchestrator({ db, store, handle, planner: options.planner });
     await orchestrator.recover();
     orchestrator.start();
-    const server = await listen(createApp(db, handle, { store, blobs }, home).fetch, p.socket);
+    const server = await listen(
+      createApp(
+        db,
+        handle,
+        { store, blobs },
+        home,
+        agentCredentials(selectSecretStore({ home, env })),
+      ).fetch,
+      p.socket,
+    );
     return {
       userId,
       db,

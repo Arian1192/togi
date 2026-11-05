@@ -50,3 +50,16 @@ export type CreateTask = z.infer<typeof CreateTask>;
 export type RegisterRepo = z.infer<typeof RegisterRepo>;
 export type EditTask = z.infer<typeof EditTask>;
 export type RejectTask = z.infer<typeof RejectTask>;
+
+export const AGENT_CREDENTIAL_MODES = ["api-key", "subscription"] as const;
+
+/** El secreto va en el cuerpo y nunca sale de vuelta: ASCII imprimible sin comillas ni `\`. */
+export const SetAgentCredential = z.object({
+  mode: z.enum(AGENT_CREDENTIAL_MODES),
+  secret: z
+    .string()
+    .min(8)
+    .max(512)
+    .regex(/^[\x21-\x7e]+$/)
+    .refine((s) => !/["'\\]/.test(s)),
+});
