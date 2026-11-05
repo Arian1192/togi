@@ -63,7 +63,7 @@ test("los dos intentos comparten el mismo delimitador", async () => {
   const { nonce: _nonce, ...sinNonce } = input;
   const { run, prompts } = agent("no es json", JSON.stringify(plan));
   await planWithRetry(sinNonce, run);
-  const code = (p?: string) => /<<<TAREA_NO_FIABLE ([0-9a-f]{32})>>>/.exec(p ?? "")?.[1];
+  const code = (p?: string) => /<<<TAREA_OBJETIVO ([0-9a-f]{32})>>>/.exec(p ?? "")?.[1];
   assert.ok(code(prompts[0]));
   assert.match(prompts[1] ?? "", new RegExp(`<<<ERROR_DE_VALIDACION ${code(prompts[0])}>>>`));
 });
