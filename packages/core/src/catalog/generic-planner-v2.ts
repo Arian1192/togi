@@ -3,7 +3,7 @@ import { ROLE_TOOLS, type Specialist } from "../model/specialist.ts";
 /**
  * Segunda versión del planificador genérico (ADR-009). Mismo rol, runtime, modelo y herramientas que
  * la 1; cambian las instrucciones. Cada versión es inmutable: un cambio es `generic-planner@3`,
- * nunca una edición de esta ni de la 1. Todavía no está en `BUILTIN_SPECIALISTS`: ningún flujo la usa.
+ * nunca una edición de esta ni de la 1. Es la del flujo por defecto; su hash está fijado en un test.
  */
 export const genericPlannerV2: Specialist = {
   id: "generic-planner",

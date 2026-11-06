@@ -1,4 +1,5 @@
 import { ROLE_TOOLS, type Specialist } from "../model/specialist.ts";
+import { genericPlannerV2 } from "./generic-planner-v2.ts";
 
 /**
  * Primer especialista del catálogo (ADR-009), definido como datos. Cada versión es inmutable: un
@@ -21,4 +22,4 @@ export const genericPlanner: Specialist = {
   ].join("\n"),
 };
 
-export const BUILTIN_SPECIALISTS: readonly Specialist[] = [genericPlanner];
+export const BUILTIN_SPECIALISTS: readonly Specialist[] = [genericPlanner, genericPlannerV2];

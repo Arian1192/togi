@@ -18,7 +18,7 @@ export interface FlowConfig {
 
 /** El flujo de quien no configura nada: un planificador y ningún evaluador. */
 export const DEFAULT_FLOW: FlowConfig = {
-  planning: { producer: { id: "generic-planner", version: 1 } },
+  planning: { producer: { id: "generic-planner", version: 2 } },
   evaluators: [],
 };
 
