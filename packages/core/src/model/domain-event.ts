@@ -231,6 +231,9 @@ const PAYLOADS: Record<string, z.ZodType> = {
   ...SPECIALIST_PAYLOADS,
 };
 
+/** Todos los tipos de evento que existen (de tareas, administración y catálogo). */
+export const EVENT_TYPES: readonly string[] = Object.keys(PAYLOADS);
+
 /** Versión vigente de cada tipo (ADR-004); el resto va en 1. Un cambio de forma sube la suya y añade su migración. */
 export const EVENT_SCHEMA_VERSIONS: Readonly<Record<string, number>> = { "session.ended": 2 };
 export const schemaVersionOf = (type: string): number => EVENT_SCHEMA_VERSIONS[type] ?? 1;

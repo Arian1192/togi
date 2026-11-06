@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Mide el tamaño de un cambio según el ADR-007.
 // Uso: node tools/diff-size.mjs [base]   (por defecto, main)
-// Compara base...HEAD más lo que haya en el índice y en el árbol de trabajo, ignorando
-// cambios de espacios (-w). Sale con 1 si se pasa de los límites, contando el margen.
+// Mide lo que habrá en el commit: la base (la merge-base) contra el índice, o sea los commits de la
+// rama más lo preparado con `git add`, ignorando cambios de espacios (-w). Lo que quede sin preparar
+// (ficheros modificados o nuevos) no cuenta, y el aviso final lo dice. Sale con 1 si se pasa de los
+// límites, contando el margen.
 import { execFileSync } from "node:child_process";
 
 const PROD_LIMIT = 200;
@@ -20,7 +22,13 @@ try {
   console.error(`No encuentro la rama base «${base}». Uso: node tools/diff-size.mjs [base]`);
   process.exit(2);
 }
-const numstat = execFileSync("git", ["diff", "--numstat", "-w", mergeBase], { encoding: "utf8" });
+const numstat = execFileSync("git", ["diff", "--cached", "--numstat", "-w", mergeBase], {
+  encoding: "utf8",
+});
+// Lo que git status ve sin preparar: la segunda columna distinta de espacio (` M`, `MM`) o `??` (nuevo).
+const unstaged = execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" })
+  .split("\n")
+  .filter((line) => line !== "" && line[1] !== " ").length;
 
 const isTest = (p) =>
   /\.test\.[cm]?[jt]sx?$/.test(p) || /(^|\/)testing\//.test(p) || p.startsWith("packages/e2e/");
@@ -52,6 +60,9 @@ console.log(`Tests       ${String(totals.tests).padStart(5)}`);
 console.log(`Docs        ${String(totals.docs).padStart(5)}`);
 console.log(`Total       ${String(total).padStart(5)}  límite ${TOTAL_LIMIT}  ${totalState}`);
 console.log(`(sin contar ${totals.ignored} líneas del lockfile; espacios ignorados)`);
+if (unstaged > 0) {
+  console.log(`Aviso: ${unstaged} fichero(s) sin preparar no cuentan; usa git add para medirlos.`);
+}
 
 if (prodState === "margen" || totalState === "margen") {
   console.log("Dentro del margen del 10%: declara en el PR que es una sola unidad coherente.");

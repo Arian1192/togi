@@ -1,3 +1,4 @@
+import { EVENT_TYPES } from "@togi/core";
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
 import {
@@ -23,6 +24,9 @@ function actorLabel(actor: Record<string, unknown>): string {
 
 const two = (n: number): string => String(n).padStart(2, "0");
 
+/** Ancho de la columna del tipo: el del tipo más largo que existe, para que ninguna fila se descuadre. */
+export const TYPE_WIDTH = Math.max(...EVENT_TYPES.map((type) => type.length));
+
 /** `HH:MM:SS  #seq  tipo  #tarea  actor`, con la hora local; `—` si el evento no es de una tarea. */
 export function formatEvent(e: WatchedEvent): string {
   const d = new Date(e.at);
@@ -30,7 +34,7 @@ export function formatEvent(e: WatchedEvent): string {
     ? "--:--:--"
     : `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
   const task = /^task:(\d+)$/.exec(e.stream)?.[1];
-  return `${time}  #${e.seq}  ${safe(e.type).padEnd(14)}  ${task === undefined ? "—" : `#${task}`}  ${actorLabel(e.actor)}\n`;
+  return `${time}  #${e.seq}  ${safe(e.type).padEnd(TYPE_WIDTH)}  ${task === undefined ? "—" : `#${task}`}  ${actorLabel(e.actor)}\n`;
 }
 
 export const watch: Command = {
