@@ -1,5 +1,5 @@
 import { PLAN_LIMITS } from "@togi/core";
-import { createClient } from "../client.ts";
+import { type Client, createClient } from "../client.ts";
 import { CliError, usageError } from "../errors.ts";
 import { clean, oneLine, say } from "../format.ts";
 import { failedSession, type SessionSummary } from "../last-session.ts";
@@ -62,6 +62,21 @@ function render(
   return `${lines.join("\n")}\n`;
 }
 
+/** El plan vigente con su enfoque, como lo muestra `togi plan show`. */
+function renderCurrent(n: number, plan: Plan, out: Output, failed?: SessionSummary): string {
+  const approach = plan.approachErased ? say("text_erased") : plan.approach;
+  return render(n, plan, approach, out, failed);
+}
+
+/** Lo mismo que `togi plan show <n>` sin flags, para quien sigue una tarea hasta su plan. */
+export async function currentPlanText(client: Client, n: string, out: Output): Promise<string> {
+  const plan = await client.checked<Plan>(
+    await client.api.v1.tasks[":n"].plan.$get({ param: { n } }),
+    { n: Number(n) },
+  );
+  return renderCurrent(Number(n), plan, out, await failedSession(client, n));
+}
+
 const show: Command = {
   summary: "Muestra el plan de una tarea.",
   example: "togi plan show 12",
@@ -116,8 +131,7 @@ Ejemplo:
     if (version === plan.planVersion) {
       const failed = await failedSession(client, n);
       if (json) return `${JSON.stringify({ ...plan, lastSession: failed ?? null })}\n`;
-      const approach = plan.approachErased ? say("text_erased") : plan.approach;
-      return render(Number(n), plan, approach, out, failed);
+      return renderCurrent(Number(n), plan, out, failed);
     }
     const older = plan.previous.find((p) => p.planVersion === version);
     if (older === undefined) {

@@ -12,7 +12,8 @@ import {
   resolveRepoBase,
 } from "./create-task.ts";
 import { resolveEditor, runEditor } from "./editor.ts";
-import type { Command } from "./index.ts";
+import { type FollowOptions, followTask } from "./follow.ts";
+import type { Command, RunContext } from "./index.ts";
 import { buildNewTemplate, parseNewTemplate, SUGGESTED_RISK } from "./new-template.ts";
 import { submitTask } from "./task-flow.ts";
 
@@ -129,7 +130,7 @@ título, descripción ni criterio, se cancela y no se crea nada.
 Ejemplo:
   togi new --risk low
 `,
-  async run({ home, json, out, values, args, interactive }) {
+  async run({ home, json, out, values, args, interactive, write, signal }) {
     const command = "togi new --help";
     if (args.length > 0) {
       throw usageError("invalid_option", {
@@ -140,8 +141,8 @@ Ejemplo:
     }
     const editor = editorForNew({ interactive, json }, process.env, command);
     const str = (v: string | boolean | undefined) => (typeof v === "string" ? v : undefined);
-    const done = await newWithEditor(
-      home,
+    return runNew(
+      { home, out, write, signal },
       editor,
       {
         risk: str(values.risk),
@@ -151,13 +152,32 @@ Ejemplo:
       },
       command,
     );
-    if (done === null) {
-      process.stderr.write(`${say("new_cancelled")}\n`);
-      return "";
-    }
-    return newLines(done, out);
   },
 };
+
+/**
+ * Crea la tarea con el editor y, si se envió, la sigue hasta que hay plan o falla la sesión. Lo
+ * creado se escribe según llega; el plan (o el aviso de que se dejó de seguir) es la salida final.
+ * Si falla la sesión o no empieza ninguna, el error sale con 1 (`CliError`).
+ */
+export async function runNew(
+  ctx: Pick<RunContext, "home" | "out" | "write" | "signal">,
+  editor: string[],
+  input: NewInput,
+  command = "togi new --help",
+  follow: FollowOptions = {},
+): Promise<string> {
+  const done = await newWithEditor(ctx.home, editor, input, command);
+  if (done === null) {
+    process.stderr.write(`${say("new_cancelled")}\n`);
+    return "";
+  }
+  const created = newLines(done, ctx.out);
+  if (done.submitted === null) return created;
+  ctx.write(created);
+  // La tarea es nueva: no tenía sesiones, así que cualquiera que aparezca es suya.
+  return followTask(ctx, String(done.created.number), { baseline: 0, ...follow });
+}
 
 /** Lo creado, lo deducido y lo que sigue: enviada con su pista, o en draft con cómo seguir. */
 export function newLines(done: NewResult, out: Output): string {
