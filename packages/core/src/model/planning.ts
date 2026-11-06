@@ -26,6 +26,23 @@ export const FAILURE_REASONS = [
 ] as const;
 export type FailureReason = (typeof FAILURE_REASONS)[number];
 
+/**
+ * Los únicos fallos que togi reintenta solo (U5), fijados en positivo: un trabajador que muere o una
+ * trayectoria que no se pudo escribir pueden no repetirse. Cualquier otro motivo queda fuera; en
+ * particular `timeout` y `agent_failed`, que reintentados costarían dinero sin que nadie lo pida, y
+ * `daemon_restarted`, que ya cubre `recover()`. Añadir un motivo exige cambiar el plan del PR U5.
+ */
+export const TRANSIENT_FAILURE_REASONS = [
+  "worker_died",
+  "trajectory_write_failed",
+] as const satisfies readonly FailureReason[];
+
+/** Reintentos automáticos por petición de plan; un reintento humano reinicia la cuenta. */
+export const MAX_AUTO_RETRIES = 1;
+
+export const isTransientFailure = (reason: FailureReason | null | undefined): boolean =>
+  TRANSIENT_FAILURE_REASONS.some((r) => r === reason);
+
 export const PLAN_CHANGES = ["add", "modify", "delete"] as const;
 export type PlanChange = (typeof PLAN_CHANGES)[number];
 
