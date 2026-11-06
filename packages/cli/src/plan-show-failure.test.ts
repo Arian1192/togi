@@ -97,6 +97,20 @@ test("sin plan, el error explica por qué terminó mal la última sesión", asyn
   assert.match(r.stderr, /Última sesión: se agotó el tiempo de la sesión\./);
 });
 
+test("credential_missing dice cómo arreglarlo en plan show y en task show", async () => {
+  const n = await submitted();
+  await ended(n, "timeout", "credential_missing");
+  const step = /togi auth set-api-key.*togi auth use-subscription/;
+  const plan = await show(n);
+  assert.equal(plan.code, 7);
+  assert.match(plan.stderr, /Última sesión: falta la credencial del agente/);
+  assert.match(plan.stderr, step);
+  const task = await runCli(["task", "show", String(n), "--no-color"], home);
+  assert.equal(task.code, 0, task.stderr);
+  assert.match(task.stdout, /Última sesión: falta la credencial del agente/);
+  assert.match(task.stdout, step);
+});
+
 test("con plan, y la última sesión fallida, lo muestra tras el plan y en --json", async () => {
   const n = await submitted();
   await seed(n);

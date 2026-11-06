@@ -3,6 +3,7 @@ import { CreateTask, RISK_LEVELS, SAFE_ID } from "@togi/core";
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
 import { clean, headerIndent, say, section } from "../format.ts";
+import { failedSession } from "../last-session.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
@@ -157,6 +158,8 @@ Ejemplo:
       n: Number(n),
     });
     if (json) return `${JSON.stringify(t)}\n`;
+    // Una tarea que espera plan y cuya última sesión falló: el porqué y el siguiente paso.
+    const failed = t.state === "planning" ? await failedSession(client, n) : undefined;
     const risk = say(`risk_${t.risk}`);
     const meta = `${t.state} · riesgo ${risk} · ${t.repo} → ${t.baseBranch} · versión ${t.version}${
       t.planVersion === null ? "" : ` · plan v${t.planVersion}`
@@ -170,6 +173,15 @@ Ejemplo:
       section(say("section_description"), t.description, t.erased.description, out),
       "",
       section(say("section_criteria"), t.acceptanceCriteria, t.erased.acceptanceCriteria, out),
+      ...(failed
+        ? [
+            "",
+            out.mark(
+              "attention",
+              say("last_session_failed", { reason: failed.failureReason ?? "" }),
+            ),
+          ]
+        : []),
     ].join("\n")}\n`;
   },
 };

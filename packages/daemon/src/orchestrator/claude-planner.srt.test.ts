@@ -26,6 +26,7 @@ import { FileBlobStore } from "../blobs/file-blob-store.ts";
 import { RedactingBlobStore } from "../blobs/redacting-blob-store.ts";
 import { type CreateTaskInput, createHandler } from "../commands/handle-command.ts";
 import { paths } from "../config/app.ts";
+import { InconsistentCredentialsError } from "../credentials/agent-credential.ts";
 import { DataKeyring } from "../keys/data-keys.ts";
 import { loadOrCreateMasterKey } from "../keys/master-key.ts";
 import { selectKeychain } from "../keys/select-keychain.ts";
@@ -232,6 +233,30 @@ test("si el sandbox no puede arrancar, la sesión acaba con sandbox_unavailable 
   });
   assert.equal(r.state, "planning");
   assert.deepEqual([r.ended.outcome, r.ended.failureReason], ["failed", "sandbox_unavailable"]);
+  assert.equal(r.ended.trajectoryEvents, 0);
+  assert.deepEqual(leftovers(), []);
+});
+
+test("sin credencial, la sesión se abre y se cierra con credential_missing antes de lanzar nada", async () => {
+  const r = await planWith("MODE:ok", {
+    credentials: { status: async () => null, read: async () => null },
+  });
+  assert.equal(r.state, "planning");
+  assert.deepEqual([r.ended.outcome, r.ended.failureReason], ["failed", "credential_missing"]);
+  assert.equal(r.ended.trajectoryEvents, 0);
+  assert.deepEqual(leftovers(), []);
+});
+
+test("con las credenciales de los dos modos (inconsistent) también es credential_missing", async () => {
+  const r = await planWith("MODE:ok", {
+    credentials: {
+      status: async () => "inconsistent" as const,
+      read: async () => {
+        throw new InconsistentCredentialsError();
+      },
+    },
+  });
+  assert.deepEqual([r.ended.outcome, r.ended.failureReason], ["failed", "credential_missing"]);
   assert.equal(r.ended.trajectoryEvents, 0);
   assert.deepEqual(leftovers(), []);
 });

@@ -10,6 +10,9 @@ import { selectKeychain } from "../../daemon/src/keys/select-keychain.ts";
 import { openEventDatabase } from "../../daemon/src/store/database.ts";
 import { SqliteEventStore } from "../../daemon/src/store/event-store.ts";
 
+// Los e2e prueban el flujo sin agente: el daemon que arrancan hereda este entorno.
+process.env.TOGI_PLANNER = "off";
+
 export { type CliResult, runCli } from "../../cli/src/testing/run-cli.ts";
 export { type RunningCli, spawnCli } from "../../cli/src/testing/spawn-cli.ts";
 export { paths };

@@ -11,7 +11,10 @@ import {
   specialistHash,
   type Usage,
 } from "@togi/core";
-import type { AgentCredentials } from "../credentials/agent-credential.ts";
+import {
+  type AgentCredentials,
+  InconsistentCredentialsError,
+} from "../credentials/agent-credential.ts";
 import type { createWorkerLauncher } from "../worker/worker-launcher.ts";
 import { withReadOnlyCopy } from "../workspaces/read-only-copy.ts";
 import type { Planner, PlannerIdentity, PlanOutcome, PlanRequest } from "./planner.ts";
@@ -63,7 +66,7 @@ class AgentRunFailed extends Error {
 /**
  * El planificador real: copia de solo lectura del repo, credencial del modo activo, sandbox por el
  * trabajador, y el plan validado con un único reintento. La copia y el directorio desechable se borran
- * siempre. Sin credencial devuelve `planner_failed`; el motivo propio llega en el PR 16c.
+ * siempre. Sin credencial (o con las de los dos modos) cierra la sesión con `credential_missing`.
  */
 export class ClaudePlanner implements Planner {
   readonly #deps: ClaudePlannerDeps;
@@ -115,8 +118,12 @@ export class ClaudePlanner implements Planner {
     if (input === undefined || request.specialist === undefined) {
       return fail("planner_error", "la sesión no pasó por identity");
     }
-    const credential = await d.credentials.read();
-    if (credential === null) return fail("planner_failed", "no hay credencial configurada");
+    // Sin credencial, o con las de los dos modos a medias, la sesión se cierra antes de lanzar nada.
+    const credential = await d.credentials.read().catch((error: unknown) => {
+      if (error instanceof InconsistentCredentialsError) return null;
+      throw error;
+    });
+    if (credential === null) return fail("credential_missing", "falta la credencial del agente");
     const declaration = d.declaration(credential.mode);
     const deadline = Date.now() + (d.timeoutMs ?? SESSION_TIMEOUT_MS);
     const { sessionId, taskNumber } = request;
