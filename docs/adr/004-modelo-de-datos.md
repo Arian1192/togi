@@ -94,6 +94,7 @@ export type TaskEvent =
   | E<"session.ended", { sessionId: SessionId; outcome: "completed" | "failed" | "cancelled" | "timeout";
                          usage: Usage; trajectoryEvents: number;
                          failureReason: FailureReason | null }>   // schemaVersion 2
+  | E<"plan.retry_requested", {}>                                    // un humano pide otra sesión; planning → planning
   | E<"plan.proposed", Plan>                                         // planning → plan_review
   | E<"workspace.created", Workspace>
   | E<"build.submitted", { cycle: number; headSha: string }>         // building → verifying
@@ -305,7 +306,7 @@ Qué entra en cada rebanada, sin cambiar el esquema:
 | Rebanada | Eventos | Proyecciones |
 | --- | --- | --- |
 | 1. Tareas y log | `task.created`, `task.edited`, `task.submitted`, `task.rejected` | `tasks` |
-| 2. Planificación | `session.*`, `plan.proposed`, `decision.recorded` (gate 1) | `plans`, `sessions`, `decisions` |
+| 2. Planificación | `session.*`, `plan.proposed`, `plan.retry_requested`, `decision.recorded` (gate 1) | `plans`, `sessions`, `decisions` |
 | 3. Construcción y verificación | `workspace.*`, `build.submitted`, `gate.completed`, `verification.completed`, `task.failed`, `failure.classified`, `task.risk_changed` | `workspaces`, `gate_runs`, `unclassified_failures` |
 | 4. PR y merge | `pr.opened`, `base.integrated`, `decision.recorded` (gate 2), `task.merged` | `shadow_agreement` (desde el paso 8) |
 

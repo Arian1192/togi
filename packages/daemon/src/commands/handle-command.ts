@@ -64,6 +64,11 @@ export interface RejectTaskInput {
 }
 
 /** Sesión de planificación: el prompt y la política llegan en claro y se guardan como blobs `prompt`. */
+export interface RequestPlanRetryInput {
+  type: "requestPlanRetry";
+  number: number;
+}
+
 export interface StartSessionInput {
   type: "startSession";
   number: number;
@@ -101,6 +106,7 @@ export type CommandInput =
   | CreateTaskInput
   | EditTaskInput
   | SubmitTaskInput
+  | RequestPlanRetryInput
   | RejectTaskInput
   | StartSessionInput
   | EndSessionInput
@@ -226,6 +232,8 @@ export function createHandler(deps: HandlerDeps) {
         }
         case "submit":
           return { type: "submit", actor, at };
+        case "requestPlanRetry":
+          return { type: "requestPlanRetry", actor, at };
         case "reject": {
           const reason = { category: cmd.category, text: await blob(cmd.text) };
           return { type: "reject", actor, at, reason };

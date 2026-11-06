@@ -9,6 +9,7 @@ import {
 import type Database from "better-sqlite3";
 import { type Context, Hono } from "hono";
 import type { createHandler } from "../commands/handle-command.ts";
+import type { PlannerStatus } from "../orchestrator/planner-status.ts";
 import type { AppEnv } from "./app.ts";
 import { hashBody, idempotencyKeys, type SavedResponse } from "./idempotency.ts";
 import { domainStatus, problem } from "./problem.ts";
@@ -41,7 +42,11 @@ interface TaskRow {
  * Rutas de comandos del ADR-005, encadenadas para que `hc` infiera sus tipos. El actor sale
  * siempre del token, nunca del cuerpo. Sin `handle` las rutas existen pero responden 503.
  */
-export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
+export function taskRoutes(
+  db: Database.Database,
+  handle: Handle | undefined,
+  planner?: PlannerStatus,
+) {
   const select = (conn: Database.Database, number: number) =>
     conn
       .prepare(
@@ -249,6 +254,13 @@ export function taskRoutes(db: Database.Database, handle: Handle | undefined) {
       .post(
         "/v1/tasks/:n/submit",
         existing(null, (number) => ({ type: "submit", number })),
+      )
+      // El evento lo recoge el orquestador, como un submit. Sin planificador activo nadie lo
+      // recogería: se rechaza antes de escribir nada.
+      .post("/v1/tasks/:n/plan/retry", (c) =>
+        planner?.state === "active"
+          ? existing(null, (number) => ({ type: "requestPlanRetry", number }))(c)
+          : problem(503, "not_configured", "no hay un planificador activo"),
       )
       .post(
         "/v1/tasks/:n/reject",

@@ -47,6 +47,8 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
       return view.exists ? { ...view, state: "planning" } : view;
     case "task.rejected":
       return view.exists ? { ...view, state: "rejected" } : view;
+    case "plan.retry_requested":
+      return view; // una petición: la tarea sigue donde estaba
     case "session.started":
       return view.exists
         ? {

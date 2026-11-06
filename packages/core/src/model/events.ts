@@ -42,6 +42,8 @@ export type TaskEvent =
   | E<"task.submitted", Record<string, never>>
   | E<"session.started", SessionStarted>
   | E<"session.ended", SessionEnded>
+  /** Un humano pide otra sesión de planificación; no cambia el estado de la tarea. */
+  | E<"plan.retry_requested", Record<string, never>>
   | E<"plan.proposed", Plan>
   | E<"decision.recorded", PlanDecision>
   | E<"task.rejected", { reason: Reason }>;
