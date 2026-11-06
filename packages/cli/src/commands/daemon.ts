@@ -20,7 +20,23 @@ const status: Command = {
       await client.api.v1.planner.$get(),
     );
     const plannerText = MESSAGES[`planner_${planner.state}`]?.({ reason: planner.reason }).text;
-    const line = `Daemon en marcha · versión ${health.daemon} · pid ${health.pid} · ${plannerText ?? clean(planner.state)} · ${client.socket}`;
+    // Un daemon más viejo no tiene la ruta: sin ella, la línea queda como estaba.
+    let notify: string | undefined;
+    try {
+      const s = await client.checked<{ state: string; reason: string }>(
+        await client.api.v1.notifications.$get(),
+      );
+      notify = MESSAGES[`notify_${s.state}`]?.({ reason: s.reason }).text;
+    } catch {}
+    const parts = [
+      "Daemon en marcha",
+      `versión ${health.daemon}`,
+      `pid ${health.pid}`,
+      plannerText ?? clean(planner.state),
+      ...(notify === undefined ? [] : [notify]),
+      client.socket,
+    ];
+    const line = parts.join(" · ");
     return `${out.mark("ok", line)}\n`;
   },
 };

@@ -29,6 +29,18 @@ export interface NotifierDeps {
   log?: (line: string) => void;
 }
 
+/** Si el daemon avisa con notificaciones de macOS, y si no, por qué. Lo ve `togi daemon status`. */
+export interface NotifierStatus {
+  state: "active" | "disabled" | "unavailable";
+  /** Texto fijo del daemon, nunca datos de usuario. */
+  reason: string;
+}
+
+export const NOTIFY_NOT_CONFIGURED: NotifierStatus = {
+  state: "disabled",
+  reason: "no se configuró ningún notificador",
+};
+
 /**
  * Avisos de macOS. Nunca lanza ni espera: notificar no puede estorbar a quien lo pide. Fuera de macOS
  * no hace nada y lo anota una sola vez; `TOGI_NOTIFY=off` lo desactiva sin ruido.
@@ -40,7 +52,14 @@ export function createNotifier({
   log = console.error,
 }: NotifierDeps = {}) {
   let warned = false;
+  const status: NotifierStatus =
+    env.TOGI_NOTIFY === "off"
+      ? { state: "disabled", reason: "TOGI_NOTIFY=off en el entorno del daemon" }
+      : platform !== "darwin"
+        ? { state: "unavailable", reason: `sin notificaciones en la plataforma ${platform}` }
+        : { state: "active", reason: "avisos de macOS" };
   return {
+    status,
     notify({ title, message }: Notification): void {
       if (env.TOGI_NOTIFY === "off") return;
       if (platform !== "darwin") {
