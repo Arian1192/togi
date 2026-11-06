@@ -230,6 +230,17 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Indica qué editar: --title, --description o --criteria (${task(p)}).`,
     next: { label: "Mira el uso con", command: p.command ?? "togi task edit --help" },
   }),
+  new_cancelled: () => ({ text: "Cancelado. No se ha creado ninguna tarea." }),
+  new_needs_terminal: () => ({
+    text: "togi new abre el editor y necesita una terminal (y no admite --json).",
+    next: { label: "Fuera de una terminal usa", command: "togi task new --help" },
+  }),
+  new_draft_kept: (p) => ({
+    text: `Queda en draft (--draft): envíala con togi task submit ${p.n ?? "<número>"}`,
+  }),
+  follow_hint: (p) => ({
+    text: `Sigue el progreso con: togi watch · togi plan show ${p.n ?? "<número>"}`,
+  }),
   edit_cancelled: () => ({ text: "Cancelado. No se ha cambiado nada." }),
   editor_failed: (p) => ({ text: `El editor falló (${p.detail}); no se ha cambiado nada.` }),
   edit_editor_unsafe: (p) => ({

@@ -209,6 +209,8 @@ Ejemplo:
     const n = taskNumber(args, "togi task submit --help");
     const done = await submitTask(home, n);
     if (json) return `${JSON.stringify(done)}\n`;
+    // La pista va por stderr: la salida estándar sigue siendo solo el resultado.
+    process.stderr.write(`${say("follow_hint", { n: done.number })}\n`);
     return `${out.mark("ok", say("task_submitted", { n: done.number, state: done.state }))}\n`;
   },
 };
