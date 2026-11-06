@@ -1,4 +1,5 @@
 import { failureReasonProblem, schemaVersionOf } from "../model/domain-event.ts";
+import { isTransientFailure, MAX_AUTO_RETRIES } from "../model/planning.ts";
 import { REASON_CATEGORIES, type TaskState } from "../model/task.ts";
 import type { TaskCommand } from "./commands.ts";
 import { type DomainError, domainError } from "./errors.ts";
@@ -54,7 +55,18 @@ export function decide(
       return [{ ...meta, type: "task.rejected", payload: { reason: { category, text } } }];
     }
     case "requestPlanRetry": {
-      if (cmd.actor.kind !== "human") return notAllowed("human");
+      // Un humano reintenta sin límite. El sistema solo reintenta un fallo pasajero, una vez (U5).
+      if (cmd.actor.kind === "system") {
+        if (
+          !isTransientFailure(planning.lastFailure) ||
+          (planning.autoRetries ?? 0) >= MAX_AUTO_RETRIES
+        ) {
+          return domainError(
+            "actor_not_allowed",
+            "el actor system solo reintenta un fallo pasajero, una vez",
+          );
+        }
+      } else if (cmd.actor.kind !== "human") return notAllowed("human");
       if (view.state !== "planning") {
         return domainError("invalid_state", "solo se reintenta la planificación en planning");
       }
