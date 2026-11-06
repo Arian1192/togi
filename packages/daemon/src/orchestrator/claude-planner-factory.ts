@@ -63,6 +63,7 @@ export function claudePlanner({
       agentEntry: join(workerPackageDir, "src", "adapters", "claude-agent-sdk", "main.ts"),
       runtime: { id: "claude-agent-sdk", version: runtime.sdkVersion },
       runtimePaths: runtime.paths,
+      executable: runtime.executable,
       maxCostUsd: cap.usd,
     });
   };

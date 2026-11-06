@@ -52,6 +52,22 @@ test("modo suscripción: el token va en claro, sin marcador ni inyección", () =
   assert.equal(d.ownSandbox, false);
 });
 
+test("el ejecutable que da el daemon es el que usa el SDK; sin él no se fija ninguno", async () => {
+  const withExe = fake([result("success")]);
+  await collect(runPlanner({ ...RUN, executable: "/bin/claude-real" }, withExe.query));
+  assert.equal(withExe.seen.options?.pathToClaudeCodeExecutable, "/bin/claude-real");
+  const without = fake([result("success")]);
+  await collect(runPlanner(RUN, without.query));
+  assert.ok(!("pathToClaudeCodeExecutable" in (without.seen.options ?? {})));
+});
+
+test("el binario escribe en el directorio desechable (HOME en el sandbox), no en /tmp", async () => {
+  const { seen, query } = fake([result("success")]);
+  await collect(runPlanner(RUN, query));
+  const env = seen.options?.env as Record<string, string>;
+  assert.equal(env.CLAUDE_CODE_TMPDIR, process.env.HOME);
+});
+
 test("lanza el SDK sin ajustes del repo, solo lectura, con topes y sin telemetría", async () => {
   const { seen, query } = fake([result("success")]);
   await collect(runPlanner(RUN, query));

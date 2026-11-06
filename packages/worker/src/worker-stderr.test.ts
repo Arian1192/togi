@@ -58,6 +58,19 @@ test("solo se conservan las últimas 20 líneas, cortas", async () => {
   assert.ok(out.every((l) => l.length <= "agente: ".length + 300));
 });
 
+test("una línea larga de código minificado seguida del error conserva el mensaje, que va al final", async () => {
+  const minified = `file:///sdk.mjs:157\n${"function a(e){return e}".repeat(200)}`;
+  const message = "Error: Claude Code returned an error result: Not logged in";
+  const out = await workerStderr(`${minified}\n${message}\n`, 1);
+  assert.ok(out.includes(`agente: ${message}`));
+  // Y cuando el mensaje va pegado al final de la línea larga, el corte lo conserva.
+  const glued = (await workerStderr(`${"x".repeat(5000)} ${message}\n`, 1)).trimEnd();
+  assert.ok(glued.endsWith(message), glued.slice(-120));
+  assert.ok(glued.includes("…"));
+  assert.ok(glued.length <= "agente: ".length + 300);
+  assert.ok(glued.startsWith(`agente: ${"x".repeat(80)}…`));
+});
+
 test("las secuencias de escape y los controles se quitan de cada línea", async () => {
   const out = await workerStderr("\u001b[31mroja\u001b[0m\u009b2J\rfin\ncolumna\tdos\n", 1);
   assert.equal(out, "agente: [31mroja[0m2Jfin\nagente: columnados\n");
