@@ -235,6 +235,10 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: "togi new abre el editor y necesita una terminal (y no admite --json).",
     next: { label: "Fuera de una terminal usa", command: "togi task new --help" },
   }),
+  new_needs_editor: () => ({
+    text: "togi new necesita un editor y no hay $VISUAL ni $EDITOR definidos.",
+    next: { label: "Define uno, por ejemplo", command: "export EDITOR=nano" },
+  }),
   new_draft_kept: (p) => ({
     text: `Queda en draft (--draft): envíala con togi task submit ${p.n ?? "<número>"}`,
   }),

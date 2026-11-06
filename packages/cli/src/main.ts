@@ -3,6 +3,7 @@ import { parseCommandLine } from "./args.ts";
 import { COMMANDS, SHORTCUTS } from "./commands/index.ts";
 import { confirm } from "./confirm.ts";
 import { CliError, renderError, usageError } from "./errors.ts";
+import { isInteractive } from "./interactive.ts";
 import { createOutput } from "./output.ts";
 import { readSecret } from "./secret-input.ts";
 
@@ -28,7 +29,7 @@ async function main(): Promise<number> {
         out,
         values: parsed.values,
         args: parsed.args,
-        interactive: process.stdin.isTTY === true && process.stderr.isTTY === true,
+        interactive: isInteractive(process.stdin, process.stderr),
         write: (text) => void process.stdout.write(text),
         signal: abort.signal,
         confirm: (question) => confirm(question, { input: process.stdin, output: process.stderr }),
