@@ -88,6 +88,22 @@ export async function newWithEditor(
   return { created, deduced: target.deduced, submitted };
 }
 
+/**
+ * El editor de `togi new`. Son dos fallos distintos y cada uno dice lo suyo: sin terminal (o con
+ * `--json`) no se puede abrir un editor; con terminal pero sin `$VISUAL` ni `$EDITOR`, no se sabe
+ * cuál abrir.
+ */
+export function editorForNew(
+  ctx: { interactive: boolean; json: boolean },
+  env: Record<string, string | undefined>,
+  command: string,
+): string[] {
+  if (ctx.json || !ctx.interactive) throw usageError("new_needs_terminal", { command });
+  const editor = resolveEditor(env);
+  if (editor === undefined) throw usageError("new_needs_editor", { command });
+  return editor;
+}
+
 export const newTaskWithEditor: Command = {
   summary: "Crea una tarea con el editor y la envía a planificar.",
   example: "togi new",
@@ -122,8 +138,7 @@ Ejemplo:
         command,
       });
     }
-    const editor = interactive && !json ? resolveEditor(process.env) : undefined;
-    if (editor === undefined) throw usageError("new_needs_terminal", { command });
+    const editor = editorForNew({ interactive, json }, process.env, command);
     const str = (v: string | boolean | undefined) => (typeof v === "string" ? v : undefined);
     const done = await newWithEditor(
       home,
