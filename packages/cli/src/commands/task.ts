@@ -3,22 +3,10 @@ import { CreateTask, RISK_LEVELS, SAFE_ID } from "@togi/core";
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
 import { clean, headerIndent, say, section } from "../format.ts";
-import { inferRepo } from "../infer-repo.ts";
 import { failedSession } from "../last-session.ts";
-import { MESSAGES } from "../messages.ts";
-import type { Output } from "../output.ts";
+import { createdLines, inferredLine, postTask, resolveRepoBase } from "./create-task.ts";
 import type { Command } from "./index.ts";
 import { flow } from "./task-flow.ts";
-
-interface Created {
-  number: number;
-  /** `null` con `titleErased` si se repite una creación idempotente cuyo título ya se borró. */
-  title: string | null;
-  titleErased: boolean;
-  state: string;
-  risk: string;
-  hasCriteria: boolean;
-}
 
 interface Detail {
   number: number;
@@ -92,40 +80,11 @@ const newTask: Command = {
     if (!SAFE_ID.test(key)) {
       throw usageError("invalid_option", { field: "--idempotency-key", command });
     }
-    let repo = str(values.repo);
-    let baseBranch = values.base === undefined ? undefined : str(values.base);
-    // Un --base que la API rechazaría se rechaza ya, antes de consultar al daemon para deducir.
-    if (baseBranch !== undefined && !CreateTask.shape.baseBranch.safeParse(baseBranch).success) {
-      throw usageError("invalid_option", { field: FLAG.baseBranch as string, command });
-    }
-    let deduced: { repo: string; baseBranch: string | undefined } | undefined;
-    if (repo === undefined) {
-      // Sin --repo se deduce del directorio; lo que no se puede deducir se pide, nunca se supone.
-      const lookup = createClient(home);
-      const { repos } = await lookup.checked<{ repos: { repo: string }[] }>(
-        await lookup.api.v1.repos.$get(),
-      );
-      const found = await inferRepo(
-        process.cwd(),
-        repos.map((r) => r.repo),
-      );
-      if (!found.ok) {
-        throw usageError("repo_not_inferred", {
-          reason: found.reason,
-          ...(found.repo === undefined ? {} : { repo: found.repo }),
-          command,
-        });
-      }
-      repo = found.repo;
-      deduced = { repo, baseBranch: undefined };
-      if (baseBranch === undefined) {
-        if (found.baseBranch === undefined) {
-          throw usageError("base_not_inferred", { repo, command });
-        }
-        baseBranch = found.baseBranch;
-        deduced = { repo, baseBranch };
-      }
-    }
+    const { repo, baseBranch, deduced } = await resolveRepoBase(
+      home,
+      { repo: str(values.repo), base: values.base === undefined ? undefined : str(values.base) },
+      command,
+    );
     const body = {
       title: args[0],
       risk: str(values.risk),
@@ -143,42 +102,12 @@ const newTask: Command = {
         command,
       });
     }
-    const client = createClient(home);
-    const created = await client.checked<Created>(
-      await client.api.v1.tasks.$post(
-        {},
-        {
-          headers: { "idempotency-key": key, "content-type": "application/json" },
-          init: { body: JSON.stringify(parsed.data) },
-        },
-      ),
-    );
+    const created = await postTask(home, parsed.data, key);
     if (json) return `${JSON.stringify(created)}\n`;
     const lines = createdLines(created, out);
-    if (deduced === undefined) return lines;
-    // Lo deducido se dice: nada de elegir el repo ni la rama en silencio.
-    const said = MESSAGES.repo_inferred?.({
-      repo: deduced.repo,
-      ...(deduced.baseBranch === undefined ? {} : { base: deduced.baseBranch }),
-    }).text;
-    return `${lines}  ${said}\n`;
+    return deduced === undefined ? lines : `${lines}  ${inferredLine(deduced)}\n`;
   },
 };
-
-function createdLines(t: Created, out: Output): string {
-  const params = {
-    n: t.number,
-    title: t.title === null ? say("text_erased") : clean(t.title),
-    risk: t.risk,
-    state: t.state,
-  };
-  const lines = [out.mark("ok", MESSAGES.task_created?.(params).text ?? "")];
-  if (!t.hasCriteria) {
-    const next = MESSAGES.task_missing_criteria?.(params);
-    lines.push(`  ${next?.text}: ${out.paint("accent", next?.next?.command ?? "")}`);
-  }
-  return `${lines.join("\n")}\n`;
-}
 
 const show: Command = {
   summary: "Muestra el detalle de una tarea.",
