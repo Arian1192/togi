@@ -45,7 +45,7 @@ Las cifras son estimaciones de líneas de producción. Si un plan pasa de los l�
 | U4 | `feat(daemon): notificaciones de macOS` | Uso y autonomía (3b) | 16 | 120 |
 | U5 | `feat(daemon): reintento automático de los fallos pasajeros` | Uso y autonomía (3b) | 16, U3 | 120 |
 | U6 | `feat: el daemon arranca con la sesión de macOS` | Uso y autonomía (3b) | U3 | 150 |
-| U7 | `feat(cli): togi inbox` | Uso y autonomía (3b) | U2, U4 | 150 |
+| U7 | `feat(desktop): fase 1 de la app de escritorio` | Uso y autonomía (3b) | 4, 12 | su propio plan |
 | 17 | `test: extremo a extremo de la rebanada 2` | Cierre | 16 | 40 |
 | 18 | `test: prueba de ataque` | Cierre | 16 | 40 |
 | 19 | `docs: cierre de la rebanada 2` | Cierre | 17, 18 | 0 |
@@ -506,20 +506,19 @@ Objetivo: que el daemon esté siempre que haga falta.
 Fuera de alcance: Linux y Windows.
 ```
 
-## PR U7 · feat(cli): togi inbox
+## PR U7 · feat(desktop): fase 1 de la app de escritorio
 
 ```
-Tarea: PR U7 de docs/plan-rebanada-2.md — feat(cli): togi inbox.
-Lee antes: AGENTS.md, docs/cli-estilo.md y los PRs U2 y U4 de este plan.
+Tarea: PR U7 de docs/plan-rebanada-2.md — feat(desktop): fase 1 de la app de escritorio.
+Lee antes: AGENTS.md, docs/adr/010 y docs/marca/manual-de-marca.md.
 
-Objetivo: una sola lista de lo que espera a la persona.
-- togi inbox muestra lo que necesita atención: planes por revisar y tareas en planning tras un
-  fallo, cada una con su siguiente paso.
-- Sale de las proyecciones, sin estado nuevo. Con --json, para scripts.
-- Vacía, lo dice y no falla.
-- Tests: lista vacía, un plan por revisar, un fallo con su motivo, orden estable y --json.
+Sustituye a `togi inbox`: la lista de lo que espera a la persona es la lista de tareas de la app.
+Objetivo: la fase 1 del ADR-010 (shell, lista de tareas, plan, cuaderno del gate 1 y trayectoria).
+- Requiere la API de planes (PR 4), la escritura de la trayectoria (PR 12) y la ruta de lectura
+  de la trayectoria que define el ADR-010.
+- Se parte en PRs pequeños con su propio plan (ADR-007); este bloque no los detalla.
 
-Fuera de alcance: acciones desde la bandeja (se hacen con los comandos de siempre).
+Fuera de alcance: las fases 2 a 4 del ADR-010.
 ```
 
 ## PR 17 · test: extremo a extremo de la rebanada 2
