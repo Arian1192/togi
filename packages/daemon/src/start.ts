@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { DEFAULT_FLOW } from "@togi/core";
 import { bootstrap } from "./auth/bootstrap.ts";
 import { FileBlobStore } from "./blobs/file-blob-store.ts";
 import { RedactingBlobStore } from "./blobs/redacting-blob-store.ts";
@@ -9,8 +10,8 @@ import { createApp } from "./http/app.ts";
 import { listen } from "./http/listen.ts";
 import { DataKeyring } from "./keys/data-keys.ts";
 import { selectSecretStore } from "./keys/select-keychain.ts";
+import type { PlannerSource } from "./orchestrator/claude-planner-factory.ts";
 import { createOrchestrator } from "./orchestrator/orchestrator.ts";
-import type { Planner } from "./orchestrator/planner.ts";
 import { SqliteEventStore } from "./store/event-store.ts";
 import { AgentEventStore } from "./trajectory/agent-event-store.ts";
 
@@ -18,8 +19,11 @@ import { AgentEventStore } from "./trajectory/agent-event-store.ts";
 export async function startDaemon(
   home: string,
   env: Record<string, string | undefined> = process.env,
-  /** Solo los tests pasan uno; en producción no hay ninguno hasta el PR 16. Nunca sale del entorno. */
-  options: { planner?: Planner } = {},
+  /**
+   * Un Planner, o una función que lo construye con lo que el daemon tiene al arrancar (esta lanza si
+   * su configuración es inválida y el daemon no arranca). Nunca sale del entorno.
+   */
+  options: { planner?: PlannerSource } = {},
 ) {
   const { db, masterKey, userId } = await bootstrap(home, env);
   try {
@@ -33,17 +37,28 @@ export async function startDaemon(
     const store = new SqliteEventStore(db);
     const agentEvents = new AgentEventStore(db, blobs);
     const handle = createHandler({ db, store, blobs });
-    const orchestrator = createOrchestrator({ db, store, handle, planner: options.planner });
+    const credentials = agentCredentials(selectSecretStore({ home, env }));
+    const source = options.planner;
+    const planner =
+      typeof source === "function"
+        ? source({
+            db,
+            home,
+            store,
+            readText: handle.readText,
+            agentEvents,
+            credentials,
+            scrub: [token],
+            env,
+          })
+        : source;
+    // Con planificador construido por el daemon, el especialista sale del flujo por defecto.
+    const flow = typeof source === "function" ? DEFAULT_FLOW : undefined;
+    const orchestrator = createOrchestrator({ db, store, handle, planner, flow });
     await orchestrator.recover();
     orchestrator.start();
     const server = await listen(
-      createApp(
-        db,
-        handle,
-        { store, blobs, agentEvents },
-        home,
-        agentCredentials(selectSecretStore({ home, env })),
-      ).fetch,
+      createApp(db, handle, { store, blobs, agentEvents }, home, credentials).fetch,
       p.socket,
     );
     return {
