@@ -29,6 +29,9 @@ export interface MessageParams {
   path?: string;
   /** Rama base. */
   base?: string;
+  /** Etiquetas instaladas del daemon y de la CLI. */
+  daemonRelease?: string;
+  cliRelease?: string;
   seconds?: number;
 }
 
@@ -377,6 +380,10 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   }),
   notify_unavailable: (p) => ({
     text: `notificaciones no disponibles (${plain(p.reason, "sin motivo")})`,
+  }),
+  release_mismatch: (p) => ({
+    text: `El daemon es ${plain(p.daemonRelease, "?")} y la CLI ${plain(p.cliRelease, "?")}.`,
+    next: { label: "Actualiza el daemon con", command: `togi update ${plain(p.cliRelease, "?")}` },
   }),
   failure_reason_credential_missing: () => ({
     text: "falta la credencial del agente: configúrala con `togi auth set-api-key` o `togi auth use-subscription` y reintenta",
