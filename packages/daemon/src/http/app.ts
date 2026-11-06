@@ -7,11 +7,13 @@ import { createMiddleware } from "hono/factory";
 import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { AgentCredentials } from "../credentials/agent-credential.ts";
+import type { NotifierStatus } from "../notify/notifier.ts";
 import type { PlannerStatus } from "../orchestrator/planner-status.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { adminRoutes } from "./admin.ts";
 import { credentialRoutes } from "./credentials.ts";
 import { eventRoutes } from "./events.ts";
+import { notificationRoutes } from "./notifications.ts";
 import { plannerRoutes } from "./planner.ts";
 import { planRoutes } from "./plans.ts";
 import { problem } from "./problem.ts";
@@ -41,6 +43,7 @@ export function createApp(
   home?: string,
   credentials?: AgentCredentials,
   planner?: PlannerStatus,
+  notifications?: NotifierStatus,
 ) {
   // Rutas encadenadas: `hc` solo infiere los tipos de lo que se encadena aquí.
   return new Hono<AppEnv>()
@@ -62,7 +65,8 @@ export function createApp(
     .route("/", eventRoutes(reads))
     .route("/", adminRoutes(reads))
     .route("/", credentialRoutes(credentials))
-    .route("/", plannerRoutes(planner));
+    .route("/", plannerRoutes(planner))
+    .route("/", notificationRoutes(notifications));
 }
 
 // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.

@@ -10,7 +10,7 @@ import { createApp } from "./http/app.ts";
 import { listen } from "./http/listen.ts";
 import { DataKeyring } from "./keys/data-keys.ts";
 import { selectSecretStore } from "./keys/select-keychain.ts";
-import type { Notification } from "./notify/notifier.ts";
+import type { Notification, NotifierStatus } from "./notify/notifier.ts";
 import type { PlannerSource } from "./orchestrator/claude-planner-factory.ts";
 import { createOrchestrator } from "./orchestrator/orchestrator.ts";
 import {
@@ -34,6 +34,8 @@ export async function startDaemon(
     plannerStatus?: PlannerStatus;
     /** Avisos al usuario. Sin él no se notifica nada: lo pone `main.ts`, nunca los tests. */
     notify?: (notification: Notification) => void;
+    /** Lo que `togi daemon status` dice de los avisos; sin él, «desactivadas». */
+    notifyStatus?: NotifierStatus;
   } = {},
 ) {
   const { db, masterKey, userId } = await bootstrap(home, env);
@@ -78,7 +80,15 @@ export async function startDaemon(
     await orchestrator.recover();
     orchestrator.start();
     const server = await listen(
-      createApp(db, handle, { store, blobs, agentEvents }, home, credentials, plannerStatus).fetch,
+      createApp(
+        db,
+        handle,
+        { store, blobs, agentEvents },
+        home,
+        credentials,
+        plannerStatus,
+        options.notifyStatus,
+      ).fetch,
       p.socket,
     );
     return {

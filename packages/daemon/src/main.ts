@@ -10,10 +10,12 @@ try {
   if (status.state !== "active") {
     process.stderr.write(`togi-daemon: planificador ${status.state}: ${status.reason}\n`);
   }
+  const notifier = createNotifier();
   const daemon = await startDaemon(resolveHome(), process.env, {
     ...(source === undefined ? {} : { planner: source }),
     plannerStatus: status,
-    notify: createNotifier().notify,
+    notify: notifier.notify,
+    notifyStatus: notifier.status,
   });
   let closing = false;
   const shutdown = () => {

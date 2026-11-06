@@ -371,6 +371,13 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   planner_unavailable: (p) => ({
     text: `planificador no disponible (${plain(p.reason, "sin motivo")})`,
   }),
+  notify_active: () => ({ text: "notificaciones activas" }),
+  notify_disabled: (p) => ({
+    text: `notificaciones desactivadas (${plain(p.reason, "sin motivo")})`,
+  }),
+  notify_unavailable: (p) => ({
+    text: `notificaciones no disponibles (${plain(p.reason, "sin motivo")})`,
+  }),
   failure_reason_credential_missing: () => ({
     text: "falta la credencial del agente: configúrala con `togi auth set-api-key` o `togi auth use-subscription` y reintenta",
   }),
