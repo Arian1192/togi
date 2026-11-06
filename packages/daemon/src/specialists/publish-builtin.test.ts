@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import { genericPlanner, specialistHash } from "@togi/core";
+import { genericPlanner, genericPlannerV2, specialistHash } from "@togi/core";
 import type Database from "better-sqlite3";
 import { openEventDatabase } from "../store/database.ts";
 import { SqliteEventStore } from "../store/event-store.ts";
@@ -27,28 +27,31 @@ const published = () =>
     .prepare("SELECT stream, payload FROM events WHERE type = 'specialist.version_published'")
     .all() as { stream: string; payload: string }[];
 
-test("publica generic-planner@1 con su contenido y su hash en su propio stream", async () => {
+test("publica generic-planner@1 y @2 con su contenido y su hash en su propio stream", async () => {
   await publishBuiltinSpecialists(store);
   const rows = published();
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0]?.stream, "specialist:generic-planner");
-  assert.deepEqual(JSON.parse(rows[0]?.payload ?? ""), {
-    specialist: genericPlanner,
-    hash: specialistHash(genericPlanner),
-  });
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((r) => r.stream === "specialist:generic-planner"));
+  assert.deepEqual(
+    rows.map((r) => JSON.parse(r.payload)),
+    [genericPlanner, genericPlannerV2].map((specialist) => ({
+      specialist,
+      hash: specialistHash(specialist),
+    })),
+  );
 });
 
-test("llamarla otra vez no duplica el evento", async () => {
+test("llamarla otra vez no duplica los eventos", async () => {
   await publishBuiltinSpecialists(store);
   await publishBuiltinSpecialists(store);
-  assert.equal(published().length, 1);
-});
-
-test("una versión nueva se añade sin tocar la anterior", async () => {
-  await publishBuiltinSpecialists(store);
-  const v2 = { ...genericPlanner, version: 2, instructions: "Otra." };
-  await publishBuiltinSpecialists(store, [v2]);
   assert.equal(published().length, 2);
+});
+
+test("una versión nueva se añade sin tocar las anteriores", async () => {
+  await publishBuiltinSpecialists(store);
+  const v3 = { ...genericPlanner, version: 3, instructions: "Otra." };
+  await publishBuiltinSpecialists(store, [v3]);
+  assert.equal(published().length, 3);
 });
 
 test("mismo id y versión con otro contenido: lanza y pide subir la versión, sin escribir", async () => {
@@ -58,7 +61,7 @@ test("mismo id y versión con otro contenido: lanza y pide subir la versión, si
     () => publishBuiltinSpecialists(store, [changed]),
     /sube la versión de generic-planner/,
   );
-  assert.equal(published().length, 1);
+  assert.equal(published().length, 2);
 });
 
 test("un especialista integrado que pide más que su rol no se publica", async () => {

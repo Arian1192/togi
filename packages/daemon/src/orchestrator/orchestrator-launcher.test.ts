@@ -6,7 +6,7 @@ import { afterEach, beforeEach, mock, test } from "node:test";
 import {
   type Actor,
   DEFAULT_FLOW,
-  genericPlanner,
+  genericPlannerV2,
   type SessionEnded,
   type SessionStarted,
   specialistHash,
@@ -124,10 +124,11 @@ test("session.started registra el especialista con su versión y su hash, y prom
   const s = toDomainEvent(started as never).payload as SessionStarted;
   assert.deepEqual(s.specialist, {
     id: "generic-planner",
-    version: 1,
-    hash: specialistHash(genericPlanner),
+    version: 2,
+    hash: "sha256:f1ed338218434e7d82148037f5b02b5eee4b0ea5a531572cf751b3789f744eff",
   });
-  assert.equal(s.model, genericPlanner.model);
+  assert.equal(s.specialist?.hash, specialistHash(genericPlannerV2));
+  assert.equal(s.model, genericPlannerV2.model);
   assert.equal(s.runtime.id, "fake-agent");
   assert.equal(s.prompt.dataClass, "prompt");
   assert.equal(s.policy.dataClass, "prompt");
@@ -165,7 +166,7 @@ test("el especialista se publica justo antes de la primera sesión y no se repit
 
 test("un hash que no coincide con el publicado impide la sesión y pide subir la versión", async () => {
   const log = mock.method(console, "error", () => {});
-  await publishBuiltinSpecialists(store, [{ ...genericPlanner, instructions: "otras" }]);
+  await publishBuiltinSpecialists(store, [{ ...genericPlannerV2, instructions: "otras" }]);
   const planner = new LauncherPlanner(launcher);
   const orq = createOrchestrator({ db, store, handle, planner, flow: DEFAULT_FLOW });
   orq.start();
