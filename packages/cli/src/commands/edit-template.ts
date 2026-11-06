@@ -1,7 +1,7 @@
 import type { EditInput } from "./task-flow.ts";
 
 /** Prefijo de los comentarios y las cabeceras de sección. El resto de líneas, incluidas las que empiezan por `#`, son texto. */
-const MARKER = "#togi";
+export const MARKER = "#togi";
 
 type Field = "title" | "description" | "acceptanceCriteria";
 
