@@ -16,6 +16,18 @@ La batería vive en `packages/worker/src/sandbox/testing/` y se ejecuta contra `
 
 **Arreglo posible (PR aparte):** contar los procesos descendientes por árbol (por ejemplo, recorriendo `ppid` o con `pgrep -P` recursivo) y matarlos todos al terminar, o aislar la ejecución en un espacio de procesos propio. Hay que comprobar que un proceso huérfano con `setsid` no escapa del recorrido por `ppid` al reasignarse su padre a `launchd`; probablemente sí escapa, así que el árbol por sí solo no basta.
 
+## Fallo conocido: el agente lee todo lo que está fuera de la carpeta personal
+
+7 de noviembre de 2026 · tarea #24
+
+**Sondas:** `tmp-sistema` (un fichero en `/tmp`), `tmp-usuario` (uno en `os.tmpdir()`, `/var/folders/…/T`) y `compartido` (uno en `/Users/Shared`). Cada una es `DENIED` y lleva su control positivo sin sandbox, que da `ALLOWED`. El control positivo de lectura de la copia del repo (`lectura-permitida`) pasa.
+
+**Resultado:** las tres leen el señuelo dentro del sandbox. El fallo es del resultado (`ALLOWED` en vez de `DENIED`), no del control.
+
+**Causa:** `toSrtConfig` solo pone la carpeta personal en `denyRead`. Lo que está fuera de ella, incluidas las carpetas temporales, las compartidas y las de otros usuarios, queda legible. Esto explica también que el control negativo de `claude-binary.srt.test.ts` falle con la copia del código en `/tmp`: el SDK encuentra allí el binario sin que se le dé la ruta.
+
+**Estado:** las tres sondas son `todo` hasta el PR que amplía `denyRead`.
+
 ## Notas de diseño de las sondas
 
 - **Llavero:** lo protege el `denyRead` de la carpeta personal sobre el **fichero** del Llavero (`~/Library/Keychains`), no un bloqueo del servicio del sistema. Lo demuestra el control: con un llavero temporal desbloqueado fuera de la carpeta personal, `security` lo leía desde dentro del sandbox, así que srt deja alcanzable el servicio del Llavero. La entrada falsa vive por eso en un llavero temporal dentro de `~/Library/Keychains` de la carpeta personal falsa, como el real. Se crea y se borra en la propia batería. Si `security create-keychain` falla, la sonda se omite con el motivo visible. Consecuencia: un llavero fuera de la carpeta personal, o una carpeta personal mal configurada en `denyRead`, reabre el acceso.

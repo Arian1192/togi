@@ -53,6 +53,8 @@ export function runConformance(name: string, opts: ConformanceOptions): void {
     const scene = {} as Scene;
     let keychainOk = false;
     let sockDir = "";
+    let userDecoyDir = "";
+    let sharedDecoy = "";
 
     before(async () => {
       const root = realpathSync(mkdtempSync(join(tmpdir(), "togi-conformance-")));
@@ -75,6 +77,7 @@ export function runConformance(name: string, opts: ConformanceOptions): void {
         join(home, ".ssh", "id_conformance"),
         join(home, ".aws", "credentials"),
         join(togiHome, "token"),
+        join(work, "repo", "dato"),
         join(nvm, "nvm.sh"),
         join(scene.nodeBin, "node"),
         join(nvm, "versions", "node", "v22", "bin", "node"),
@@ -89,6 +92,19 @@ export function runConformance(name: string, opts: ConformanceOptions): void {
       // Ruta corta a propósito: un socket Unix no admite más de 104 caracteres en macOS.
       sockDir = mkdtempSync("/tmp/tc-");
       scene.socket = join(sockDir, "d.sock");
+      // Señuelos fuera de la carpeta personal. El del usuario va en tmpdir() directamente, no en
+      // root: root cae bajo rutas que el sandbox deja leer a propósito.
+      userDecoyDir = mkdtempSync(join(tmpdir(), "togi-decoy-"));
+      const decoys = { system: join(sockDir, "decoy"), userTmp: join(userDecoyDir, "decoy") };
+      for (const f of Object.values(decoys)) writeFileSync(f, "dato-falso\n");
+      try {
+        sharedDecoy = `/Users/Shared/togi-decoy-${process.pid}`;
+        writeFileSync(sharedDecoy, "dato-falso\n");
+        scene.decoys = { ...decoys, shared: sharedDecoy };
+      } catch {
+        sharedDecoy = ""; // sin permiso de escritura: la sonda se omite con su motivo
+        scene.decoys = decoys;
+      }
       const unix = createServer((c) => c.destroy());
       const tcp = createServer((c) => c.destroy());
       servers.push(unix, tcp);
@@ -114,6 +130,8 @@ export function runConformance(name: string, opts: ConformanceOptions): void {
       }
       rmSync(scene.root, { recursive: true, force: true });
       rmSync(sockDir, { recursive: true, force: true });
+      rmSync(userDecoyDir, { recursive: true, force: true });
+      if (sharedDecoy) rmSync(sharedDecoy, { force: true });
     });
 
     for (const probe of probes) {
