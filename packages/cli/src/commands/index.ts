@@ -3,6 +3,7 @@ import type { Output } from "../output.ts";
 import { admin } from "./admin.ts";
 import { auth } from "./auth.ts";
 import { daemon } from "./daemon.ts";
+import { newTaskWithEditor } from "./new.ts";
 import { plan } from "./plan.ts";
 import { repo } from "./repo.ts";
 import { status } from "./status.ts";
@@ -54,4 +55,4 @@ export const COMMANDS: Record<string, Record<string, Command>> = {
 };
 
 /** Atajos de un verbo (`togi status`), sin recurso. */
-export const SHORTCUTS: Record<string, Command> = { status, watch };
+export const SHORTCUTS: Record<string, Command> = { status, watch, new: newTaskWithEditor };
