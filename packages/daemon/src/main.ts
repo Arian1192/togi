@@ -1,4 +1,5 @@
 import { resolveHome } from "./config/app.ts";
+import { createNotifier } from "./notify/notifier.ts";
 import { productionPlanner } from "./production-planner.ts";
 import { startDaemon } from "./start.ts";
 
@@ -12,6 +13,7 @@ try {
   const daemon = await startDaemon(resolveHome(), process.env, {
     ...(source === undefined ? {} : { planner: source }),
     plannerStatus: status,
+    notify: createNotifier().notify,
   });
   let closing = false;
   const shutdown = () => {
