@@ -3,6 +3,7 @@ import { CreateTask, RISK_LEVELS, SAFE_ID } from "@togi/core";
 import { createClient } from "../client.ts";
 import { usageError } from "../errors.ts";
 import { clean, headerIndent, say, section } from "../format.ts";
+import { inferRepo } from "../infer-repo.ts";
 import { failedSession } from "../last-session.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Output } from "../output.ts";
@@ -47,10 +48,14 @@ const FLAG: Record<string, string> = {
 const NUMBER = /^[1-9]\d*$/;
 const str = (v: string | boolean | undefined) => (typeof v === "string" ? v : undefined);
 
-const NEW_USAGE = `Uso: togi task new "<título>" --risk <low|medium|high> --repo <owner/repo> [--base dev]
+const NEW_USAGE = `Uso: togi task new "<título>" --risk <low|medium|high> [--repo <owner/repo>] [--base dev]
                     [--description <texto>] [--criteria <texto>] [--idempotency-key <clave>]
 
 Crea una tarea en draft. Sin --description se crea vacía.
+
+  --repo, --base     Opcionales dentro de un clon registrado (togi repo add): el repo sale de su
+                     remote origin y la rama base de origin/HEAD. Si no se pueden deducir, se
+                     piden; nunca se suponen. Con --repo y sin --base, la rama es dev.
 
   --idempotency-key  Repetir el comando con la misma clave no crea otra tarea.
                      Sin ella, cada ejecución genera la suya.
@@ -83,16 +88,49 @@ const newTask: Command = {
       });
     }
     if (str(values.risk) === undefined) throw missing("--risk");
-    if (str(values.repo) === undefined) throw missing("--repo");
     const key = str(values["idempotency-key"]) ?? randomUUID();
     if (!SAFE_ID.test(key)) {
       throw usageError("invalid_option", { field: "--idempotency-key", command });
     }
+    let repo = str(values.repo);
+    let baseBranch = values.base === undefined ? undefined : str(values.base);
+    // Un --base que la API rechazaría se rechaza ya, antes de consultar al daemon para deducir.
+    if (baseBranch !== undefined && !CreateTask.shape.baseBranch.safeParse(baseBranch).success) {
+      throw usageError("invalid_option", { field: FLAG.baseBranch as string, command });
+    }
+    let deduced: { repo: string; baseBranch: string | undefined } | undefined;
+    if (repo === undefined) {
+      // Sin --repo se deduce del directorio; lo que no se puede deducir se pide, nunca se supone.
+      const lookup = createClient(home);
+      const { repos } = await lookup.checked<{ repos: { repo: string }[] }>(
+        await lookup.api.v1.repos.$get(),
+      );
+      const found = await inferRepo(
+        process.cwd(),
+        repos.map((r) => r.repo),
+      );
+      if (!found.ok) {
+        throw usageError("repo_not_inferred", {
+          reason: found.reason,
+          ...(found.repo === undefined ? {} : { repo: found.repo }),
+          command,
+        });
+      }
+      repo = found.repo;
+      deduced = { repo, baseBranch: undefined };
+      if (baseBranch === undefined) {
+        if (found.baseBranch === undefined) {
+          throw usageError("base_not_inferred", { repo, command });
+        }
+        baseBranch = found.baseBranch;
+        deduced = { repo, baseBranch };
+      }
+    }
     const body = {
       title: args[0],
       risk: str(values.risk),
-      repo: str(values.repo),
-      ...(values.base === undefined ? {} : { baseBranch: str(values.base) }),
+      repo,
+      ...(baseBranch === undefined ? {} : { baseBranch }),
       ...(values.description === undefined ? {} : { description: str(values.description) }),
       ...(values.criteria === undefined ? {} : { acceptanceCriteria: str(values.criteria) }),
     };
@@ -116,7 +154,14 @@ const newTask: Command = {
       ),
     );
     if (json) return `${JSON.stringify(created)}\n`;
-    return createdLines(created, out);
+    const lines = createdLines(created, out);
+    if (deduced === undefined) return lines;
+    // Lo deducido se dice: nada de elegir el repo ni la rama en silencio.
+    const said = MESSAGES.repo_inferred?.({
+      repo: deduced.repo,
+      ...(deduced.baseBranch === undefined ? {} : { base: deduced.baseBranch }),
+    }).text;
+    return `${lines}  ${said}\n`;
   },
 };
 

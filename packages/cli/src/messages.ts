@@ -27,6 +27,8 @@ export interface MessageParams {
   /** owner/repo y ruta de un repo registrado. */
   repo?: string;
   path?: string;
+  /** Rama base. */
+  base?: string;
 }
 
 export interface NextStep {
@@ -166,6 +168,31 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   plan_approved: (p) => ({ text: `Aprobado el plan de ${task(p)} · ${p.state ?? "building"}` }),
   plan_changes_requested: (p) => ({
     text: `Pedidos cambios sobre el plan de ${task(p)} · vuelve a planning`,
+  }),
+  repo_not_inferred: (p) => {
+    const why: Record<string, string> = {
+      not_a_repo: "este directorio no está dentro de un repo git",
+      no_origin: "el repo git no tiene un remote origin",
+      not_github: "el remote origin no es de GitHub",
+      not_registered: `el repo ${repoName(p)} de este directorio no está registrado`,
+    };
+    return {
+      text: `No se pudo deducir el repo: ${why[p.reason ?? ""] ?? "motivo desconocido"}.`,
+      next:
+        p.reason === "not_registered"
+          ? { label: "Regístralo con", command: `togi repo add ${repoName(p)} --path <ruta>` }
+          : { label: "Indícalo con", command: "--repo <owner/repo>" },
+    };
+  },
+  base_not_inferred: (p) => ({
+    text: `Se deduce el repo ${repoName(p)} pero no su rama base: origin/HEAD no existe o su nombre no es válido. Puedes fijarlo con git remote set-head origin --auto.`,
+    next: { label: "Indícala con", command: "--base <rama>" },
+  }),
+  repo_inferred: (p) => ({
+    text:
+      p.base === undefined
+        ? `Repo deducido del directorio: ${repoName(p)}`
+        : `Repo y rama base deducidos del directorio: ${repoName(p)} → ${plain(p.base, "?")}`,
   }),
   not_configured: () => ({
     text: "El daemon no tiene disponible lo que hace falta, por ejemplo un planificador activo.",
