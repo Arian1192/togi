@@ -16,8 +16,10 @@ import {
 } from "@togi/core";
 import type Database from "better-sqlite3";
 import type { createHandler } from "../commands/handle-command.ts";
+import type { Notification } from "../notify/notifier.ts";
 import { publishBuiltinSpecialists } from "../specialists/publish-builtin.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
+import { orchestratorFailed, planReady, sessionFailed } from "./alerts.ts";
 import { describeFailure, nextStep } from "./describe-failure.ts";
 import type { Planner, PlannerIdentity } from "./planner.ts";
 
@@ -37,6 +39,8 @@ export interface OrchestratorDeps {
    */
   flow?: FlowConfig | undefined;
   catalog?: readonly Specialist[] | undefined;
+  /** Avisa a la persona (notificación de macOS). Opcional: sin él, nada cambia. */
+  notify?: ((notification: Notification) => void) | undefined;
 }
 
 /** Solo los eventos que piden planificar; sus propios eventos no coinciden con ninguno. */
@@ -57,6 +61,7 @@ export function createOrchestrator({
   planner,
   flow,
   catalog = BUILTIN_SPECIALISTS,
+  notify,
 }: OrchestratorDeps) {
   const queue: number[] = [];
   /** Los especialistas ya publicados (y comprobados) en esta ejecución. */
@@ -76,6 +81,19 @@ export function createOrchestrator({
   const fail = (what: string, result: unknown, next?: string) => {
     const step = next === undefined ? "" : ` · siguiente paso: ${next}`;
     console.error(`orquestador: ${what}: ${JSON.stringify(describeFailure(result))}${step}`);
+  };
+  /** Notifica sin que un fallo al notificar pueda romper la planificación. */
+  const alert = (notification: Notification) => {
+    try {
+      notify?.(notification);
+    } catch (error) {
+      fail("no se pudo notificar", error);
+    }
+  };
+  /** Un fallo del orquestador sin sesión que lo registre: al log y a la persona. */
+  const abort = (number: number, what: string, result: unknown, next?: string) => {
+    fail(what, result, next);
+    alert(orchestratorFailed(number));
   };
   const repoOf = db.prepare("SELECT repo FROM tasks WHERE number = ?");
   const nextFor = (code: string, number: number) =>
@@ -107,6 +125,8 @@ export function createOrchestrator({
         "reinicia el daemon: al arrancar cierra las sesiones que quedaron abiertas",
       );
     }
+    if (failure === null) alert(planReady(number));
+    else if (failure !== "daemon_restarted") alert(sessionFailed(number, failure));
   };
 
   const planOne = async (number: number) => {
@@ -123,7 +143,8 @@ export function createOrchestrator({
     if (flow !== undefined) {
       producer = planningProducer(flow, catalog);
       if (producer === undefined) {
-        return fail(
+        return abort(
+          number,
           `la tarea ${number} no se planifica`,
           "el flujo nombra un especialista que no existe",
         );
@@ -134,7 +155,8 @@ export function createOrchestrator({
           published.add(producer);
         } catch (error) {
           const { id, version } = producer;
-          return fail(
+          return abort(
+            number,
             `la tarea ${number} no se planifica: ${id}@${version} cambió sin subir de versión; publícalo como ${id}@${version + 1}`,
             String(error),
           );
@@ -147,7 +169,12 @@ export function createOrchestrator({
       identity =
         typeof planner.identity === "function" ? await planner.identity(request) : planner.identity;
     } catch (error) {
-      return fail(`la tarea ${number} no se planifica`, error, nextFor("planner_error", number));
+      return abort(
+        number,
+        `la tarea ${number} no se planifica`,
+        error,
+        nextFor("planner_error", number),
+      );
     }
     if (producer !== undefined) {
       const { id, version } = producer;
@@ -172,7 +199,7 @@ export function createOrchestrator({
       throw error;
     });
     if (!("events" in started))
-      return fail(`no se inició la sesión de la tarea ${number}`, started);
+      return abort(number, `no se inició la sesión de la tarea ${number}`, started);
 
     // El repo de la tarea tiene que estar registrado (togi repo add). El motivo aún no cabe en
     // session.ended: solo se registra en el log del daemon.
@@ -238,7 +265,8 @@ export function createOrchestrator({
       try {
         await planOne(number);
       } catch (error) {
-        fail(
+        abort(
+          number,
           `error planificando la tarea ${number}: la planificación no llegó a empezar`,
           error,
           nextFor("planner_error", number),

@@ -10,6 +10,7 @@ import { createApp } from "./http/app.ts";
 import { listen } from "./http/listen.ts";
 import { DataKeyring } from "./keys/data-keys.ts";
 import { selectSecretStore } from "./keys/select-keychain.ts";
+import type { Notification } from "./notify/notifier.ts";
 import type { PlannerSource } from "./orchestrator/claude-planner-factory.ts";
 import { createOrchestrator } from "./orchestrator/orchestrator.ts";
 import {
@@ -28,7 +29,12 @@ export async function startDaemon(
    * Un Planner, o una función que lo construye con lo que el daemon tiene al arrancar (esta lanza si
    * su configuración es inválida y el daemon no arranca). Nunca sale del entorno.
    */
-  options: { planner?: PlannerSource; plannerStatus?: PlannerStatus } = {},
+  options: {
+    planner?: PlannerSource;
+    plannerStatus?: PlannerStatus;
+    /** Avisos al usuario. Sin él no se notifica nada: lo pone `main.ts`, nunca los tests. */
+    notify?: (notification: Notification) => void;
+  } = {},
 ) {
   const { db, masterKey, userId } = await bootstrap(home, env);
   try {
@@ -61,7 +67,14 @@ export async function startDaemon(
     const flow = typeof source === "function" ? DEFAULT_FLOW : undefined;
     const plannerStatus =
       options.plannerStatus ?? (source === undefined ? PLANNER_NOT_CONFIGURED : PLANNER_ACTIVE);
-    const orchestrator = createOrchestrator({ db, store, handle, planner, flow });
+    const orchestrator = createOrchestrator({
+      db,
+      store,
+      handle,
+      planner,
+      flow,
+      notify: options.notify,
+    });
     await orchestrator.recover();
     orchestrator.start();
     const server = await listen(
