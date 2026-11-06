@@ -149,6 +149,10 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `El daemon murió al arrancar.${p.detail ? `\n${p.detail}` : ""}`,
     next: { label: "Mira el log en ~/.togi/run/daemon.log" },
   }),
+  daemon_log_missing: () => ({
+    text: "Todavía no hay log del daemon: no ha arrancado nunca con este TOGI_HOME.",
+    next: { label: "Arráncalo con", command: "togi daemon start" },
+  }),
   daemon_start_timeout: () => ({
     text: "El daemon no respondió en 10 s y se ha parado.",
     next: { label: "Mira el log en ~/.togi/run/daemon.log" },
