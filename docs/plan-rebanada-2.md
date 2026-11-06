@@ -39,11 +39,18 @@ Las cifras son estimaciones de líneas de producción. Si un plan pasa de los l�
 | 14 | `feat(worker): adaptador del Claude Agent SDK` | Planificador real | 13 | 200 |
 | 15 | `feat: especialista generic-planner@1` | Planificador real | 14 | 150 |
 | 16 | `feat(daemon): planificador real` | Planificador real | 8, 11, 12, 15 | 180 |
+| U1 | `feat: el repo y la rama base se deducen del directorio` | Uso y autonomía (3b) | 16 | 120 |
+| U2 | `feat(cli): togi new con el editor y seguimiento hasta el plan` | Uso y autonomía (3b) | U1 | 180 |
+| U3 | `fix: CLI, log del daemon y medidor de tamaño` | Uso y autonomía (3b) | 16 | 180 |
+| U4 | `feat(daemon): notificaciones de macOS` | Uso y autonomía (3b) | 16 | 120 |
+| U5 | `feat(daemon): reintento automático de los fallos pasajeros` | Uso y autonomía (3b) | 16, U3 | 120 |
+| U6 | `feat: el daemon arranca con la sesión de macOS` | Uso y autonomía (3b) | U3 | 150 |
+| U7 | `feat(cli): togi inbox` | Uso y autonomía (3b) | U2, U4 | 150 |
 | 17 | `test: extremo a extremo de la rebanada 2` | Cierre | 16 | 40 |
 | 18 | `test: prueba de ataque` | Cierre | 16 | 40 |
 | 19 | `docs: cierre de la rebanada 2` | Cierre | 17, 18 | 0 |
 
-Los PRs 1 a 6 construyen y prueban la revisión de planes con un planificador falso, antes de traer ningún agente: es el principio 1, los controles antes que la flota. Los PRs 7 a 13 construyen la infraestructura de ejecución, y del 14 al 16 llega el agente real.
+Los PRs 1 a 6 construyen y prueban la revisión de planes con un planificador falso, antes de traer ningún agente: es el principio 1, los controles antes que la flota. Los PRs 7 a 13 construyen la infraestructura de ejecución, y del 14 al 16 llega el agente real. Los PRs U1 a U7 (fase 3b, «Uso y autonomía») van después del 16 y antes del 17: hacen que togi se pueda usar a diario, y desde el U1 se construyen con togi.
 
 ## Cómo usar este plan
 
@@ -371,6 +378,148 @@ Objetivo: sustituir el planificador falso por el real.
   repo y del directorio desechable.
 
 Fuera de alcance: pruebas con el modelo real (PR 17).
+```
+
+## Fase 3b · Uso y autonomía
+
+Con el planificador real funcionando, estos siete PRs quitan fricción del uso diario y hacen que togi avise y se recupere solo de lo pasajero. Van antes del PR 17: el extremo a extremo de la rebanada 2 debe recorrer togi tal como se va a usar.
+
+**Desde el U1, cada PR empieza como una tarea de togi planificada por togi.** En lugar de pedir el plan a Claude Code, se crea la tarea (`togi task new`, con el prompt del PR como descripción y su criterio de aceptación), se envía, y el plan que propone togi se revisa con `togi plan show`: el gate 1 del flujo de arriba pasa a ser el gate 1 de togi (aprobar, pedir cambios o rechazar). Con el plan aprobado se sigue como siempre: construcción con aprobación manual de las ediciones, gate 2 y merge a cargo del usuario. Si el planificador falla o el plan no sirve, se anota en el PR: es la mejor prueba de la rebanada. Los PRs anteriores al U1 no se rehacen.
+
+## PR U1 · feat: el repo y la rama base se deducen del directorio
+
+```
+Tarea: PR U1 de docs/plan-rebanada-2.md — feat: el repo y la rama base se deducen del directorio.
+Lee antes: AGENTS.md y docs/adr/005, y el PR 7 de este plan (registro de repos).
+
+Objetivo: que crear una tarea desde dentro de un clon no obligue a escribir --repo ni --base.
+- Desde el directorio actual: el owner/repo sale del remote origin y la rama base, de la rama por
+  defecto del repo; --repo y --base siguen mandando si se pasan.
+- Solo si ese owner/repo está registrado (togi repo add). Si no, un error claro con el siguiente
+  paso, nunca una suposición.
+- Fuera de un repo git, o con un remote que no es de GitHub, el comportamiento actual no cambia.
+- Tests de cada caso: clon registrado, no registrado, sin remote, fuera de git y flags explícitos.
+
+Fuera de alcance: crear la tarea con el editor (U2).
+```
+
+## PR U2 · feat(cli): togi new con el editor y seguimiento hasta el plan
+
+```
+Tarea: PR U2 de docs/plan-rebanada-2.md — feat(cli): togi new con el editor y seguimiento hasta el plan.
+Lee antes: AGENTS.md, docs/cli-estilo.md, el PR U1 de este plan y packages/cli/src/commands/task.ts.
+
+Objetivo: un solo comando para ir de la idea al plan.
+- togi new abre el editor (el mismo mecanismo que togi task edit) con una plantilla de título,
+  descripción, criterio de aceptación y riesgo; crea la tarea con el repo y la rama de U1.
+- La tarea se envía a planificación automáticamente, salvo con --draft.
+- El comando sigue la tarea hasta que hay plan o falla la sesión, y lo cuenta con el mismo
+  lenguaje que togi plan show: el plan listo con su siguiente paso, o el motivo del fallo con
+  el suyo (togi plan retry, togi auth ...). Ctrl+C deja de seguir sin cancelar nada.
+- Fuera de una terminal no abre el editor: exige los campos por flags, como togi task new.
+- Tests: crear, enviar, plan listo, fallo de sesión, --draft, cancelar el editor sin crear nada y
+  salida sin terminal.
+
+Fuera de alcance: notificaciones (U4).
+```
+
+## PR U3 · fix: CLI, log del daemon y medidor de tamaño
+
+```
+Tarea: PR U3 de docs/plan-rebanada-2.md — fix: CLI, log del daemon y medidor de tamaño.
+Lee antes: AGENTS.md, docs/cli-estilo.md y tools/diff-size.mjs.
+
+Objetivo: cuatro arreglos pequeños de uso diario.
+- El EPIPE de la CLI: cerrar la tubería de la salida (togi watch | head) termina el comando sin
+  volcar un error.
+- La columna del tipo de evento de togi watch: se descuadra con tipos largos como
+  specialist.version_published o plan.retry_requested. El ancho se calcula con el tipo más largo
+  del catálogo de eventos (o es uno fijo que quepa a todos), nunca con el de la primera línea.
+  Test con los tipos más largos.
+- togi daemon logs: muestra el final de daemon.log (-n, y -f para seguirlo), sin salir de la CLI.
+- Los mensajes del log del daemon, legibles en todos los fallos: cada fallo del orquestador, del
+  planificador y del arranque dice qué tarea, qué pasó y qué hacer, con el código de motivo.
+  Nunca el entorno ni la credencial, y con los caracteres de control quitados.
+- node tools/diff-size.mjs mide solo lo preparado (git diff --cached), no el árbol de trabajo.
+- Tests de cada punto. Si no cabe en un PR, se parte por puntos, nunca quitando tests.
+
+Fuera de alcance: cambiar qué eventos se registran.
+```
+
+## PR U4 · feat(daemon): notificaciones de macOS
+
+```
+Tarea: PR U4 de docs/plan-rebanada-2.md — feat(daemon): notificaciones de macOS.
+Lee antes: AGENTS.md, docs/adr/008 y el PR U3 de este plan.
+
+Objetivo: enterarse sin mirar la terminal.
+- Una notificación de macOS cuando un plan está listo para revisar, cuando una sesión de
+  planificación falla y cuando falla el orquestador.
+- El texto (el título de la tarea, el motivo) es contenido del usuario o del agente: se pasa como
+  argumento al proceso, nunca se incrusta en un script. Nada de construir un AppleScript con el
+  texto dentro; ni comillas ni saltos de línea ni caracteres de control pueden cambiar lo que
+  se ejecuta. Los argumentos se limpian y se acotan.
+- Se puede desactivar. En otra plataforma, o si falla el envío, no pasa nada y se anota en el log.
+- Tests con un ejecutor falso: cada evento produce una notificación, el texto hostil llega solo
+  como argumento y un fallo al notificar no rompe al orquestador.
+
+Fuera de alcance: notificar otros eventos.
+```
+
+## PR U5 · feat(daemon): reintento automático de los fallos pasajeros
+
+```
+Tarea: PR U5 de docs/plan-rebanada-2.md — feat(daemon): reintento automático de los fallos pasajeros.
+Lee antes: AGENTS.md, el PR 16 de este plan y packages/daemon/src/orchestrator.
+
+Objetivo: que un fallo pasajero no obligue a escribir togi plan retry.
+- Una lista cerrada de motivos pasajeros, en core junto a FAILURE_REASONS, fijada en positivo:
+  solo worker_died y trajectory_write_failed. Cualquier otro motivo queda fuera, en particular
+  timeout y agent_failed; daemon_restarted ya lo cubre recover(). Añadir un motivo a la lista
+  exige cambiar este plan.
+- Como mucho un reintento automático por tarea y por petición de plan. Si vuelve a fallar, la
+  tarea queda en planning con el motivo y espera a togi plan retry.
+- El reintento pasa por los mismos eventos que el manual, y se ve en el log y en togi plan show.
+- Tests: worker_died y trajectory_write_failed se reintentan una vez; timeout, agent_failed y el
+  resto de motivos no; el segundo fallo no se reintenta y un reinicio del daemon no cuenta como
+  reintento.
+
+Fuera de alcance: reintentar otras fases.
+```
+
+## PR U6 · feat: el daemon arranca con la sesión de macOS
+
+```
+Tarea: PR U6 de docs/plan-rebanada-2.md — feat: el daemon arranca con la sesión de macOS.
+Lee antes: AGENTS.md y el PR U3 de este plan (togi daemon logs).
+
+Objetivo: que el daemon esté siempre que haga falta.
+- togi daemon install y togi daemon uninstall: un LaunchAgent del usuario que arranca el daemon al
+  iniciar sesión y lo reinicia si cae.
+- Desde una versión estable: el LaunchAgent apunta a una instalación fija, no al árbol de
+  trabajo, para que editar el repo no cambie el daemon que corre. Sin instalación estable, el
+  comando se niega y dice cómo hacerla.
+- Idempotente, y con togi daemon status mostrando si está instalado.
+- Tests con un directorio de LaunchAgents de prueba: instalar, repetir, desinstalar y la
+  negativa sin versión estable. Nada toca el launchctl real en la CI.
+
+Fuera de alcance: Linux y Windows.
+```
+
+## PR U7 · feat(cli): togi inbox
+
+```
+Tarea: PR U7 de docs/plan-rebanada-2.md — feat(cli): togi inbox.
+Lee antes: AGENTS.md, docs/cli-estilo.md y los PRs U2 y U4 de este plan.
+
+Objetivo: una sola lista de lo que espera a la persona.
+- togi inbox muestra lo que necesita atención: planes por revisar y tareas en planning tras un
+  fallo, cada una con su siguiente paso.
+- Sale de las proyecciones, sin estado nuevo. Con --json, para scripts.
+- Vacía, lo dice y no falla.
+- Tests: lista vacía, un plan por revisar, un fallo con su motivo, orden estable y --json.
+
+Fuera de alcance: acciones desde la bandeja (se hacen con los comandos de siempre).
 ```
 
 ## PR 17 · test: extremo a extremo de la rebanada 2
