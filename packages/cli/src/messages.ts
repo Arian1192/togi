@@ -89,10 +89,21 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   task_final: (p) => ({
     text: `La tarea ${task(p)} ya está cerrada${p.state === undefined ? "" : ` (${p.state})`}.`,
   }),
-  invalid_state: (p) => ({
-    text: "Esta acción no es posible en el estado actual.",
-    next: { label: "Consulta el estado con", command: showTask(p) },
-  }),
+  invalid_state: (p) => {
+    const n = p.n ?? "<número>";
+    // Qué se puede hacer según dónde esté la tarea. Sin estado, el aviso de siempre.
+    const advice: Record<string, string> = {
+      draft: `aún no tiene plan. Envíala con togi task submit ${n} (o edítala con togi task edit ${n}).`,
+      planning: `la planifica el agente. Sigue con togi watch o togi plan show ${n}; si la sesión falló, reintenta con togi plan retry ${n}.`,
+      plan_review: `espera tu decisión sobre el plan. Míralo con togi plan show ${n} y decide con togi plan approve ${n}, togi plan request-changes ${n} (para cambiarlo) o togi plan reject ${n}.`,
+    };
+    const state = p.state;
+    const text =
+      state === undefined
+        ? "Esta acción no es posible en el estado actual."
+        : `Esta acción no es posible en el estado actual: ${task(p)} está en ${state}, ${advice[state] ?? "y ya no admite esa acción."}`;
+    return { text, next: { label: "Consulta el estado con", command: showTask(p) } };
+  },
   invalid_reason: () => ({
     text: "El rechazo necesita un motivo con texto.",
     next: { label: "Indícalo con", command: "--reason" },
@@ -422,6 +433,26 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     next: { label: "Pásalo por tubería", command: "pbpaste | togi auth set-api-key" },
   }),
   secret_cancelled: () => ({ text: "Cancelado. No se ha guardado nada." }),
+  unknown_option: (p) => ({
+    text: `Opción desconocida${p.field === undefined ? "" : `: ${plain(p.field, "?")}`}.`,
+    next: { label: "Mira las opciones con", command: p.command ?? "togi --help" },
+  }),
+  option_value_missing: (p) => ({
+    text: `Falta el valor de ${p.field === undefined ? "una opción" : plain(p.field, "?")}.`,
+    next: { label: "Mira el uso con", command: p.command ?? "togi --help" },
+  }),
+  option_value_ambiguous: (p) => ({
+    text: `El valor de ${p.field === undefined ? "una opción" : plain(p.field, "?")} empieza por «-» y se confunde con otra opción: escríbelo con =, por ejemplo ${p.field === undefined ? "--opción" : plain(p.field, "?")}=-valor.`,
+    next: { label: "Mira el uso con", command: p.command ?? "togi --help" },
+  }),
+  option_value_unexpected: (p) => ({
+    text: `${p.field === undefined ? "Una opción" : plain(p.field, "?")} no admite un valor.`,
+    next: { label: "Mira el uso con", command: p.command ?? "togi --help" },
+  }),
+  invalid_usage: (p) => ({
+    text: "Uso incorrecto.",
+    next: { label: "Mira el uso con", command: p.command ?? "togi --help" },
+  }),
   usage: (p) => ({
     text: p.command ?? "Uso incorrecto.",
     next: { label: "Mira el uso con", command: "togi --help" },
