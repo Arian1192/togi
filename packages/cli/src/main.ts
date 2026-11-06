@@ -7,6 +7,15 @@ import { isInteractive } from "./interactive.ts";
 import { createOutput } from "./output.ts";
 import { readSecret } from "./secret-input.ts";
 
+// Una tubería que se cierra antes de tiempo (`togi watch | head`) es un final normal, no un error.
+// Cualquier otro fallo de escritura se relanza.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EPIPE") process.exit(0);
+    throw error;
+  });
+}
+
 async function main(): Promise<number> {
   const env = process.env;
   const errorOut = (noColorFlag: boolean) =>
