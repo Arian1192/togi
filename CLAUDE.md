@@ -21,3 +21,4 @@ o de plugins. En particular, en este repo:
 - Los PRs se mergean solo con tools/merge-pr.sh, que exige los tres jobs en verde.
 - Antes de abrir o actualizar un PR, confirma con git status que no queda nada sin commit.
 - Todo test que necesite el sandbox real termina en .srt.test.ts, para que la CI de macOS lo ejecute.
+- Todo test que necesite el sandbox real termina en .srt.test.ts, para que la CI de macOS lo ejecute.
