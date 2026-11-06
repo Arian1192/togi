@@ -48,6 +48,7 @@ test("--json: stdout es JSON de la API y sin daemon el error va a stderr", async
     "daemon",
     "lastSeq",
     "pid",
+    "release",
     "schema",
   ]);
   const fail = await runCli(["daemon", "status", "--json"], join(root, "vacio"));

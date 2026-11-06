@@ -1,10 +1,12 @@
 import { paths } from "@togi/daemon/config";
+import { releaseTag } from "@togi/daemon/release";
 import { createClient } from "../client.ts";
 import { DEFAULT_LINES, followLog, logSize, MAX_LINES, tailLog } from "../daemon-logs.ts";
 import { CliError, usageError } from "../errors.ts";
 import { clean } from "../format.ts";
 import { startDaemon, stopDaemon } from "../lifecycle.ts";
 import { MESSAGES } from "../messages.ts";
+import { releaseNotice } from "../release-notice.ts";
 import type { Command } from "./index.ts";
 
 const status: Command = {
@@ -12,9 +14,12 @@ const status: Command = {
   example: "togi daemon status",
   async run({ home, json, out }) {
     const client = createClient(home);
-    const health = await client.checked<{ daemon: string; schema: number; pid: number }>(
-      await client.api.v1.health.$get(),
-    );
+    const health = await client.checked<{
+      daemon: string;
+      schema: number;
+      pid: number;
+      release?: string;
+    }>(await client.api.v1.health.$get());
     if (json) return `${JSON.stringify(health)}\n`;
     const planner = await client.checked<{ state: string; reason: string }>(
       await client.api.v1.planner.$get(),
@@ -37,7 +42,8 @@ const status: Command = {
       client.socket,
     ];
     const line = parts.join(" · ");
-    return `${out.mark("ok", line)}\n`;
+    const notice = releaseNotice(releaseTag(), health.release);
+    return `${out.mark("ok", line)}\n${notice === undefined ? "" : `${out.mark("attention", notice)}\n`}`;
   },
 };
 

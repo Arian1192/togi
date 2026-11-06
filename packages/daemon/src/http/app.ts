@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
+import { releaseTag } from "../config/release.ts";
 import type { AgentCredentials } from "../credentials/agent-credential.ts";
 import type { NotifierStatus } from "../notify/notifier.ts";
 import type { PlannerStatus } from "../orchestrator/planner-status.ts";
@@ -27,6 +28,9 @@ const DAEMON_VERSION =
       version?: string;
     }
   ).version ?? "0.0.0";
+
+// Se lee al arrancar: una instalación no cambia mientras el daemon corre.
+const RELEASE = releaseTag();
 
 export type AppEnv = { Variables: { actor: Actor; requestId: string } };
 
@@ -56,7 +60,13 @@ export function createApp(
         .get() as {
         lastSeq: number;
       };
-      return c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION, pid: process.pid, lastSeq });
+      return c.json({
+        daemon: DAEMON_VERSION,
+        schema: SCHEMA_VERSION,
+        pid: process.pid,
+        lastSeq,
+        release: RELEASE,
+      });
     })
     .route("/", taskRoutes(db, handle, planner))
     .route("/", queryRoutes(db, reads, handle))

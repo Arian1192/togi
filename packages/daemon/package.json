@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./config": "./src/config/app.ts",
+    "./release": "./src/config/release.ts",
     "./main": "./src/main.ts"
   },
   "scripts": {
