@@ -16,6 +16,31 @@ export interface WorkerDeps {
   /** Donde srt lee la credencial. Por defecto, el entorno de este proceso. */
   env?: NodeJS.ProcessEnv;
   heartbeatMs?: number;
+  /** Donde cae la cola del stderr del agente; el lanzador la recoge. Por defecto, el de este proceso. */
+  stderr?: Writable;
+}
+
+const STDERR_LINES = 20;
+const STDERR_LINE_CHARS = 300;
+
+/**
+ * Caracteres de control (escapes de terminal incluidos): el agente controla su stderr y el log se
+ * lee en una terminal. Es la limpieza de la CLI sin la excepción del salto de línea, que aquí ya
+ * separó las líneas.
+ */
+const CONTROL = /\p{Cc}/gu;
+
+/**
+ * Las últimas líneas del stderr del agente, sin la credencial. El lanzador las limpia otra vez con
+ * el detector de secretos; esto solo evita que el valor exacto salga de este proceso.
+ */
+function stderrTail(stderr: string, secret: string | undefined): string {
+  const clean = secret ? stderr.split(secret).join("[credencial]") : stderr;
+  const lines = clean.split("\n").filter((l) => l.trim() !== "");
+  return lines
+    .slice(-STDERR_LINES)
+    .map((l) => `agente: ${l.slice(0, STDERR_LINE_CHARS).replace(CONTROL, "")}\n`)
+    .join("");
 }
 
 export const srtSandbox = (order: SessionOrder): Sandbox =>
@@ -77,6 +102,9 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
         .createSandbox(order)
         .run(order.spec, order.argv, order.input, signal);
       for (const event of events(order.sessionId, result.stdout)) send(event);
+      if (result.exitCode !== 0 || result.timedOut) {
+        (deps.stderr ?? process.stderr).write(stderrTail(result.stderr, order.credential?.secret));
+      }
       exitCode = result.exitCode;
       outcome = result.timedOut ? "timeout" : result.exitCode === 0 ? "completed" : "failed";
       if (outcome === "failed") failureReason = stopReason(order.sessionId, result.stdout);
