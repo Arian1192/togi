@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import { isAbsolute, relative, sep } from "node:path";
 import { promisify } from "node:util";
+import { parseGithubRemote } from "@togi/core";
 
 const run = promisify(execFile);
 
@@ -11,10 +12,6 @@ export type RepoCheck =
       ok: false;
       code: "path_not_found" | "inside_togi_home" | "not_a_git_repo" | "remote_mismatch";
     };
-
-// https://github.com/o/r(.git), ssh://git@github.com/o/r y git@github.com:o/r
-const GITHUB_REMOTE =
-  /^(?:https?:\/\/(?:[^@/]+@)?github\.com\/|ssh:\/\/git@github\.com\/|git@github\.com:)([^/]+)\/(.+?)(?:\.git)?\/?$/i;
 
 const git = async (path: string, args: string[]): Promise<string | undefined> => {
   try {
@@ -49,8 +46,8 @@ export async function validateRepo(repo: string, path: string, home: string): Pr
   const urls = (await git(real, ["config", "--get-regexp", "^remote\\..*\\.url$"])) ?? "";
   const wanted = repo.toLowerCase();
   const matches = urls.split("\n").some((line) => {
-    const m = GITHUB_REMOTE.exec(line.split(" ").slice(1).join(" ").trim());
-    return m !== null && `${m[1]}/${m[2]}`.toLowerCase() === wanted;
+    const found = parseGithubRemote(line.split(" ").slice(1).join(" "));
+    return found !== undefined && found.toLowerCase() === wanted;
   });
   return matches ? { ok: true, path: real } : { ok: false, code: "remote_mismatch" };
 }

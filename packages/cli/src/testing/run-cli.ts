@@ -16,6 +16,8 @@ export function runCli(
   env: Record<string, string> = {},
   /** Lo que recibe la entrada estándar; sin él, queda abierta como hasta ahora. */
   input?: string,
+  /** Directorio desde el que se ejecuta; sin él, el del proceso de test. */
+  cwd?: string,
 ): Promise<CliResult> {
   const base: Record<string, string | undefined> = {
     ...process.env,
@@ -29,7 +31,7 @@ export function runCli(
     const child = execFile(
       process.execPath,
       [BIN, ...args],
-      { env: { ...base, ...env } },
+      { env: { ...base, ...env }, ...(cwd === undefined ? {} : { cwd }) },
       (error, stdout, stderr) => {
         resolve({
           code: error === null ? 0 : ((error as { code?: number }).code ?? 1),

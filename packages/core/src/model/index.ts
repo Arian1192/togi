@@ -4,5 +4,6 @@ export * from "./domain-event.ts";
 export type * from "./events.ts";
 export * from "./ids.ts";
 export * from "./planning.ts";
+export * from "./repo-remote.ts";
 export * from "./specialist.ts";
 export * from "./task.ts";
