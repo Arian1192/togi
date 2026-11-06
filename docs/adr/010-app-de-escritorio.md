@@ -4,7 +4,7 @@
 
 ## Estado y contexto
 
-**Estado:** propuesto el 7 de noviembre de 2026. Pendiente de aprobación.
+**Estado:** aprobado el 7 de noviembre de 2026. Propuesto y revisado ese mismo día; la revisión añade la sección 8 (seguridad del contenido de los agentes), construye la fase 1 ahora en lugar del PR U7 (`togi inbox`) y resuelve la pregunta 1 sobre el navegador de los gates.
 
 El principio 3 hace del daemon el núcleo y de la CLI, la web UI y la app de escritorio sus clientes. Este ADR define la app de escritorio: qué muestra, cómo se conecta al daemon y qué no puede hacer. El diseño de referencia son las siete pantallas del [lienzo de la app de escritorio](https://claude.ai/artifact/QCo31vuqqDekePy6dNWcmM) y la identidad visual, el [manual de marca](../marca/manual-de-marca.md).
 
@@ -16,7 +16,7 @@ Debe cumplir:
 - El token del daemon no puede llegar a ningún contenido que la app renderice ni a ningún proceso que lance (ADR-005).
 - Nada de lo que la app añade puede abrir una vía para que un agente salga de su sandbox (ADR-008).
 - Los agentes no se hablan entre sí; todo pasa por togi (ADR-009). La app lo muestra, no lo esconde.
-- No adelanta trabajo de las rebanadas (principio 1).
+- No adelanta controles (principio 1): la fase 1 solo consume APIs que ya existen o están planificadas.
 
 ## Decisión
 
@@ -66,7 +66,7 @@ El diseño de la pantalla 7 mostraba al constructor manejando un navegador duran
 
 Decisión para la primera versión:
 
-- **El navegador pertenece a los gates**, con actor `system: gates`, y se usa en `verifying`. El ejecutor de gates levanta la aplicación y un Chromium headless **dentro del mismo sandbox**, sin acceso a internet.
+- **El navegador pertenece a los gates**, con actor `system: gates`, y se usa en `verifying`. El ejecutor de gates levanta la aplicación y un Chromium headless **dentro de un aislamiento propio que permita el loopback interno** (previsto: microsandbox, ADR-008 §3), sin acceso a internet. `srt` no sirve: sin `allowLocalBinding` (ADR-008 §2), un servidor y un navegador no se pueden hablar.
 - Las capturas y las acciones se guardan como blobs y eventos. La app las muestra, en directo si el daemon reenvía los frames.
 - **Solo lectura.** "Tomar el control" sale de esta versión: una persona interactuando con el navegador de un gate rompería la reproducibilidad de la verificación.
 - Las capturas son evidencia para la revisión, no un gate. La comparación visual automática se decidirá aparte (principio 5).
@@ -77,6 +77,14 @@ Que el constructor use el navegador durante `building` exige revisar el ADR-008 
 
 La app sigue el manual de marca: los tokens del sistema de diseño en los dos temas, solo Shippori Mincho, Zen Kaku Gothic New y M PLUS 1 Code, empaquetadas en la app y nunca cargadas de Google Fonts, y la tabla de estados como única fuente de glifos y colores. Densidad de escritorio: texto a 13 / 20 px, mono a 12,5 / 20 px y filas de 32 px.
 
+### 8. Seguridad del contenido de los agentes
+
+Todo lo que escribe un agente (plan, trayectoria, log, salida de herramientas, diff) es entrada no fiable. Complementa la CSP y las capacidades limitadas de la sección 1:
+
+- **Nunca se pinta como HTML.** Solo texto o markdown con un renderizador de versión fijada que no admita HTML crudo. Sin `dangerouslySetInnerHTML`.
+- **La CSP prohíbe scripts en línea y `eval`:** ni `unsafe-inline` ni `unsafe-eval` en `script-src`.
+- **Los comandos de Tauri son concretos, uno por acción.** Nunca un reenvío genérico (método y ruta) a la API del daemon, para que el webview no pueda emitir peticiones arbitrarias. El token no cruza al webview (ADR-005).
+
 ## Lo que necesita de la API
 
 Propuesta; cada endpoint se precisa en el ADR de la API de la rebanada que lo construya.
@@ -85,7 +93,8 @@ Propuesta; cada endpoint se precisa en el ADR de la API de la rebanada que lo co
 | --- | --- | --- |
 | `GET /tasks/:id/diff` | Diff | Contra el `baseSha` del plan |
 | `GET /tasks/:id/files?ref=` y `GET /tasks/:id/files/{path}` | Ficheros | Solo lectura, rama de la tarea |
-| `GET /sessions?state=active` | Mesa, trayectoria | |
+| `GET /v1/tasks/:n/sessions/:id/trajectory` | Trayectoria | Nueva; hoy no existe ninguna ruta de lectura. Sigue el patrón de `GET /v1/tasks/:n/sessions` |
+| `GET /sessions?state=active` | Mesa | Nueva; hoy las sesiones solo se listan por tarea |
 | `GET /tasks/:id/evidence` | Cuaderno de revisión | Gates, trayectoria resumida y revisor en sombra en una sola respuesta |
 | `GET /tasks/:id/browser` (SSE) | Navegador | Frames y acciones del navegador de los gates |
 | `GET /events` (SSE) | Todo lo que va en directo | Ya existe (ADR-005) |
@@ -104,23 +113,26 @@ Propuesta; cada endpoint se precisa en el ADR de la API de la rebanada que lo co
 
 ## Consecuencias y cuándo se construye
 
-La app de escritorio sigue en el backlog: este ADR la deja definida, no adelantada. Se construye después de la rebanada 4, cuando existan la revisión y su evidencia, con su propio plan y por fases:
+La fase 1 se construye ahora, en lugar del PR U7 de `docs/plan-rebanada-2.md` (`togi inbox`): la lista de tareas de la app hace ese papel. Las fases 2 a 4 se construyen después, con su propio plan:
 
 | Fase | Qué entra | Requiere |
 | --- | --- | --- |
-| 1 | Shell, lista de tareas, trayectoria, plan y cuaderno del gate 1 | Rebanadas 2 y 3 |
+| 1 | Shell, lista de tareas, plan, cuaderno del gate 1 y trayectoria | `GET /v1/tasks`, `GET /v1/events`, la API de planes (PR 4), la escritura de la trayectoria (PR 12) y la ruta de lectura de la trayectoria |
 | 2 | Diff, log, cuaderno del gate 2 y terminales | Rebanada 4 |
 | 3 | Ficheros y mesa en vivo | Endpoints de ficheros y sesiones |
-| 4 | Navegador | Gate visual y la comprobación de la pregunta 1 |
+| 4 | Navegador | Gate visual y el aislamiento con loopback interno (sección 6) |
 
 Riesgos:
 
 - **La PTY da una shell con los permisos del usuario** dentro de un proceso que también habla con el daemon. Mitigación: entorno en lista blanca, el token solo en el lado Rust y un webview que no carga contenido remoto.
 - **Las fuentes japonesas pesan.** Mitigación: subconjuntos de caracteres en el empaquetado.
 
+Decidido en la revisión:
+
+- El navegador de los gates no puede ir en `srt`: no permite loopback entre servidor y navegador sin abrir puertos locales (ADR-008 §2). Necesita otro aislamiento; el previsto es microsandbox (ADR-008 §3), sujeto a su evaluación en la rebanada 3.
+
 Pendiente de decidir:
 
-1. Si Anthropic Sandbox Runtime permite que un servidor y un navegador se hablen por loopback dentro del sandbox sin abrir puertos al resto del sistema. Si no lo permite, el navegador de los gates necesita otro aislamiento, como un contenedor o una máquina virtual.
-2. Qué evento registra un commit humano en la rama de una tarea en `review`, y si `plan_contract` se le aplica. Propuesta: se registra, no se le aplica el contrato y se repiten los gates.
-3. Qué crate de PTY se usa en el lado Rust, con versión fijada.
-4. El tema por defecto de la app (decisión abierta del manual de marca).
+1. Qué evento registra un commit humano en la rama de una tarea en `review`, y si `plan_contract` se le aplica. Propuesta: se registra, no se le aplica el contrato y se repiten los gates.
+2. Qué crate de PTY se usa en el lado Rust, con versión fijada.
+3. El tema por defecto de la app (decisión abierta del manual de marca).
