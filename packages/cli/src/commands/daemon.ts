@@ -1,4 +1,7 @@
+import { paths } from "@togi/daemon/config";
 import { createClient } from "../client.ts";
+import { DEFAULT_LINES, followLog, logSize, MAX_LINES, tailLog } from "../daemon-logs.ts";
+import { CliError, usageError } from "../errors.ts";
 import { clean } from "../format.ts";
 import { startDaemon, stopDaemon } from "../lifecycle.ts";
 import { MESSAGES } from "../messages.ts";
@@ -44,4 +47,56 @@ const stop: Command = {
   },
 };
 
-export const daemon = { status, start, stop };
+const logs: Command = {
+  summary: "Muestra el final del log del daemon (-f para seguirlo).",
+  example: "togi daemon logs -n 100",
+  options: {
+    lines: { type: "string", short: "n" },
+    follow: { type: "boolean", short: "f" },
+  },
+  usage: `Uso: togi daemon logs [-n <líneas>] [-f] [--json]
+
+Muestra el final de daemon.log: las últimas ${DEFAULT_LINES} líneas, o las que pidas con -n (hasta
+${MAX_LINES}). Quita las secuencias de escape y los caracteres de control: lo que escriben los agentes
+no puede mover la terminal.
+
+  -n, --lines   Cuántas líneas del final mostrar.
+  -f, --follow  Sigue el log y muestra las líneas nuevas hasta Ctrl+C.
+
+Con --json escribe {"lines": [...]}; no se combina con -f.
+
+Ejemplo:
+  togi daemon logs -f
+`,
+  async run({ home, json, values, write, signal }) {
+    const command = "togi daemon logs --help";
+    const raw = values.lines;
+    const count = raw === undefined ? DEFAULT_LINES : Number(raw);
+    if (raw !== undefined && !(/^[1-9]\d*$/.test(String(raw)) && count <= MAX_LINES)) {
+      throw usageError("invalid_option", {
+        field: "-n",
+        detail: `un número entre 1 y ${MAX_LINES}`,
+        command,
+      });
+    }
+    const follow = values.follow === true;
+    if (json && follow) {
+      throw usageError("invalid_option", {
+        field: "--json",
+        detail: "no se combina con -f",
+        command,
+      });
+    }
+    const file = paths(home).log;
+    if (logSize(file) === undefined) throw new CliError("daemon_log_missing", 7);
+    const { lines, size } = tailLog(file, count);
+    if (json) return `${JSON.stringify({ lines })}\n`;
+    const text = lines.map((line) => `${line}\n`).join("");
+    if (!follow) return text;
+    write(text);
+    await followLog(file, size, (line) => write(`${line}\n`), signal);
+    return "";
+  },
+};
+
+export const daemon = { status, start, stop, logs };

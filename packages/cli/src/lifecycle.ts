@@ -3,6 +3,7 @@ import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } f
 import { fileURLToPath } from "node:url";
 import { paths } from "@togi/daemon/config";
 import { createClient } from "./client.ts";
+import { cleanLogText } from "./daemon-logs.ts";
 import { CliError } from "./errors.ts";
 
 const POLL_MS = 100;
@@ -35,8 +36,7 @@ const alive = (pid: number): boolean => {
 function logTail(file: string): string {
   try {
     const text = readFileSync(file, "utf8").split("\n").slice(-10).join("\n").slice(-2000);
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: se quitan a propósito
-    return text.replace(/[\x00-\x09\x0b-\x1f\x7f]/g, "").trim();
+    return cleanLogText(text).trim();
   } catch {
     return "";
   }
