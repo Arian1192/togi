@@ -4,7 +4,12 @@
       "Edit(.github/workflows/**)",
       "Edit(AGENTS.md)",
       "Edit(CLAUDE.md)",
-      "Edit(.claude/**)"
+      "Edit(.claude/**)",
+      "Bash(python -c:*)",
+      "Bash(python3 -c:*)",
+      "Bash(sed -i:*)",
+      "Bash(perl -i:*)",
+      "Bash(perl -pi:*)"
     ]
   }
 }
