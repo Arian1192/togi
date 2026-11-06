@@ -123,9 +123,6 @@ export const scanArgv = (needle: string): string[] => {
 };
 const scanFor = (s: Scene) => scanArgv(`${KEY_NAME}=${s.fakeKey}`);
 
-const OUTSIDE_HOME_TODO =
-  "hueco confirmado: el sandbox solo deniega la carpeta personal (denyRead: [home]) y todo lo de fuera se lee; lo cierra el PR siguiente";
-
 export const probes: readonly Probe[] = [
   {
     id: "credencial-entorno-ajeno",
@@ -210,14 +207,12 @@ export const probes: readonly Probe[] = [
     title: "leer un fichero de /tmp",
     expect: "DENIED",
     argv: (s) => reads(s.decoys?.system ?? ""),
-    todo: OUTSIDE_HOME_TODO,
   },
   {
     id: "tmp-usuario",
     title: "leer un fichero de la carpeta temporal del usuario (os.tmpdir())",
     expect: "DENIED",
     argv: (s) => reads(s.decoys?.userTmp ?? ""),
-    todo: OUTSIDE_HOME_TODO,
   },
   {
     id: "compartido",
@@ -225,7 +220,6 @@ export const probes: readonly Probe[] = [
     expect: "DENIED",
     controlFailure: "no se pudo crear el señuelo en /Users/Shared",
     argv: (s) => reads(s.decoys?.shared ?? "/nonexistent"),
-    todo: OUTSIDE_HOME_TODO,
   },
   {
     id: "lectura-permitida",

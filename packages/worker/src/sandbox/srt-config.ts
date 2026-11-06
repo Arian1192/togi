@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 import type { SandboxRuntimeConfig } from "@anthropic-ai/sandbox-runtime";
 import type { SandboxSpec } from "@togi/core";
 
@@ -14,6 +15,34 @@ export interface SrtContext {
   togiHome: string;
   /** Rutas del entorno de ejecución (Node, código del agente). Las pone quien construye el sandbox. */
   runtimePaths: readonly string[];
+  /** Carpetas temporales del usuario que se deniegan; sin él, las de este Mac. Los tests lo fijan. */
+  tmpDirs?: readonly string[];
+}
+
+/** Fuera de la carpeta personal, el resto del Mac se lee salvo que se deniegue (ADR-008). */
+const DENIED_OUTSIDE_HOME = ["/Users", "/Volumes", "/private/tmp"];
+
+/**
+ * La carpeta temporal del usuario. En /var/folders/xx/yyyy el `T/` va junto a `C/` (cachés de otras
+ * aplicaciones) y `0/`, así que se deniega el padre entero.
+ */
+export function userTmpDirs(path: string = tmpdir()): string[] {
+  const tmp = realpathSync(path);
+  const parent = dirname(tmp);
+  return basename(tmp) === "T" && parent.startsWith("/private/var/folders/") ? [parent] : [tmp];
+}
+
+/**
+ * Lo que se deniega de lectura, siempre en el mismo orden y sin duplicados: la carpeta personal, las
+ * rutas fijas, las temporales del usuario y /tmp. Una temporal que fuera la raíz del disco (TMPDIR=/)
+ * denegaría todo, así que se rechaza.
+ */
+export function deniedRead(home: string, tmpDirs: readonly string[]): string[] {
+  const tmp = tmpDirs.map(real);
+  for (const p of tmp) {
+    if (p === parse(p).root) throw new SandboxSpecError(`la carpeta temporal es la raíz: ${p}`);
+  }
+  return [...new Set([home, ...DENIED_OUTSIDE_HOME, ...tmp, real("/tmp")])];
 }
 
 const LABEL = "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?";
@@ -118,7 +147,7 @@ export function toSrtConfig(spec: SandboxSpec, ctx: SrtContext): SandboxRuntimeC
       allowLocalBinding: false,
     },
     filesystem: {
-      denyRead: [home],
+      denyRead: deniedRead(home, ctx.tmpDirs ?? userTmpDirs()),
       allowRead: [...new Set([...runtimePaths, ...readPaths, writeDir])],
       allowWrite: [writeDir],
       denyWrite: [],
