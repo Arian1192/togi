@@ -268,6 +268,16 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   failure_reason_sandbox_unavailable: () => ({
     text: "el sandbox no pudo arrancar, así que no se lanzó el agente (togi nunca ejecuta uno sin sandbox)",
   }),
+  planner_active: () => ({ text: "planificador activo" }),
+  planner_disabled: (p) => ({
+    text: `planificador desactivado (${plain(p.reason, "sin motivo")})`,
+  }),
+  planner_unavailable: (p) => ({
+    text: `planificador no disponible (${plain(p.reason, "sin motivo")})`,
+  }),
+  failure_reason_credential_missing: () => ({
+    text: "falta la credencial del agente: configúrala con `togi auth set-api-key` o `togi auth use-subscription` y reintenta",
+  }),
   plan_not_found: (p) => ({
     text: `La tarea ${task(p)} no tiene plan.${lastSession(p)}`,
     next: { label: "Mira el estado con", command: showTask(p) },

@@ -1,7 +1,8 @@
 import { PLAN_LIMITS } from "@togi/core";
-import { type Client, createClient } from "../client.ts";
+import { createClient } from "../client.ts";
 import { CliError, usageError } from "../errors.ts";
 import { clean, oneLine, say } from "../format.ts";
+import { failedSession, type SessionSummary } from "../last-session.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
 import { decisions } from "./plan-decide.ts";
@@ -20,25 +21,6 @@ interface Plan extends PlanSummary {
   approach: string;
   approachErased: boolean;
   previous: PlanSummary[];
-}
-
-interface SessionSummary {
-  sessionId: string;
-  outcome: string | null;
-  failureReason: string | null;
-}
-
-/** La última sesión de la tarea, si terminó mal con motivo. No consultarla nunca rompe `plan show`. */
-async function failedSession(client: Client, n: string): Promise<SessionSummary | undefined> {
-  try {
-    const { sessions } = await client.checked<{ sessions: SessionSummary[] }>(
-      await client.api.v1.tasks[":n"].sessions.$get({ param: { n } }),
-    );
-    const last = sessions.at(-1);
-    return last?.failureReason ? last : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 const exceedsLimits = ({ production, tests }: PlanSummary["estimatedLines"]) =>

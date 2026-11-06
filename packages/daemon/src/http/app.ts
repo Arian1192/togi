@@ -7,10 +7,12 @@ import { createMiddleware } from "hono/factory";
 import { authenticate, type TokenRow } from "../auth/tokens.ts";
 import type { createHandler } from "../commands/handle-command.ts";
 import type { AgentCredentials } from "../credentials/agent-credential.ts";
+import type { PlannerStatus } from "../orchestrator/planner-status.ts";
 import { SCHEMA_VERSION } from "../store/schema.ts";
 import { adminRoutes } from "./admin.ts";
 import { credentialRoutes } from "./credentials.ts";
 import { eventRoutes } from "./events.ts";
+import { plannerRoutes } from "./planner.ts";
 import { planRoutes } from "./plans.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
@@ -38,6 +40,7 @@ export function createApp(
   /** Directorio de datos de togi: el registro de repos rechaza rutas dentro de él. */
   home?: string,
   credentials?: AgentCredentials,
+  planner?: PlannerStatus,
 ) {
   // Rutas encadenadas: `hc` solo infiere los tipos de lo que se encadena aquí.
   return new Hono<AppEnv>()
@@ -58,7 +61,8 @@ export function createApp(
     .route("/", repoRoutes(db, home))
     .route("/", eventRoutes(reads))
     .route("/", adminRoutes(reads))
-    .route("/", credentialRoutes(credentials));
+    .route("/", credentialRoutes(credentials))
+    .route("/", plannerRoutes(planner));
 }
 
 // El id del cliente se usa solo si es razonable: acaba en el log de eventos y en cabeceras.

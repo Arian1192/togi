@@ -1,9 +1,18 @@
 import { resolveHome } from "./config/app.ts";
+import { productionPlanner } from "./production-planner.ts";
 import { startDaemon } from "./start.ts";
 
 /** Punto de entrada del proceso: SIGTERM o SIGINT cierran limpio; un fallo de arranque sale con 1. */
 try {
-  const daemon = await startDaemon(resolveHome());
+  const { source, status } = productionPlanner(process.platform, process.env);
+  // Que un planificador desactivado no pase desapercibido: queda en el log y en `togi daemon status`.
+  if (status.state !== "active") {
+    process.stderr.write(`togi-daemon: planificador ${status.state}: ${status.reason}\n`);
+  }
+  const daemon = await startDaemon(resolveHome(), process.env, {
+    ...(source === undefined ? {} : { planner: source }),
+    plannerStatus: status,
+  });
   let closing = false;
   const shutdown = () => {
     if (closing) return;

@@ -1,4 +1,5 @@
 import { createClient } from "../client.ts";
+import { clean } from "../format.ts";
 import { startDaemon, stopDaemon } from "../lifecycle.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Command } from "./index.ts";
@@ -12,7 +13,12 @@ const status: Command = {
       await client.api.v1.health.$get(),
     );
     if (json) return `${JSON.stringify(health)}\n`;
-    return `${out.mark("ok", `Daemon en marcha · versión ${health.daemon} · pid ${health.pid} · ${client.socket}`)}\n`;
+    const planner = await client.checked<{ state: string; reason: string }>(
+      await client.api.v1.planner.$get(),
+    );
+    const plannerText = MESSAGES[`planner_${planner.state}`]?.({ reason: planner.reason }).text;
+    const line = `Daemon en marcha · versión ${health.daemon} · pid ${health.pid} · ${plannerText ?? clean(planner.state)} · ${client.socket}`;
+    return `${out.mark("ok", line)}\n`;
   },
 };
 
