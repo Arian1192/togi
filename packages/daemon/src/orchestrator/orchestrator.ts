@@ -15,6 +15,8 @@ import {
 } from "@togi/core";
 import type Database from "better-sqlite3";
 import type { createHandler } from "../commands/handle-command.ts";
+import { stripControl } from "../redaction/control-chars.ts";
+import { redact } from "../redaction/redact.ts";
 import { publishBuiltinSpecialists } from "../specialists/publish-builtin.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
 import type { Planner, PlannerIdentity } from "./planner.ts";
@@ -180,7 +182,12 @@ export function createOrchestrator({
       } else {
         // Un código fuera de la lista cerrada (un adaptador que se salta el tipo) nunca llega al evento.
         failure = FAILURE_REASONS.find((c) => c === outcome.code) ?? "planner_failed";
-        fail(`el planificador falló en la tarea ${number}`, outcome.reason);
+        // El motivo lleva las líneas de diagnóstico del agente; se limpian aquí otra vez, porque
+        // daemon.log no debe recibir nada que el detector de secretos reconozca.
+        fail(
+          `el planificador falló en la tarea ${number} (${failure})`,
+          stripControl(redact(outcome.reason)),
+        );
       }
     } catch (error) {
       failure = "planner_error";

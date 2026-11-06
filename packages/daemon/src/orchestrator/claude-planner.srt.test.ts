@@ -12,7 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, beforeEach, test } from "node:test";
+import { afterEach, beforeEach, mock, test } from "node:test";
 import {
   type Actor,
   DEFAULT_FLOW,
@@ -234,6 +234,48 @@ test("si el sandbox no puede arrancar, la sesión acaba con sandbox_unavailable 
   assert.equal(r.state, "planning");
   assert.deepEqual([r.ended.outcome, r.ended.failureReason], ["failed", "sandbox_unavailable"]);
   assert.equal(r.ended.trajectoryEvents, 0);
+  assert.deepEqual(leftovers(), []);
+});
+
+test("un fallo del agente deja en daemon.log el código y su stderr, sin secretos", {
+  skip: SKIP,
+}, async () => {
+  const log = mock.method(console, "error", () => {});
+  try {
+    const r = await planWith("MODE:stderr");
+    assert.deepEqual([r.ended.outcome, r.ended.failureReason], ["failed", "agent_failed"]);
+    const lines = log.mock.calls.map((c) => String(c.arguments[0])).join("\n");
+    assert.match(lines, /el planificador falló en la tarea \d+ \(agent_failed\)/);
+    assert.match(
+      lines,
+      /agente: Error: la API rechazó la petición con \[REDACTED:anthropic-api-key\]/,
+    );
+    assert.match(lines, /agente: segunda línea de contexto/);
+    assert.ok(!lines.includes("A".repeat(40)), "la clave no debe llegar al log");
+  } finally {
+    log.mock.restore();
+  }
+  assert.deepEqual(leftovers(), []);
+});
+
+test("los escapes de terminal y los saltos de línea del stderr del agente no llegan al log", {
+  skip: SKIP,
+}, async () => {
+  const log = mock.method(console, "error", () => {});
+  try {
+    await planWith("MODE:escape");
+    const entry = log.mock.calls
+      .map((c) => String(c.arguments[0]))
+      .find((l) => l.includes("el planificador falló"));
+    assert.ok(entry, "falta la entrada del fallo");
+    assert.ok(!/\p{Cc}/u.test(entry), "ni escapes ni saltos de línea sin escapar");
+    assert.match(entry, /agente: \]0;titulo\[31mroja\[0m2Jtexto/);
+    // La línea falsa queda dentro de la entrada, no como una línea del orquestador.
+    assert.ok(entry.includes("agente: orquestador: FALSO plan aprobado"));
+    assert.ok(!entry.split("\n").some((l) => l.startsWith("orquestador: FALSO")));
+  } finally {
+    log.mock.restore();
+  }
   assert.deepEqual(leftovers(), []);
 });
 
