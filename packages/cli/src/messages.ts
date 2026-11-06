@@ -29,6 +29,7 @@ export interface MessageParams {
   path?: string;
   /** Rama base. */
   base?: string;
+  seconds?: number;
 }
 
 export interface NextStep {
@@ -242,6 +243,32 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   new_draft_kept: (p) => ({
     text: `Queda en draft (--draft): envíala con togi task submit ${p.n ?? "<número>"}`,
   }),
+  follow_waiting: (p) => ({ text: `Esperando a que el planificador empiece con ${task(p)}…` }),
+  follow_session_started: () => ({ text: "Sesión de planificación en curso…" }),
+  follow_plan_ready: (p) => ({
+    text: `Plan listo: apruébalo con togi plan approve ${p.n ?? "<número>"} o pide cambios con togi plan request-changes ${p.n ?? "<número>"}.`,
+  }),
+  follow_stopped: (p) => ({
+    text: `Dejo de seguir ${task(p)}: la tarea continúa. Retómalo con togi plan show ${p.n ?? "<número>"} o togi watch.`,
+  }),
+  follow_session_failed: (p) => {
+    const why =
+      MESSAGES[`failure_reason_${p.reason}`]?.({}).text ?? plain(p.reason, "motivo desconocido");
+    return {
+      text: `La planificación de ${task(p)} falló: ${why}.`,
+      next: { label: "Reintenta con", command: `togi plan retry ${p.n ?? "<número>"}` },
+    };
+  },
+  follow_no_session: (p) => {
+    const planner =
+      p.state === undefined
+        ? ""
+        : ` El planificador está ${p.state === "disabled" ? "desactivado" : "no disponible"}: ${plain(p.detail, "sin motivo")}.`;
+    return {
+      text: `Han pasado ${p.seconds ?? "?"} s sin que empiece ninguna sesión de planificación de ${task(p)}. Puede estar en cola tras otra tarea, o el orquestador pudo fallar sin abrir sesión.${planner}`,
+      next: { label: "Mira el log en ~/.togi/run/daemon.log" },
+    };
+  },
   follow_hint: (p) => ({
     text: `Sigue el progreso con: togi watch · togi plan show ${p.n ?? "<número>"}`,
   }),
