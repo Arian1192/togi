@@ -6,6 +6,8 @@ import {
   FAILURE_REASONS,
   type FailureReason,
   type FlowConfig,
+  isTransientFailure,
+  MAX_AUTO_RETRIES,
   planningProducer,
   type SessionId,
   type Specialist,
@@ -126,7 +128,34 @@ export function createOrchestrator({
       );
     }
     if (failure === null) alert(planReady(number));
-    else if (failure !== "daemon_restarted") alert(sessionFailed(number, failure));
+    else if (failure !== "daemon_restarted" && !(await retryAutomatically(number, failure))) {
+      alert(sessionFailed(number, failure));
+    }
+  };
+
+  /**
+   * Un fallo pasajero se reintenta una vez por los mismos eventos que el manual: el decider decide si
+   * procede. Si procede, la tarea vuelve a la cola sin avisar a nadie; si no, el aviso es el de siempre.
+   */
+  const retryAutomatically = async (number: number, failure: FailureReason) => {
+    if (!isTransientFailure(failure)) return false;
+    const asked: unknown = await handle(system, { type: "requestPlanRetry", number }).catch(
+      (error: unknown) => error,
+    );
+    if (typeof asked === "object" && asked !== null && "events" in asked) {
+      console.error(
+        `orquestador: la tarea ${number} se reintenta automáticamente tras ${failure} (1 de ${MAX_AUTO_RETRIES})`,
+      );
+      // Sigue en `pending` hasta que acabe esta vuelta: se vuelve a poner en la cola desde aquí.
+      queue.push(number);
+      return true;
+    }
+    fail(
+      `la tarea ${number} no se reintenta automáticamente (${failure})`,
+      asked,
+      nextFor(failure, number),
+    );
+    return false;
   };
 
   const planOne = async (number: number) => {
@@ -242,10 +271,11 @@ export function createOrchestrator({
         // Un código fuera de la lista cerrada (un adaptador que se salta el tipo) nunca llega al evento.
         failure = FAILURE_REASONS.find((c) => c === outcome.code) ?? "planner_failed";
         // El motivo lleva las líneas de diagnóstico del agente: `fail` las limpia otra vez.
+        // Un fallo pasajero se reintenta solo: su siguiente paso lo dice `retryAutomatically`.
         fail(
           `el planificador falló en la tarea ${number} (${failure})`,
           outcome.reason,
-          nextFor(failure, number),
+          isTransientFailure(failure) ? undefined : nextFor(failure, number),
         );
       }
     } catch (error) {
@@ -272,7 +302,8 @@ export function createOrchestrator({
           nextFor("planner_error", number),
         );
       } finally {
-        pending.delete(number);
+        // Un reintento automático ya está en la cola: sigue pendiente hasta su vuelta.
+        if (!queue.includes(number)) pending.delete(number);
       }
     }
   };
@@ -307,14 +338,20 @@ export function createOrchestrator({
         await endSession(row.task_number, row.session_id, "daemon_restarted", NO_USAGE);
       // Solo las tareas sin sesión, con la última completada (petición de cambios) o cortada por el
       // reinicio. Una que falló se reintenta a mano (`togi plan retry`): relanzar un agente real en
-      // cada arranque costaría dinero sin que nadie lo pida.
+      // cada arranque costaría dinero sin que nadie lo pida. La excepción es una petición de reintento
+      // (humana o automática) sin sesión abierta después: nadie la ha atendido, y un reinicio entre la
+      // petición y la sesión nueva no debe dejar la tarea esperando en silencio.
       const waiting = db
         .prepare(
-          `SELECT t.number FROM tasks t WHERE t.state = 'planning' AND NOT EXISTS (
+          `SELECT t.number FROM tasks t WHERE t.state = 'planning' AND (NOT EXISTS (
              SELECT 1 FROM sessions s WHERE s.task_number = t.number
                AND s.failure_reason IS NOT NULL AND s.failure_reason <> 'daemon_restarted'
                AND s.rowid = (SELECT MAX(rowid) FROM sessions WHERE task_number = t.number)
-           ) ORDER BY t.number`,
+           ) OR (
+             SELECT MAX(seq) FROM events WHERE stream = 'task:' || t.number AND type = 'plan.retry_requested'
+           ) > COALESCE(
+             (SELECT MAX(seq) FROM events WHERE stream = 'task:' || t.number AND type = 'session.started'), 0
+           )) ORDER BY t.number`,
         )
         .all() as { number: number }[];
       for (const { number } of waiting) enqueue(number);
