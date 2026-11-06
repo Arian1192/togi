@@ -53,6 +53,16 @@ export function decide(
       }
       return [{ ...meta, type: "task.rejected", payload: { reason: { category, text } } }];
     }
+    case "requestPlanRetry": {
+      if (cmd.actor.kind !== "human") return notAllowed("human");
+      if (view.state !== "planning") {
+        return domainError("invalid_state", "solo se reintenta la planificación en planning");
+      }
+      if (planning.activeSession) {
+        return domainError("session_already_active", "ya hay una sesión activa");
+      }
+      return [{ ...meta, type: "plan.retry_requested", payload: {} }];
+    }
     case "startSession": {
       if (cmd.actor.kind !== "system") return notAllowed("system");
       if (view.state !== "planning")

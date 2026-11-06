@@ -25,6 +25,7 @@ export type TaskCommand =
   | (Meta & { type: "edit"; changes: TaskChanges })
   | (Meta & { type: "submit" })
   | (Meta & { type: "reject"; reason: { category: ReasonCategory; text: BlobRef | null } })
+  | (Meta & { type: "requestPlanRetry" })
   | (Meta & { type: "startSession"; session: SessionStarted })
   | (Meta & { type: "endSession"; session: SessionEndedInput })
   | (Meta & { type: "proposePlan"; plan: Omit<Plan, "planVersion" | "sessionId"> })

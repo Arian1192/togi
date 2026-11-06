@@ -55,7 +55,7 @@ export function createApp(
       };
       return c.json({ daemon: DAEMON_VERSION, schema: SCHEMA_VERSION, pid: process.pid, lastSeq });
     })
-    .route("/", taskRoutes(db, handle))
+    .route("/", taskRoutes(db, handle, planner))
     .route("/", queryRoutes(db, reads, handle))
     .route("/", planRoutes(db, reads, handle))
     .route("/", repoRoutes(db, home))

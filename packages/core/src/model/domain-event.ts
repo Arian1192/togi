@@ -188,6 +188,9 @@ const TASK_PAYLOADS = {
   "task.submitted": z.strictObject({}) satisfies z.ZodType<
     Extract<TaskEvent, { type: "task.submitted" }>["payload"]
   >,
+  "plan.retry_requested": z.strictObject({}) satisfies z.ZodType<
+    Extract<TaskEvent, { type: "plan.retry_requested" }>["payload"]
+  >,
   "session.started": sessionStarted satisfies z.ZodType<
     Extract<TaskEvent, { type: "session.started" }>["payload"]
   >,

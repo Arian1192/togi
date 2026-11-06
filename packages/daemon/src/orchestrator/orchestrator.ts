@@ -12,6 +12,7 @@ import {
   type StoredEvent,
   specialistHash,
   type Usage,
+  VersionConflictError,
 } from "@togi/core";
 import type Database from "better-sqlite3";
 import type { createHandler } from "../commands/handle-command.ts";
@@ -42,6 +43,7 @@ export interface OrchestratorDeps {
 /** Solo los eventos que piden planificar; sus propios eventos no coinciden con ninguno. */
 const wantsPlanning = (e: StoredEvent): boolean =>
   e.type === "task.submitted" ||
+  e.type === "plan.retry_requested" ||
   (e.type === "decision.recorded" &&
     (e.payload as { verdict?: string }).verdict === "request_changes");
 
@@ -138,16 +140,23 @@ export function createOrchestrator({
       const { id, version } = producer;
       identity = { ...identity, specialist: { id, version, hash: specialistHash(producer) } };
     }
-    const started = await handle(system, {
-      type: "startSession",
-      number,
-      session: {
-        ...identity,
-        sessionId,
-        role: "planner",
-        cycle: null,
-        workspaceId: null,
-      },
+    const startSession = () =>
+      handle(system, {
+        type: "startSession",
+        number,
+        session: {
+          ...identity,
+          sessionId,
+          role: "planner",
+          cycle: null,
+          workspaceId: null,
+        },
+      });
+    // Una persona puede escribir en el stream de la tarea (otro `plan retry`) justo mientras se
+    // abre la sesión: se vuelve a decidir sobre el estado nuevo en vez de perder la planificación.
+    const started = await startSession().catch((error: unknown) => {
+      if (error instanceof VersionConflictError) return startSession();
+      throw error;
     });
     if (!("events" in started))
       return fail(`no se inició la sesión de la tarea ${number}`, started);
