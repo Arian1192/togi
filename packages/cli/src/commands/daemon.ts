@@ -4,6 +4,7 @@ import { createClient } from "../client.ts";
 import { DEFAULT_LINES, followLog, logSize, MAX_LINES, tailLog } from "../daemon-logs.ts";
 import { CliError, usageError } from "../errors.ts";
 import { clean } from "../format.ts";
+import { managesHome } from "../launchd.ts";
 import { startDaemon, stopDaemon } from "../lifecycle.ts";
 import { MESSAGES } from "../messages.ts";
 import { releaseNotice } from "../release-notice.ts";
@@ -51,6 +52,7 @@ const start: Command = {
   summary: "Arranca el daemon en segundo plano.",
   example: "togi daemon start",
   async run({ home, json, out }) {
+    if (managesHome(home)) throw new CliError("launchagent_managed", 1);
     const r = await startDaemon(home);
     if (json) return `${JSON.stringify(r)}\n`;
     const key = r.already ? "daemon_already_running" : "daemon_started";
@@ -62,6 +64,7 @@ const stop: Command = {
   summary: "Para el daemon.",
   example: "togi daemon stop",
   async run({ home, json, out }) {
+    if (managesHome(home)) throw new CliError("launchagent_managed", 1);
     const pid = await stopDaemon(home);
     if (json) return `${JSON.stringify({ stopped: pid !== undefined, pid })}\n`;
     const msg = pid === undefined ? "daemon_not_running" : "daemon_stopped";
