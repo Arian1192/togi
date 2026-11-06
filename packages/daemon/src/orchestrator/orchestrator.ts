@@ -16,10 +16,9 @@ import {
 } from "@togi/core";
 import type Database from "better-sqlite3";
 import type { createHandler } from "../commands/handle-command.ts";
-import { stripControl } from "../redaction/control-chars.ts";
-import { redact } from "../redaction/redact.ts";
 import { publishBuiltinSpecialists } from "../specialists/publish-builtin.ts";
 import type { SqliteEventStore } from "../store/event-store.ts";
+import { describeFailure, nextStep } from "./describe-failure.ts";
 import type { Planner, PlannerIdentity } from "./planner.ts";
 
 const system: Actor = { kind: "system", component: "adapter:planner" };
@@ -70,9 +69,17 @@ export function createOrchestrator({
   const registered = db.prepare(
     "SELECT 1 FROM repos r JOIN tasks t ON r.repo = t.repo WHERE t.number = ?",
   );
-  const fail = (what: string, result: unknown) => {
-    console.error(`orquestador: ${what}: ${JSON.stringify(result)}`);
+  /**
+   * Una línea de daemon.log: qué falló, el detalle (limpio de secretos y de caracteres de control, y
+   * entrecomillado para que quepa en una sola línea) y, si lo hay, el siguiente paso.
+   */
+  const fail = (what: string, result: unknown, next?: string) => {
+    const step = next === undefined ? "" : ` · siguiente paso: ${next}`;
+    console.error(`orquestador: ${what}: ${JSON.stringify(describeFailure(result))}${step}`);
   };
+  const repoOf = db.prepare("SELECT repo FROM tasks WHERE number = ?");
+  const nextFor = (code: string, number: number) =>
+    nextStep(code, number, (repoOf.get(number) as { repo: string } | undefined)?.repo);
 
   /** `failure` es el motivo si la sesión falló; `null` si completó. */
   const endSession = async (
@@ -93,7 +100,13 @@ export function createOrchestrator({
         failureReason: failure,
       },
     });
-    if (!("events" in ended)) fail(`no se cerró la sesión ${sessionId}`, ended);
+    if (!("events" in ended)) {
+      fail(
+        `no se cerró la sesión ${sessionId} de la tarea ${number}`,
+        ended,
+        "reinicia el daemon: al arrancar cierra las sesiones que quedaron abiertas",
+      );
+    }
   };
 
   const planOne = async (number: number) => {
@@ -134,7 +147,7 @@ export function createOrchestrator({
       identity =
         typeof planner.identity === "function" ? await planner.identity(request) : planner.identity;
     } catch (error) {
-      return fail(`la tarea ${number} no se planifica`, String(error));
+      return fail(`la tarea ${number} no se planifica`, error, nextFor("planner_error", number));
     }
     if (producer !== undefined) {
       const { id, version } = producer;
@@ -164,7 +177,11 @@ export function createOrchestrator({
     // El repo de la tarea tiene que estar registrado (togi repo add). El motivo aún no cabe en
     // session.ended: solo se registra en el log del daemon.
     if (registered.get(number) === undefined) {
-      fail(`la tarea ${number} no se planifica`, "repo_not_registered");
+      fail(
+        `la tarea ${number} no se planifica (repo_not_registered)`,
+        "el repo de la tarea no está registrado",
+        nextFor("repo_not_registered", number),
+      );
       return endSession(number, sessionId, "repo_not_registered", NO_USAGE);
     }
     let failure: FailureReason | null = "planner_failed";
@@ -187,20 +204,30 @@ export function createOrchestrator({
           throw error;
         });
         failure = "events" in proposed ? null : "invalid_plan";
-        if (failure) fail(`plan rechazado en la tarea ${number}`, String(proposed));
+        if (failure) {
+          fail(
+            `plan rechazado en la tarea ${number} (${failure})`,
+            proposed,
+            nextFor(failure, number),
+          );
+        }
       } else {
         // Un código fuera de la lista cerrada (un adaptador que se salta el tipo) nunca llega al evento.
         failure = FAILURE_REASONS.find((c) => c === outcome.code) ?? "planner_failed";
-        // El motivo lleva las líneas de diagnóstico del agente; se limpian aquí otra vez, porque
-        // daemon.log no debe recibir nada que el detector de secretos reconozca.
+        // El motivo lleva las líneas de diagnóstico del agente: `fail` las limpia otra vez.
         fail(
           `el planificador falló en la tarea ${number} (${failure})`,
-          stripControl(redact(outcome.reason)),
+          outcome.reason,
+          nextFor(failure, number),
         );
       }
     } catch (error) {
       failure = "planner_error";
-      fail(`el planificador lanzó en la tarea ${number}`, String(error));
+      fail(
+        `el planificador lanzó en la tarea ${number} (planner_error)`,
+        error,
+        nextFor("planner_error", number),
+      );
     }
     await endSession(number, sessionId, failure, usage, trajectoryEvents);
   };
@@ -211,7 +238,11 @@ export function createOrchestrator({
       try {
         await planOne(number);
       } catch (error) {
-        fail(`error planificando la tarea ${number}`, String(error));
+        fail(
+          `error planificando la tarea ${number}: la planificación no llegó a empezar`,
+          error,
+          nextFor("planner_error", number),
+        );
       } finally {
         pending.delete(number);
       }
