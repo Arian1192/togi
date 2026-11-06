@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 import type { Command } from "./commands/index.ts";
-import { usageError } from "./errors.ts";
+import { type CliError, usageError } from "./errors.ts";
 
 type Commands = Record<string, Record<string, Command>>;
 /** Atajos `togi <verbo>`: un comando sin recurso. */
@@ -12,6 +12,48 @@ export const OPTIONS = {
   json: { type: "boolean" },
   "no-color": { type: "boolean" },
 } as const;
+
+/**
+ * El error de `parseArgs` (en inglés) como un error de uso en español que dice qué opción falló y
+ * dónde mirar el uso del comando. Solo se nombra el flag, nunca su valor. En `auth` no se nombra
+ * nada: el texto que escribió la persona podría ser el secreto.
+ */
+export function usageFromParseError(
+  error: Error & { code?: string },
+  argv: string[],
+  commands: Commands,
+  shortcuts: Shortcuts = {},
+): CliError {
+  const [resource, verb] = parseArgs({
+    args: argv,
+    options: OPTIONS,
+    allowPositionals: true,
+    strict: false,
+  }).positionals;
+  const path =
+    resource === undefined
+      ? "togi"
+      : shortcuts[resource] !== undefined || commands[resource]?.[verb ?? ""] === undefined
+        ? `togi ${resource}`
+        : `togi ${resource} ${verb}`;
+  const command = `${path} --help`;
+  if (resource === "auth") return usageError("invalid_usage", { command });
+  const names = error.message.match(/-{1,2}[A-Za-z0-9][A-Za-z0-9-]*/g) ?? [];
+  const field = names.find((n) => n.startsWith("--")) ?? names[0];
+  const named = field === undefined ? {} : { field };
+  if (error.code === "ERR_PARSE_ARGS_UNKNOWN_OPTION") {
+    return usageError("unknown_option", { ...named, command });
+  }
+  if (error.code === "ERR_PARSE_ARGS_INVALID_OPTION_VALUE") {
+    const why = error.message.includes("missing")
+      ? "option_value_missing"
+      : error.message.includes("ambiguous")
+        ? "option_value_ambiguous"
+        : "option_value_unexpected";
+    return usageError(why, { ...named, command });
+  }
+  return usageError("invalid_usage", { command });
+}
 
 /** Distancia de edición (Levenshtein) para sugerir el comando parecido. */
 function distance(a: string, b: string): number {

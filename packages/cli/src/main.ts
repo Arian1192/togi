@@ -1,8 +1,8 @@
 import { resolveHome } from "@togi/daemon/config";
-import { parseCommandLine } from "./args.ts";
+import { parseCommandLine, usageFromParseError } from "./args.ts";
 import { COMMANDS, SHORTCUTS } from "./commands/index.ts";
 import { confirm } from "./confirm.ts";
-import { CliError, renderError, usageError } from "./errors.ts";
+import { CliError, renderError } from "./errors.ts";
 import { isInteractive } from "./interactive.ts";
 import { createOutput } from "./output.ts";
 import { readSecret } from "./secret-input.ts";
@@ -52,10 +52,9 @@ async function main(): Promise<number> {
       error instanceof CliError
         ? error
         : (error as NodeJS.ErrnoException).code?.startsWith("ERR_PARSE_ARGS")
-          ? // El mensaje de parseArgs repite el flag tal cual: en `auth` podría ser el secreto.
-            usageError("usage", {
-              command: argv[0] === "auth" ? "togi auth --help" : (error as Error).message,
-            })
+          ? // El mensaje de parseArgs está en inglés y repite el flag tal cual: se traduce y, en
+            // `auth`, no se nombra nada porque podría ser el secreto.
+            usageFromParseError(error as Error, argv, COMMANDS, SHORTCUTS)
           : null;
     if (cli === null) throw error;
     if (cli.stdout !== undefined) process.stdout.write(cli.stdout);

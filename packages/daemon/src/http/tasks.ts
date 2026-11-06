@@ -161,6 +161,11 @@ export function taskRoutes(
           ifMatch: version,
           correlationId: c.get("requestId"),
         });
+        // «Esa acción no es posible» sin decir en qué estado está la tarea no ayuda: va en el problema.
+        if ("kind" in result && result.kind === "domain_error" && result.code === "invalid_state") {
+          const { state } = select(db, Number(param));
+          return problem(domainStatus(result.code), result.code, result.message, {}, { state });
+        }
         return respond(handle, result, 200);
       });
 

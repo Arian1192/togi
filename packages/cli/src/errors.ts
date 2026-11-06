@@ -1,3 +1,4 @@
+import { TASK_STATES } from "@togi/core";
 import { MESSAGES, type Message, type MessageParams, unexpected } from "./messages.ts";
 import type { Output } from "./output.ts";
 
@@ -51,9 +52,12 @@ const SAFE_CODE = /^[a-z_]+$/;
 
 /** Convierte un problem+json en un `CliError`. El texto libre (`detail`) no se usa nunca. */
 export function fromProblem(status: number, body: unknown, context: ErrorContext): CliError {
-  const code = (body as { code?: unknown } | null)?.code;
+  const { code, state } = (body ?? {}) as { code?: unknown; state?: unknown };
   const safe = typeof code === "string" && SAFE_CODE.test(code) ? code : `http_${status}`;
-  return new CliError(safe, EXIT_BY_CODE[safe] ?? exitFor(status), context, status);
+  // El estado de la tarea solo se acepta si es uno de la lista: nada del servidor llega tal cual.
+  const known = TASK_STATES.find((s) => s === state);
+  const withState = known === undefined ? context : { ...context, state: known };
+  return new CliError(safe, EXIT_BY_CODE[safe] ?? exitFor(status), withState, status);
 }
 
 export const daemonUnavailable = (): CliError => new CliError("daemon_unavailable", 6);
