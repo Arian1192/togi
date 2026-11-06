@@ -167,6 +167,18 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   plan_changes_requested: (p) => ({
     text: `Pedidos cambios sobre el plan de ${task(p)} · vuelve a planning`,
   }),
+  not_configured: () => ({
+    text: "El daemon no tiene disponible lo que hace falta, por ejemplo un planificador activo.",
+    next: { label: "Mira su estado con", command: "togi daemon status" },
+  }),
+  plan_retry_requested: (p) => ({
+    text: `Pedida otra sesión de planificación para ${task(p)}`,
+    next: { label: "Sigue su estado con", command: showTask(p) },
+  }),
+  session_already_active: (p) => ({
+    text: `La tarea ${task(p)} ya tiene una sesión de planificación en curso.`,
+    next: { label: "Consulta el estado con", command: showTask(p) },
+  }),
   plan_rejected: (p) => ({ text: `Rechazado el plan de ${task(p)}: la tarea queda cerrada` }),
   plan_reject_confirm: (p) => ({
     text: `¿Rechazar el plan de ${task(p)} «${p.title ?? ""}»? Es definitivo: la tarea queda cerrada. [s/N]`,

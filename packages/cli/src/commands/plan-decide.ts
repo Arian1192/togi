@@ -67,7 +67,7 @@ async function send(client: Client, n: string, verb: Verb, etag: string, input: 
   }
 }
 
-function planNumber(args: string[], command: string): string {
+export function planNumber(args: string[], command: string): string {
   const n = args[0];
   if (n === undefined) throw usageError("missing_option", { field: "el número de tarea", command });
   if (args.length > 1 || !NUMBER.test(n)) {

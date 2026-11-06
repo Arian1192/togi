@@ -6,6 +6,7 @@ import { failedSession, type SessionSummary } from "../last-session.ts";
 import type { Output } from "../output.ts";
 import type { Command } from "./index.ts";
 import { decisions } from "./plan-decide.ts";
+import { retry } from "./plan-retry.ts";
 
 const NUMBER = /^[1-9]\d*$/;
 
@@ -127,4 +128,4 @@ Ejemplo:
   },
 };
 
-export const plan = { show, ...decisions };
+export const plan = { show, retry, ...decisions };
