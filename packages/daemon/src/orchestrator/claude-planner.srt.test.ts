@@ -105,6 +105,7 @@ function planner(over: Partial<ConstructorParameters<typeof ClaudePlanner>[0]> =
     runtime: { id: "claude-agent-sdk", version: runtime.sdkVersion },
     // El agente falso es un .mjs suelto: solo hace falta Node y su carpeta.
     runtimePaths: [dirname(realpathSync(process.execPath)), AGENT_DIR],
+    executable: runtime.executable,
     maxCostUsd: 1,
     ...over,
   });

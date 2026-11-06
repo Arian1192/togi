@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { test } from "node:test";
@@ -25,6 +25,14 @@ test("la lista es exactamente: carpeta de Node, paquete del worker, SDK con su v
     paths[3] as string,
     new RegExp(`claude-agent-sdk-${process.platform}-${process.arch}@${sdkVersion}/`),
   );
+});
+
+test("el ejecutable es el binario real del SDK y vive en la última carpeta de la lista, sin ampliarla", () => {
+  const { paths, executable } = claudeRuntime(WORKER);
+  assert.equal(executable, realpathSync(executable));
+  assert.equal(dirname(executable), paths[3]);
+  assert.ok(statSync(executable).isFile());
+  assert.equal(paths.length, 4);
 });
 
 test("la versión del SDK es la fijada en el package.json del worker", () => {

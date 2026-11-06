@@ -6,6 +6,11 @@ export interface ClaudeRuntime {
   paths: string[];
   /** Versión instalada del SDK: la que registra `session.started`. */
   sdkVersion: string;
+  /**
+   * Ruta real del ejecutable nativo del SDK, resuelta aquí, fuera del sandbox. El adaptador la usa
+   * como `pathToClaudeCodeExecutable`: dentro del sandbox no se busca nada.
+   */
+  executable: string;
 }
 
 /**
@@ -26,8 +31,16 @@ export function claudeRuntime(workerPackageDir: string): ClaudeRuntime {
   const { version } = JSON.parse(readFileSync(join(sdk, "package.json"), "utf8")) as {
     version: string;
   };
+  // La ruta real del binario: si el enlace de pnpm apunta a otra parte, `paths` ya lleva su carpeta.
+  const executable = realpathSync(
+    join(native, process.platform === "win32" ? "claude.exe" : "claude"),
+  );
+  if (dirname(executable) !== native) {
+    throw new Error(`el binario nativo del SDK está fuera de su carpeta: ${executable}`);
+  }
   return {
     paths: [dirname(realpathSync(process.execPath)), worker, sdk, native],
     sdkVersion: version,
+    executable,
   };
 }

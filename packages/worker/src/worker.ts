@@ -22,6 +22,17 @@ export interface WorkerDeps {
 
 const STDERR_LINES = 20;
 const STDERR_LINE_CHARS = 300;
+const STDERR_HEAD_CHARS = 80;
+
+/**
+ * Una línea larga conserva su principio y su final con «…» en medio: el SDK imprime una línea de
+ * código minificado y el mensaje real va al final, así que cortar por el final lo perdería.
+ */
+function shorten(line: string): string {
+  if (line.length <= STDERR_LINE_CHARS) return line;
+  const tail = STDERR_LINE_CHARS - STDERR_HEAD_CHARS - 1;
+  return `${line.slice(0, STDERR_HEAD_CHARS)}…${line.slice(-tail)}`;
+}
 
 /**
  * Caracteres de control (escapes de terminal incluidos): el agente controla su stderr y el log se
@@ -39,7 +50,7 @@ function stderrTail(stderr: string, secret: string | undefined): string {
   const lines = clean.split("\n").filter((l) => l.trim() !== "");
   return lines
     .slice(-STDERR_LINES)
-    .map((l) => `agente: ${l.slice(0, STDERR_LINE_CHARS).replace(CONTROL, "")}\n`)
+    .map((l) => `agente: ${shorten(l.replace(CONTROL, ""))}\n`)
     .join("");
 }
 

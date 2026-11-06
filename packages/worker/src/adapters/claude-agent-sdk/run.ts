@@ -7,6 +7,11 @@ export interface PlannerRun {
   model: string;
   maxTurns: number;
   maxBudgetUsd: number;
+  /**
+   * Ejecutable nativo del SDK, resuelto por el daemon fuera del sandbox. Dentro no se busca nada:
+   * la búsqueda del SDK no encuentra el binario de pnpm desde aquí.
+   */
+  executable?: string;
 }
 
 export const DEFAULT_LIMITS = { maxTurns: 20, maxBudgetUsd: 1 } as const;
@@ -32,12 +37,19 @@ export async function* runPlanner(
     options: {
       cwd: run.cwd,
       model: run.model,
+      ...(run.executable === undefined ? {} : { pathToClaudeCodeExecutable: run.executable }),
       settingSources: [],
       permissionMode: "dontAsk",
       allowedTools: [...PLANNER_TOOLS],
       maxTurns: run.maxTurns,
       maxBudgetUsd: run.maxBudgetUsd,
-      env: { ...process.env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
+      env: {
+        ...process.env,
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+        // El binario crea `claude-<uid>` en /tmp, que el sandbox no deja escribir: se le da el
+        // directorio desechable de la sesión, que el sandbox pone como HOME.
+        ...(process.env.HOME === undefined ? {} : { CLAUDE_CODE_TMPDIR: process.env.HOME }),
+      },
       hooks: { PreToolUse: [{ hooks: [plannerHook((l) => denied.push(l))] }] },
     },
   });

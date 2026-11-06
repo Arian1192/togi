@@ -39,6 +39,8 @@ export interface ClaudePlannerDeps extends TaskTextSource {
   runtime: { id: string; version: string };
   /** Las carpetas que el sandbox deja leer además de la copia (`claudeRuntime().paths`). */
   runtimePaths: readonly string[];
+  /** Ejecutable nativo del SDK, ya resuelto fuera del sandbox (`claudeRuntime().executable`). */
+  executable: string;
   maxCostUsd: number;
   /** Tope de toda la sesión, reintento incluido. */
   timeoutMs?: number;
@@ -173,6 +175,7 @@ export class ClaudePlanner implements Planner {
                 cwd: copy.path,
                 model: request.specialist?.model,
                 maxBudgetUsd: budget,
+                executable: d.executable,
               }),
               credential: { name: credential.envName, secret: credential.secret },
             };
