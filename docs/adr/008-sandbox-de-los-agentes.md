@@ -22,7 +22,7 @@ La decisión se ha tomado con un experimento: la misma batería de pruebas, con 
 
 El sandbox recibe una especificación y no sabe qué agente ejecuta:
 
-- **Lectura:** las rutas de la copia del repo y del código del agente, en solo lectura. La copia se exporta con `git archive`, no con `git worktree`: un checkout ejecutaría los hooks del repo (también los de `core.hooksPath`) en el daemon, fuera del sandbox. Nada más de la carpeta del usuario.
+- **Lectura:** las rutas de la copia del repo y del código del agente, en solo lectura. La copia se exporta con `git archive`, no con `git worktree`: un checkout ejecutaría los hooks del repo (también los de `core.hooksPath`) en el daemon, fuera del sandbox. Nada más de la carpeta del usuario, ni lo que está fuera de ella: `/Users`, `/Volumes`, `/tmp` y las carpetas temporales del usuario también se deniegan.
 - **Escritura:** un único directorio desechable por ejecución, que también es el `HOME` y el directorio temporal del agente.
 - **Red:** una lista blanca de nombres exactos de dominio, nunca sufijos. Sin DNS abierto, sin sockets Unix y sin puertos locales.
 - **Entorno:** una lista blanca de variables. Ninguna variable del usuario llega al agente si no está en ella.
@@ -35,7 +35,7 @@ El sandbox es **desechable y sin estado propio**. Todo lo que importa vive fuera
 
 Para la rebanada 2, en la que el agente solo lee el repo y propone un plan. Versión fijada, con la regla de las dos semanas de antigüedad. Configuración obligatoria:
 
-- `denyRead` de la carpeta personal completa, con `allowRead` explícito de las rutas de la copia del repo, del agente y del entorno de ejecución.
+- `denyRead` de la carpeta personal completa, de `/Users`, `/Volumes`, `/tmp` y de la carpeta temporal del usuario (`/var/folders/xx/yyyy`), con `allowRead` explícito de las rutas de la copia del repo, del agente y del entorno de ejecución.
 - `allowWrite` solo del directorio desechable.
 - Sockets Unix bloqueados y sin `allowLocalBinding`.
 - Red solo hacia los dominios del runtime.

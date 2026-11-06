@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { SandboxRuntimeConfigSchema } from "@anthropic-ai/sandbox-runtime";
 import type { SandboxSpec } from "@togi/core";
-import { SandboxSpecError, toSrtConfig } from "./srt-config.ts";
+import { SandboxSpecError, toSrtConfig, userTmpDirs } from "./srt-config.ts";
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "togi-srt-")));
 const home = join(root, "home");
@@ -38,7 +38,7 @@ const refuses = (spec: SandboxSpec, re: RegExp, c = ctx) =>
 test("traduce la especificación a la configuración obligatoria del ADR-008", () => {
   const c = toSrtConfig(base(), ctx);
   assert.deepEqual(c.filesystem, {
-    denyRead: [home],
+    denyRead: [home, "/Users", "/Volumes", "/private/tmp", ...userTmpDirs()],
     allowRead: [agent, nodeDir, repo, scratch],
     allowWrite: [scratch],
     denyWrite: [],
