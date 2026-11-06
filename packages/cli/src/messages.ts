@@ -381,6 +381,10 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   notify_unavailable: (p) => ({
     text: `notificaciones no disponibles (${plain(p.reason, "sin motivo")})`,
   }),
+  launchagent_managed: () => ({
+    text: "El daemon lo gestiona launchd (LaunchAgent com.togi.daemon), así que togi no lo arranca ni lo para a mano.",
+    next: { label: "Para quitarlo", command: "launchctl bootout gui/$(id -u)/com.togi.daemon" },
+  }),
   release_mismatch: (p) => ({
     text: `El daemon es ${plain(p.daemonRelease, "?")} y la CLI ${plain(p.cliRelease, "?")}.`,
     next: { label: "Actualiza el daemon con", command: `togi update ${plain(p.cliRelease, "?")}` },
