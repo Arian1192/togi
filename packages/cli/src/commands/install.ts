@@ -17,6 +17,8 @@ const realDeps = (): InstallDeps => ({
   uid: process.getuid?.() ?? 0,
   node: process.execPath,
   platform: process.platform,
+  // macOS tarda en quitar un servicio tras el bootout: se espera hasta 10 s y se reintenta el error 5.
+  settle: { pollMs: 200, limitMs: 10_000 },
 });
 
 function oneTag(args: string[], verb: string): string {
