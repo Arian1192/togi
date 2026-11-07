@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -9,10 +11,11 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -31,6 +34,7 @@ jobs:
       - run: pnpm test
 
   sandbox-macos:
+    if: github.event_name == 'pull_request'
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
@@ -57,9 +61,31 @@ jobs:
       # Tauri exige que frontendDist exista al compilar
       - run: pnpm --filter @togi/desktop build
       # rustup no instala solo el toolchain de rust-toolchain.toml
-      - run: rustup toolchain install 1.99.0 --profile minimal
+      - run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt,clippy
+      - id: cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-audit
+          key: rust-${{ runner.os }}-${{ hashFiles('packages/desktop/src-tauri/Cargo.lock') }}-audit-0.22.2
+      - run: cargo fmt --check
+        working-directory: packages/desktop/src-tauri
+      - run: cargo clippy --all-targets --locked -- -D warnings
+        working-directory: packages/desktop/src-tauri
       - run: cargo test --locked
         working-directory: packages/desktop/src-tauri
-      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: cargo install cargo-audit --version 0.22.2 --locked
       - run: cargo audit
         working-directory: packages/desktop/src-tauri
+      # Solo main guarda la caché, y solo si no hubo acierto
+      - if: github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin/cargo-audit
+          key: rust-${{ runner.os }}-${{ hashFiles('packages/desktop/src-tauri/Cargo.lock') }}-audit-0.22.2
