@@ -5,5 +5,6 @@ export default defineConfig({
   plugins: [react()],
   clearScreen: false,
   server: { port: 5173, strictPort: true },
-  build: { target: "es2023" },
+  // Nunca fuentes en data: URI: la CSP (font-src 'self') las bloquearía.
+  build: { target: "es2023", assetsInlineLimit: 0 },
 });
