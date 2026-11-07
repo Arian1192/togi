@@ -30,5 +30,5 @@ for name in "${REQUIRED[@]}"; do
   fi
 done
 
-echo "✓ Los tres jobs están en verde y el PR está al día con main."
+echo "✓ Todos los jobs obligatorios están en verde y el PR está al día con main."
 gh pr merge "$pr" --rebase --delete-branch
