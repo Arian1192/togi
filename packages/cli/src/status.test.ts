@@ -64,17 +64,17 @@ test("agrupa por estado, oculta las rechazadas y las cuenta; --all las muestra",
   const out = (await status()).stdout;
   assert.match(
     out,
-    new RegExp(`^Pendiente de ti\\n {2}#${a} {2}Sin criterio +draft +bajo +falta criterio\\n`),
+    new RegExp(`^Pendiente de ti\\n {2}#${a} {2}○ draft +Sin criterio +bajo +falta criterio\\n`),
   );
   assert.match(
     out,
-    new RegExp(`\\nEn curso\\n {2}#${b} {2}Con criterio +planning +bajo +ahora\\n`),
+    new RegExp(`\\nEn curso\\n {2}#${b} {2}◐ planning +Con criterio +bajo +ahora\\n`),
   );
   assert.match(out, /\n2 tareas · 1 rechazada oculta \(togi status --all\)\n$/);
   assert.ok(!out.includes("Rechazada"), out);
 
   const all = (await status("--all")).stdout;
-  assert.match(all, new RegExp(`\\nCerradas\\n {2}#${c} {2}Rechazada +rejected `));
+  assert.match(all, new RegExp(`\\nCerradas\\n {2}#${c} {2}— rejected +Rechazada `));
   assert.match(all, /\n3 tareas\n$/);
 });
 

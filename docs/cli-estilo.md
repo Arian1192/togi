@@ -34,25 +34,27 @@ Cada comando cabe en 80 columnas, usa tablas alineadas sin bordes y muestra el n
 
 ```
 Pendiente de ti
-  #15  Migración de perfiles        draft      alto   falta criterio
+  #15  ○ draft     Migración de perfiles       alto   falta criterio
 
 En curso
-  #12  Filtro por fecha en envíos   planning   bajo   hace 2 h
-  #13  Paginación de pedidos        planning   medio  hace 1 d
+  #12  ◐ planning  Filtro por fecha en envíos  bajo   hace 2 h
+  #13  ◐ planning  Paginación de pedidos       medio  hace 1 d
 
 3 tareas · 2 rechazadas ocultas (togi status --all)
 ```
+
+Cada fila lleva primero el glifo y el estado, separados por un espacio, con el color de su token de marca (ver «Color, símbolos y accesibilidad»).
 
 **Cerradas.** Las tareas `merged` y `rejected` no salen por defecto: la línea final las cuenta como ocultas. El grupo «Cerradas» aparece, después de «En curso», solo con `--all` o con `--state merged` / `--state rejected`; en esos casos ya no hay línea de ocultas.
 
 ```
 $ togi status --all
 En curso
-  #12  Filtro por fecha en envíos  planning  bajo   hace 2 h
+  #12  ◐ planning  Filtro por fecha en envíos  bajo   hace 2 h
 
 Cerradas
-  #9   Exportar a PDF              rejected  medio  hace 3 d
-  #10  Login con enlace mágico     merged    alto   hace 1 d
+  #9   — rejected  Exportar a PDF              medio  hace 3 d
+  #10  ● merged    Login con enlace mágico     alto   hace 1 d
 
 3 tareas
 ```
@@ -126,6 +128,7 @@ El color refuerza, nunca carga solo el significado: cada estado lleva también u
 - **Sin color** si la salida no es una terminal, si existe `NO_COLOR` o con `--no-color`; `FORCE_COLOR` lo fuerza.
 - **Sin símbolos Unicode** con `TERM=dumb` o si la configuración regional no es UTF-8: se usa la columna de la derecha.
 - **Sin animaciones** fuera de una terminal: nada de spinners en logs ni en CI.
+- **Estados.** Glifo y token vienen de `STATE_BRAND` (`@togi/core`), la tabla «Estados de una tarea» del manual. Los tokens de marca se pintan con los de la CLI así: `human` → `attention`, `agent` y `ink-muted` → `muted`, `done` → sin color. Sin Unicode no se muestra el glifo y queda solo el nombre del estado. Los símbolos de la tabla anterior (`✓ ● ✗ ·`) son de operación, no de estado.
 - **Contraste:** al mapear los tokens a la marca, cada color debe leerse sobre fondo claro y oscuro.
 
 ## Errores
@@ -252,6 +255,6 @@ Ejemplo:
 
 Pendiente de decidir:
 
-- [ ] Mapear los cinco tokens de color a la paleta del manual de marca de togi, con contraste en fondo claro y oscuro.
+- [ ] Mapear los cinco tokens de color a la paleta del manual de marca de togi, con contraste en fondo claro y oscuro. Hecho: el mapa estado → token (arriba). Falta: la paleta y el contraste; la CLI usa colores ANSI, y `attention` (amarillo) no es aún el Shu del manual.
 - [x] Decidir si el título de las tareas se cifra (ADR-004): se cifra como `task_text`. La API devuelve `[borrado]` si su clave se destruyó, y así lo muestra la CLI.
 - [ ] Decidir en la rebanada 2 si `togi inbox` se construye con Ink (TypeScript) o con Bubble Tea (Go), tras comprobar el estado de las dos.
