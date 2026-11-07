@@ -139,7 +139,7 @@ Esta tabla es la única definición visual de los estados: la web UI, la CLI y c
 
 - El glifo va antes del nombre del estado, separado por `space-1`, en `font-mono`.
 - **Dónde se dibuja cada glifo.** En las interfaces gráficas (web UI y app de escritorio) los glifos se dibujan como SVG en línea, con trazo de 1,5 px, esquinas rectas y `currentColor` para que tomen el color del token del estado. Ninguna de las tres fuentes de la marca los trae: faltan ◐ ◑ y ✕, y M PLUS 1 Code tampoco trae ◆ ni ●, así que un carácter suelto saldría de la fuente de reserva del sistema y cambiaría de forma. En la terminal son los caracteres de la tabla.
-- Las listas de tareas se agrupan por quién tiene que actuar (te esperan, en marcha, el resto), no por estado ni por fecha.
+- Las listas de tareas se agrupan por quién tiene que actuar (Pendiente de ti, En curso y Cerradas, los nombres de la CLI y de la app), no por estado ni por fecha.
 - Un resultado de gate usa la misma lógica: ● en `ink` si pasa, ◆ en `human` si necesita tu atención (por ejemplo, mutantes que sobreviven), ✕ en `human` si falla.
 
 ## Patrones de interfaz

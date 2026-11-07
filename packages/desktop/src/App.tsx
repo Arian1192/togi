@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { TaskList, type TaskRow } from "./TaskList.ts";
 
 type DaemonStatus =
   | { state: "running"; version: string }
@@ -23,16 +24,25 @@ function Monogram() {
   );
 }
 
-/** Estado del daemon. Sin datos viejos: si deja de responder, lo dice y suelta la versión. */
+type TaskResult =
+  | { status: "ok"; tasks: TaskRow[]; truncated: boolean }
+  | { status: "unreachable"; reason: string };
+
+/** Estado del daemon y lista de tareas. Sin datos viejos: si deja de responder, lo dice y suelta ambos. */
 export function App() {
   const [status, setStatus] = useState<DaemonStatus | null>(null);
+  const [list, setList] = useState<TaskResult | null>(null);
 
   useEffect(() => {
     let live = true;
-    const poll = () =>
+    const poll = () => {
       invoke<DaemonStatus>("get_daemon_status")
         .then((s) => live && setStatus(s))
         .catch(() => live && setStatus({ state: "unreachable", reason: "app" }));
+      invoke<TaskResult>("list_tasks")
+        .then((l) => live && setList(l))
+        .catch(() => live && setList({ status: "unreachable", reason: "app" }));
+    };
     poll();
     const timer = setInterval(poll, POLL_MS);
     return () => {
@@ -59,6 +69,7 @@ export function App() {
         <span>togi</span>
       </div>
       <p role="status">{text}</p>
+      {list?.status === "ok" && <TaskList tasks={list.tasks} truncated={list.truncated} />}
     </main>
   );
 }
