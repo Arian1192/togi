@@ -4,7 +4,7 @@
 
 use std::io::{Read, Write};
 use std::os::unix::net::UnixListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -26,7 +26,7 @@ fn home(token: Option<&str>) -> PathBuf {
 
 /// Daemon falso: lee la petición, comprueba el token y responde `status` con `body`, partiendo
 /// cabeceras y cuerpo en trozos con pausas. Devuelve la petición que recibió.
-fn fake_daemon(home: &PathBuf, status: &str, body: String) -> JoinHandle<String> {
+fn fake_daemon(home: &Path, status: &str, body: String) -> JoinHandle<String> {
     let listener = UnixListener::bind(home.join("run").join("togi.sock")).unwrap();
     let status = status.to_owned();
     thread::spawn(move || {
@@ -57,7 +57,10 @@ fn health_body(version: &str) -> String {
 
 fn assert_clean(status: &DaemonStatus) -> String {
     let json = serde_json::to_string(status).unwrap();
-    assert!(!json.contains(SENTINEL), "el estado contiene el token: {json}");
+    assert!(
+        !json.contains(SENTINEL),
+        "el estado contiene el token: {json}"
+    );
     json
 }
 
@@ -69,7 +72,10 @@ fn un_daemon_que_responde_en_trozos_da_su_version_sin_el_token() {
     let request = daemon.join().unwrap();
     assert!(request.starts_with("GET /v1/health HTTP/1.1\r\n"));
     assert!(request.contains(&format!("Authorization: Bearer {SENTINEL}\r\n")));
-    assert_eq!(assert_clean(&status), r#"{"state":"running","version":"0.3.1"}"#);
+    assert_eq!(
+        assert_clean(&status),
+        r#"{"state":"running","version":"0.3.1"}"#
+    );
 }
 
 #[test]
@@ -78,24 +84,39 @@ fn una_version_que_contiene_el_token_no_se_devuelve() {
     let daemon = fake_daemon(&home, "200 OK", health_body(SENTINEL));
     let status = status_at(&home);
     daemon.join().unwrap();
-    assert_eq!(status, DaemonStatus::Unreachable { reason: "bad_response" });
+    assert_eq!(
+        status,
+        DaemonStatus::Unreachable {
+            reason: "bad_response"
+        }
+    );
     assert_clean(&status);
 }
 
 #[test]
 fn un_401_que_refleja_el_token_da_unauthorized_sin_el_cuerpo() {
     let home = home(Some(SENTINEL));
-    let daemon = fake_daemon(&home, "401 Unauthorized", format!(r#"{{"detail":"{SENTINEL}"}}"#));
+    let daemon = fake_daemon(
+        &home,
+        "401 Unauthorized",
+        format!(r#"{{"detail":"{SENTINEL}"}}"#),
+    );
     let status = status_at(&home);
     daemon.join().unwrap();
-    assert_eq!(assert_clean(&status), r#"{"state":"unreachable","reason":"unauthorized"}"#);
+    assert_eq!(
+        assert_clean(&status),
+        r#"{"state":"unreachable","reason":"unauthorized"}"#
+    );
 }
 
 #[test]
 fn sin_socket_el_daemon_no_responde_y_el_motivo_no_lleva_el_token() {
     let home = home(Some(SENTINEL));
     let status = status_at(&home);
-    assert_eq!(assert_clean(&status), r#"{"state":"unreachable","reason":"no_socket"}"#);
+    assert_eq!(
+        assert_clean(&status),
+        r#"{"state":"unreachable","reason":"no_socket"}"#
+    );
 }
 
 /// Lo que responde un daemon con `release` y `commit`, con la forma de `GET /v1/health`.
@@ -138,5 +159,10 @@ fn un_commit_que_no_es_un_sha_se_omite_y_una_etiqueta_con_el_token_se_rechaza() 
 #[test]
 fn sin_credenciales_no_se_intenta_conectar() {
     let home = home(None);
-    assert_eq!(status_at(&home), DaemonStatus::Unreachable { reason: "no_credentials" });
+    assert_eq!(
+        status_at(&home),
+        DaemonStatus::Unreachable {
+            reason: "no_credentials"
+        }
+    );
 }
