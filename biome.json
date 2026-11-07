@@ -1,6 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-  "files": { "includes": ["packages/**", "*.json", "!pnpm-lock.yaml"] },
+  "files": {
+    "includes": [
+      "packages/**",
+      "*.json",
+      "!pnpm-lock.yaml",
+      "!packages/desktop/dist",
+      "!packages/desktop/src-tauri/target",
+      "!packages/desktop/src-tauri/gen"
+    ]
+  },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
   "linter": { "enabled": true },
   "assist": { "actions": { "source": { "organizeImports": "on" } } }
