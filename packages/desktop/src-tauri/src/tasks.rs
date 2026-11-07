@@ -31,8 +31,13 @@ pub struct TaskSummary {
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum TaskList {
     /// `truncated`: la API devolvió su máximo, así que puede haber más tareas.
-    Ok { tasks: Vec<TaskSummary>, truncated: bool },
-    Unreachable { reason: &'static str },
+    Ok {
+        tasks: Vec<TaskSummary>,
+        truncated: bool,
+    },
+    Unreachable {
+        reason: &'static str,
+    },
 }
 
 fn unreachable(reason: &'static str) -> TaskList {
@@ -45,7 +50,12 @@ pub fn tasks_at(home: &Path) -> TaskList {
         Ok(connection) => connection,
         Err(reason) => return unreachable(reason),
     };
-    match get(&socket, &token, &format!("/v1/tasks?limit={PAGE}"), MAX_BODY) {
+    match get(
+        &socket,
+        &token,
+        &format!("/v1/tasks?limit={PAGE}"),
+        MAX_BODY,
+    ) {
         Ok((200, body)) => match parse(&body, &token) {
             Some((tasks, truncated)) => TaskList::Ok { tasks, truncated },
             None => unreachable("bad_response"),
@@ -60,7 +70,10 @@ pub fn tasks_at(home: &Path) -> TaskList {
 fn parse(body: &[u8], token: &str) -> Option<(Vec<TaskSummary>, bool)> {
     let json: Value = serde_json::from_slice(body).ok()?;
     let rows = json.get("tasks")?.as_array()?;
-    let tasks = rows.iter().map(|row| summary(row, token)).collect::<Option<Vec<_>>>()?;
+    let tasks = rows
+        .iter()
+        .map(|row| summary(row, token))
+        .collect::<Option<Vec<_>>>()?;
     Some((tasks, rows.len() >= PAGE))
 }
 
@@ -95,7 +108,10 @@ fn summary(row: &Value, token: &str) -> Option<TaskSummary> {
 
 /// El título en una sola línea, sin caracteres de control y recortado a `MAX_TITLE` caracteres.
 fn one_line(title: &str) -> String {
-    let spaced: String = title.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
+    let spaced: String = title
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
     let line = spaced.split_whitespace().collect::<Vec<_>>().join(" ");
     line.chars().take(MAX_TITLE).collect()
 }
@@ -139,7 +155,12 @@ pub fn task_at(home: &Path, number: u64) -> TaskRead {
         Ok(connection) => connection,
         Err(reason) => return unreachable(reason),
     };
-    match get(&socket, &token, &format!("/v1/tasks/{number}"), MAX_DETAIL_BODY) {
+    match get(
+        &socket,
+        &token,
+        &format!("/v1/tasks/{number}"),
+        MAX_DETAIL_BODY,
+    ) {
         Ok((200, body)) => match detail(&body, &token).filter(|t| t.number == number) {
             Some(task) => TaskRead::Ok { task },
             None => unreachable("bad_response"),
@@ -156,13 +177,17 @@ fn detail(body: &[u8], token: &str) -> Option<TaskDetail> {
     let json: Value = serde_json::from_slice(body).ok()?;
     let int = |v: Option<&Value>| v?.as_u64().filter(|n| *n <= MAX_SAFE);
     let text = |name: &str, max: usize| {
-        json.get(name)?.as_str().filter(|s| s.len() <= max && !s.contains(token))
+        json.get(name)?
+            .as_str()
+            .filter(|s| s.len() <= max && !s.contains(token))
     };
     let line = |s: &str| !s.is_empty() && !s.chars().any(char::is_control);
-    let state = text("state", 32).filter(|s| s.chars().all(|c| c.is_ascii_lowercase() || c == '_'))?;
+    let state =
+        text("state", 32).filter(|s| s.chars().all(|c| c.is_ascii_lowercase() || c == '_'))?;
     let repo = text("repo", 200).filter(|r| {
         r.split('/').count() == 2
-            && r.chars().all(|c| c.is_ascii_alphanumeric() || "_.-/".contains(c))
+            && r.chars()
+                .all(|c| c.is_ascii_alphanumeric() || "_.-/".contains(c))
     })?;
     let title = match json.get("title")? {
         Value::Null => None,
@@ -179,7 +204,9 @@ fn detail(body: &[u8], token: &str) -> Option<TaskDetail> {
         title,
         title_erased: json.get("titleErased")?.as_bool()?,
         state: state.to_owned(),
-        risk: text("risk", 8).filter(|r| ["low", "medium", "high"].contains(r))?.to_owned(),
+        risk: text("risk", 8)
+            .filter(|r| ["low", "medium", "high"].contains(r))?
+            .to_owned(),
         repo: repo.to_owned(),
         base_branch: text("baseBranch", 200).filter(|b| line(b))?.to_owned(),
         criteria,

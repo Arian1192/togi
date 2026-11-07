@@ -18,7 +18,14 @@ const MAX_REASON: usize = 5_000;
 /// El mayor entero que JavaScript representa sin perder precisión.
 const MAX_SAFE: u64 = (1 << 53) - 1;
 /// `REASON_CATEGORIES` de `@togi/core`; plan-boundary.rs vigila que sigan siendo las mismas.
-pub const CATEGORIES: [&str; 6] = ["misunderstanding", "scope", "logic", "tests", "style", "other"];
+pub const CATEGORIES: [&str; 6] = [
+    "misunderstanding",
+    "scope",
+    "logic",
+    "tests",
+    "style",
+    "other",
+];
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct PlanFile {
@@ -94,8 +101,14 @@ pub fn plan_at(home: &Path, number: u64) -> PlanRead {
     };
     let path = format!("/v1/tasks/{number}/plan");
     match request(&socket, &token, "GET", &path, &[], None, MAX_BODY) {
-        Ok(Reply { code: 200, etag, body }) => {
-            let version = etag.and_then(|e| e.trim_matches('"').parse::<u64>().ok()).filter(|v| valid_id(*v));
+        Ok(Reply {
+            code: 200,
+            etag,
+            body,
+        }) => {
+            let version = etag
+                .and_then(|e| e.trim_matches('"').parse::<u64>().ok())
+                .filter(|v| valid_id(*v));
             match (version, parse(&body, &token)) {
                 (Some(version), Some(plan)) => PlanRead::Ok { plan, version },
                 _ => unreachable("bad_response"),
@@ -126,11 +139,20 @@ fn parse(body: &[u8], token: &str) -> Option<PlanView> {
     let files = list("files")?
         .iter()
         .map(|f| {
-            let change = f.get("change")?.as_str().filter(|c| ["add", "modify", "delete"].contains(c))?;
-            Some(PlanFile { path: path(f.get("path")?, token)?, change: change.to_owned() })
+            let change = f
+                .get("change")?
+                .as_str()
+                .filter(|c| ["add", "modify", "delete"].contains(c))?;
+            Some(PlanFile {
+                path: path(f.get("path")?, token)?,
+                change: change.to_owned(),
+            })
         })
         .collect::<Option<Vec<_>>>()?;
-    let new_tests = list("newTests")?.iter().map(|t| path(t, token)).collect::<Option<Vec<_>>>()?;
+    let new_tests = list("newTests")?
+        .iter()
+        .map(|t| path(t, token))
+        .collect::<Option<Vec<_>>>()?;
     let lines = json.get("estimatedLines")?;
     Some(PlanView {
         plan_version: int(json.get("planVersion")).filter(|n| *n >= 1)?,
@@ -138,7 +160,10 @@ fn parse(body: &[u8], token: &str) -> Option<PlanView> {
         new_tests,
         approach: text(json.get("approach")?, token, MAX_APPROACH)?.to_owned(),
         approach_erased: json.get("approachErased")?.as_bool()?,
-        estimated_lines: Lines { production: int(lines.get("production"))?, tests: int(lines.get("tests"))? },
+        estimated_lines: Lines {
+            production: int(lines.get("production"))?,
+            tests: int(lines.get("tests"))?,
+        },
     })
 }
 
@@ -153,8 +178,10 @@ impl Reason {
     pub fn new(category: &str, text: &str) -> Option<Reason> {
         let category = CATEGORIES.iter().find(|c| **c == category)?;
         let text = text.trim();
-        (!text.is_empty() && text.encode_utf16().count() <= MAX_REASON)
-            .then(|| Reason { category, text: text.to_owned() })
+        (!text.is_empty() && text.encode_utf16().count() <= MAX_REASON).then(|| Reason {
+            category,
+            text: text.to_owned(),
+        })
     }
 }
 
@@ -168,15 +195,20 @@ pub enum Action {
 impl Action {
     /// La ruta del daemon, la pregunta de confirmación (`None`: no hace falta) y el cuerpo.
     fn parts(&self, number: u64) -> (&'static str, Option<String>, Vec<u8>) {
-        let body = |r: &Reason| json!({ "reason": { "category": r.category, "text": r.text } }).to_string();
+        let body = |r: &Reason| {
+            json!({ "reason": { "category": r.category, "text": r.text } }).to_string()
+        };
         match self {
             Action::Approve => {
-                let question = format!("¿Aprobar el plan de la tarea {number}? El agente empezará a construir.");
+                let question = format!(
+                    "¿Aprobar el plan de la tarea {number}? El agente empezará a construir."
+                );
                 ("approve", Some(question), Vec::new())
             }
             Action::RequestChanges(r) => ("request-changes", None, body(r).into_bytes()),
             Action::Reject(r) => {
-                let question = format!("¿Rechazar el plan de la tarea {number}? La tarea queda rechazada.");
+                let question =
+                    format!("¿Rechazar el plan de la tarea {number}? La tarea queda rechazada.");
                 ("reject", Some(question), body(r).into_bytes())
             }
         }
@@ -199,7 +231,10 @@ impl Confirm for Native {
             .message(question)
             .title("togi")
             .kind(MessageDialogKind::Warning)
-            .buttons(MessageDialogButtons::OkCancelCustom("Confirmar".into(), "Cancelar".into()))
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                "Confirmar".into(),
+                "Cancelar".into(),
+            ))
             .blocking_show()
     }
 }
@@ -207,7 +242,13 @@ impl Confirm for Native {
 /// Decide sobre el plan de `number` que la persona vio en `version` (el `ETag` de `plan_at`). Pide
 /// confirmación antes de llamar al daemon y no la pide si no puede conectar. Un 412 es `PlanChanged`
 /// y no se reintenta.
-pub fn decide_at(home: &Path, number: u64, version: u64, action: &Action, confirm: &dyn Confirm) -> Decision {
+pub fn decide_at(
+    home: &Path,
+    number: u64,
+    version: u64,
+    action: &Action,
+    confirm: &dyn Confirm,
+) -> Decision {
     if !valid_id(number) || !valid_id(version) {
         return failed("invalid_request");
     }
@@ -221,7 +262,15 @@ pub fn decide_at(home: &Path, number: u64, version: u64, action: &Action, confir
     }
     let path = format!("/v1/tasks/{number}/plan/{verb}");
     let if_match = format!("\"{version}\"");
-    match request(&socket, &token, "POST", &path, &[("If-Match", &if_match)], Some(&body), MAX_BODY) {
+    match request(
+        &socket,
+        &token,
+        "POST",
+        &path,
+        &[("If-Match", &if_match)],
+        Some(&body),
+        MAX_BODY,
+    ) {
         Ok(Reply { code: 200, .. }) => Decision::Ok,
         Ok(Reply { code: 412, .. }) => Decision::PlanChanged,
         Ok(reply) => failed(closed_reason(reply.code)),
@@ -230,16 +279,23 @@ pub fn decide_at(home: &Path, number: u64, version: u64, action: &Action, confir
 }
 
 /// El trabajo bloqueante (red y diálogo) va a otro hilo para no congelar la ventana.
-async fn decide(app: tauri::AppHandle, number: u64, version: u64, action: Option<Action>) -> Decision {
+async fn decide(
+    app: tauri::AppHandle,
+    number: u64,
+    version: u64,
+    action: Option<Action>,
+) -> Decision {
     let Some(action) = action else {
         return failed("invalid_request");
     };
     let Some(home) = home() else {
         return failed("no_home");
     };
-    tauri::async_runtime::spawn_blocking(move || decide_at(&home, number, version, &action, &Native(app)))
-        .await
-        .unwrap_or_else(|_| failed("internal"))
+    tauri::async_runtime::spawn_blocking(move || {
+        decide_at(&home, number, version, &action, &Native(app))
+    })
+    .await
+    .unwrap_or_else(|_| failed("internal"))
 }
 
 #[tauri::command]
@@ -267,11 +323,29 @@ pub async fn request_plan_changes(
     category: String,
     text: String,
 ) -> Decision {
-    decide(app, number, version, Reason::new(&category, &text).map(Action::RequestChanges)).await
+    decide(
+        app,
+        number,
+        version,
+        Reason::new(&category, &text).map(Action::RequestChanges),
+    )
+    .await
 }
 
 /// Pide confirmación con un diálogo nativo.
 #[tauri::command]
-pub async fn reject_plan(app: tauri::AppHandle, number: u64, version: u64, category: String, text: String) -> Decision {
-    decide(app, number, version, Reason::new(&category, &text).map(Action::Reject)).await
+pub async fn reject_plan(
+    app: tauri::AppHandle,
+    number: u64,
+    version: u64,
+    category: String,
+    text: String,
+) -> Decision {
+    decide(
+        app,
+        number,
+        version,
+        Reason::new(&category, &text).map(Action::Reject),
+    )
+    .await
 }

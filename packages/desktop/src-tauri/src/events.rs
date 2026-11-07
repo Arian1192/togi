@@ -27,8 +27,14 @@ pub enum Forwarded {
     /// Conectado: lo anterior pudo perderse, así que la interfaz recarga la lista.
     Open,
     /// Un evento de la tarea `number`; `name` es su tipo (`task.state_changed`…).
-    Task { seq: u64, number: u64, name: String },
-    Closed { reason: &'static str },
+    Task {
+        seq: u64,
+        number: u64,
+        name: String,
+    },
+    Closed {
+        reason: &'static str,
+    },
 }
 
 /// Cuerpo con `Transfer-Encoding: chunked`, que es como el daemon manda el SSE.
@@ -74,7 +80,11 @@ impl<R: BufRead> Read for Chunked<R> {
 /// Una línea entera (con su `\n`), de a lo sumo `MAX_LINE` bytes. `false` si la conexión se cerró.
 fn line<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) -> Result<bool, &'static str> {
     buf.clear();
-    let n = reader.by_ref().take(MAX_LINE).read_until(b'\n', buf).map_err(|_| "io")?;
+    let n = reader
+        .by_ref()
+        .take(MAX_LINE)
+        .read_until(b'\n', buf)
+        .map_err(|_| "io")?;
     match (n, buf.ends_with(b"\n")) {
         (0, _) => Ok(false),
         (_, true) => Ok(true),
@@ -101,10 +111,18 @@ fn forward(name: &str, data: &str, token: &str) -> Result<Option<Forwarded>, &'s
     let number = int(number.parse().ok());
     let seq = int(json.get("seq").and_then(|s| s.as_u64()));
     let kind = json.get("type").and_then(|t| t.as_str()).filter(|t| {
-        !t.is_empty() && t.len() <= 64 && !t.contains(token) && t.chars().all(|c| c.is_ascii_lowercase() || "._".contains(c))
+        !t.is_empty()
+            && t.len() <= 64
+            && !t.contains(token)
+            && t.chars()
+                .all(|c| c.is_ascii_lowercase() || "._".contains(c))
     });
     match (seq, number, kind) {
-        (Some(seq), Some(number), Some(kind)) => Ok(Some(Forwarded::Task { seq, number, name: kind.to_owned() })),
+        (Some(seq), Some(number), Some(kind)) => Ok(Some(Forwarded::Task {
+            seq,
+            number,
+            name: kind.to_owned(),
+        })),
         _ => Err("bad_response"),
     }
 }
@@ -150,7 +168,9 @@ fn run(home: &Path, emit: &mut dyn FnMut(Forwarded)) -> Result<(), &'static str>
         if !line(&mut reader, &mut buf)? {
             return Err("bad_response");
         }
-        let header = String::from_utf8_lossy(&buf).trim_end().to_ascii_lowercase();
+        let header = String::from_utf8_lossy(&buf)
+            .trim_end()
+            .to_ascii_lowercase();
         if header.is_empty() {
             break;
         }
@@ -161,7 +181,11 @@ fn run(home: &Path, emit: &mut dyn FnMut(Forwarded)) -> Result<(), &'static str>
     }
 
     emit(Forwarded::Open);
-    let mut body = BufReader::new(Chunked { inner: reader, left: 0, done: false });
+    let mut body = BufReader::new(Chunked {
+        inner: reader,
+        left: 0,
+        done: false,
+    });
     let (mut name, mut data) = (String::new(), String::new());
     while line(&mut body, &mut buf)? {
         let text = String::from_utf8_lossy(&buf);
