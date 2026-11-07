@@ -171,5 +171,6 @@ test("reinstalar una versión ya instalada no la clona otra vez y mantiene su co
   calls = [];
   const again = await install(home(), "v1.0.0", deps());
   assert.equal(again.commit, commit);
-  assert.ok(!calls.some((c) => c[0] === "git" || c[0] === "pnpm"));
+  assert.ok(calls.filter((c) => c[0] === "git").every((c) => c[1] === "ls-remote"));
+  assert.ok(!calls.some((c) => c[0] === "pnpm"));
 });

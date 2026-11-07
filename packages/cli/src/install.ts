@@ -63,16 +63,55 @@ function check(tag: string, deps: InstallDeps, command: string): void {
   if (deps.platform !== "darwin") throw new CliError("install_unsupported", 1);
 }
 
+const sourceOf = async (deps: InstallDeps): Promise<string> =>
+  deps.source ?? (await deps.run("git", ["-C", CODE_ROOT, "remote", "get-url", "origin"])).trim();
+
+/** El commit al que apunta ahora la etiqueta en el origen (el de una etiqueta anotada, no su objeto). */
+async function tagCommit(tag: string, source: string, run: Runner): Promise<string | undefined> {
+  const ref = `refs/tags/${tag}`;
+  const out = await run("git", ["ls-remote", "--tags", "--", source, ref, `${ref}^{}`]);
+  const shaOf = new Map<string, string>();
+  for (const line of out.split("\n")) {
+    const [sha, name] = line.split("\t");
+    if (sha !== undefined && name !== undefined) shaOf.set(name, sha);
+  }
+  return shaOf.get(`${ref}^{}`) ?? shaOf.get(ref);
+}
+
+/**
+ * Una carpeta de esa etiqueta que ya existe (un intento anterior) solo se reutiliza si su commit es el
+ * que tiene la etiqueta ahora: las etiquetas se pueden mover. Si no, se niega, sin activar nada.
+ */
+async function reusable(tag: string, release: string, deps: InstallDeps): Promise<string> {
+  const installed = readRelease(release)?.commit;
+  const current = await tagCommit(tag, await sourceOf(deps), deps.run);
+  const short = (c: string | undefined) => (c === undefined ? "ninguno" : c.slice(0, 7));
+  const borrar = `borra la carpeta (rm -rf "${release}") y repite el comando`;
+  if (current === undefined) {
+    throw new Error(
+      `La etiqueta ${tag} ya no existe en el origen, y ${release} sigue ahí.\nSi no la necesitas, ${borrar}.`,
+    );
+  }
+  if (installed !== current) {
+    throw new Error(
+      `${release} es de otro commit (${short(installed)}) que la etiqueta ${tag} (${short(current)}); ` +
+        `las etiquetas de versión no se reutilizan, así que no se activa nada.\n` +
+        `Lo más limpio: publica una etiqueta nueva e instala esa.\n` +
+        `Si de verdad quieres ${tag}: ${borrar}.`,
+    );
+  }
+  return installed;
+}
+
 /** Clona la etiqueta, instala las dependencias y escribe RELEASE. Una versión ya instalada no se toca. */
 async function fetchRelease(tag: string, deps: InstallDeps) {
   const { run, supportDir } = deps;
   const release = join(supportDir, "releases", tag);
-  if (existsSync(release)) return { release, commit: readRelease(release)?.commit ?? "" };
+  if (existsSync(release)) return { release, commit: await reusable(tag, release, deps) };
   const tmp = join(supportDir, "releases", `.tmp-${tag}-${process.pid}`);
   mkdirSync(join(supportDir, "releases"), { recursive: true });
   try {
-    const source =
-      deps.source ?? (await run("git", ["-C", CODE_ROOT, "remote", "get-url", "origin"])).trim();
+    const source = await sourceOf(deps);
     await run("git", ["clone", "--quiet", "--depth", "1", "--branch", tag, "--", source, tmp]);
     const commit = (await run("git", ["-C", tmp, "rev-parse", "HEAD"])).trim();
     // Sin scripts de dependencias: el SDK y el sandbox no los necesitan (comprobado en una instalación real).
