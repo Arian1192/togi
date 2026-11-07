@@ -49,7 +49,9 @@ export function groupTasks(tasks: TaskRow[]): Record<AttentionGroup, TaskRow[]> 
   return groups;
 }
 
-function Row({ task }: { task: TaskRow }): ReactNode {
+type OnOpen = ((number: number) => void) | undefined;
+
+function Row({ task, onOpen }: { task: TaskRow; onOpen: OnOpen }): ReactNode {
   // Un estado que esta versión no conoce (un daemon más nuevo) se pinta en gris.
   const tone = Object.hasOwn(STATE_BRAND, task.state) ? stateColor(task.state) : "ink-muted";
   const erased = task.titleErased || task.title === null;
@@ -66,16 +68,32 @@ function Row({ task }: { task: TaskRow }): ReactNode {
       { className: erased ? "task-title muted" : "task-title" },
       erased ? "[borrado]" : task.title,
     ),
+    // Solo un plan en revisión tiene algo que abrir: la decisión es de quien lee.
+    onOpen !== undefined && task.state === "plan_review"
+      ? createElement(
+          "button",
+          { type: "button", className: "btn btn-secondary", onClick: () => onOpen(task.number) },
+          "Revisar el plan",
+        )
+      : null,
     task.hasCriteria ? null : createElement("span", { className: "task-flag" }, "falta criterio"),
   );
 }
 
-function Group({ group, tasks }: { group: AttentionGroup; tasks: TaskRow[] }): ReactNode {
+function Group({
+  group,
+  tasks,
+  onOpen,
+}: {
+  group: AttentionGroup;
+  tasks: TaskRow[];
+  onOpen: OnOpen;
+}): ReactNode {
   const heading = `${GROUP_LABEL[group]} · ${tasks.length}`;
   const rows = createElement(
     "ul",
     { className: "task-rows" },
-    tasks.map((task) => createElement(Row, { key: task.number, task })),
+    tasks.map((task) => createElement(Row, { key: task.number, task, onOpen })),
   );
   // Las cerradas van plegadas, como `togi status` las oculta; el recuento se ve igualmente.
   if (group === "closed") {
@@ -98,9 +116,11 @@ function Group({ group, tasks }: { group: AttentionGroup; tasks: TaskRow[] }): R
 export function TaskList({
   tasks,
   truncated,
+  onOpen,
 }: {
   tasks: TaskRow[];
   truncated: boolean;
+  onOpen?: OnOpen;
 }): ReactNode {
   if (tasks.length === 0) return createElement("p", { className: "muted" }, "No hay tareas.");
   const groups = groupTasks(tasks);
@@ -108,7 +128,7 @@ export function TaskList({
     "div",
     { className: "task-list" },
     ATTENTION_GROUPS.filter((g) => groups[g].length > 0).map((g) =>
-      createElement(Group, { key: g, group: g, tasks: groups[g] }),
+      createElement(Group, { key: g, group: g, tasks: groups[g], onOpen }),
     ),
     truncated
       ? createElement(

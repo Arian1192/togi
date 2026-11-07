@@ -31,11 +31,26 @@ test("el frontend no pinta contenido como HTML", () => {
   }
 });
 
-test("el frontend solo invoca los comandos del estado, de la lista de tareas y de los eventos", () => {
+test("el frontend solo invoca los comandos del estado, las tareas, el plan y los eventos", () => {
   const invoked = sources.flatMap(({ text }) =>
     [...text.matchAll(/invoke(?:<[^>]*>)?\(\s*"([^"]+)"/g)].map((m) => m[1]),
   );
-  assert.deepEqual(invoked, ["get_daemon_status", "list_tasks", "watch_events"]);
+  assert.deepEqual(invoked, [
+    "read_task",
+    "read_plan",
+    "approve_plan",
+    "reject_plan",
+    "request_plan_changes",
+    "get_daemon_status",
+    "list_tasks",
+    "watch_events",
+  ]);
+});
+
+test("ningún comando se invoca por un nombre calculado: todos aparecen escritos arriba", () => {
+  for (const { file, text } of sources) {
+    assert.doesNotMatch(text, /invoke(?:<[^>]*>)?\(\s*[^"\s]/, file);
+  }
 });
 
 test("la página no tiene recursos remotos ni scripts en línea", () => {

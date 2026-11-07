@@ -220,6 +220,10 @@ body {
   font: 400 15px / 24px var(--font-sans);
 }
 
+.notebook-form select {
+  height: 44px;
+}
+
 /* Botones (manual de marca): principal con fondo `ink`, secundario transparente con borde. */
 .btn {
   height: 48px;
@@ -241,6 +245,10 @@ body {
   color: var(--ink);
 }
 
+.btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
 .btn:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
@@ -251,4 +259,24 @@ body {
   background: transparent;
   color: var(--ink-muted);
   cursor: not-allowed;
+}
+
+.plan-review {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.notebook-notice {
+  margin: 0;
+  color: var(--human);
+}
+
+/* En una fila el botón es compacto y no estira la fila. */
+.task-row .btn {
+  flex: none;
+  height: 28px;
+  padding: 0 var(--space-3);
+  font: 500 13px / 20px var(--font-sans);
 }
