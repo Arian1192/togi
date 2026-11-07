@@ -1,5 +1,6 @@
 import {
   type BlobRef,
+  CompleteTask,
   CreateTask,
   EditTask,
   RejectTask,
@@ -266,6 +267,15 @@ export function taskRoutes(
         planner?.state === "active"
           ? existing(null, (number) => ({ type: "requestPlanRetry", number }))(c)
           : problem(503, "not_configured", "no hay un planificador activo"),
+      )
+      // El PR es una referencia que da el humano: togi no tiene acceso a GitHub y no la verifica.
+      .post(
+        "/v1/tasks/:n/done",
+        existing(CompleteTask, (number, { prNumber }) => ({
+          type: "completeTask",
+          number,
+          prNumber,
+        })),
       )
       .post(
         "/v1/tasks/:n/reject",

@@ -32,6 +32,8 @@ Una tarea solo avanza cuando se cumple la condición de su estado. El agente act
 
 Estados finales sin merge: `failed` (agotó los reintentos) y `rejected` (cancelada por el humano).
 
+**`merged` tiene un segundo camino, manual.** Además del merge de togi desde `review`, `merged` se alcanza cuando un humano marca como hecha una tarea que construyó fuera de togi (`task.completed`, `togi task done`). Solo se admite desde `building`: la tarea ya tiene su plan aprobado y el humano hizo el trabajo y el PR por su cuenta. La marca la pone únicamente un humano (un agente o el sistema reciben `actor_not_allowed`) y es definitiva. El número del PR que acompaña a la marca es una referencia que da el humano: togi no tiene acceso a GitHub y no la verifica.
+
 ## Transiciones
 
 ```mermaid
@@ -47,6 +49,7 @@ stateDiagram-v2
     verifying --> review: gates en verde
     review --> building: pide cambios
     review --> merged: aprobado (gate 2)
+    building --> merged: un humano la marca como hecha (construida fuera de togi)
     merged --> [*]
     failed --> [*]
     rejected --> [*]

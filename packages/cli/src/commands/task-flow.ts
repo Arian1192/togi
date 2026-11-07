@@ -195,6 +195,79 @@ export async function rejectTask(
   );
 }
 
+export interface CompleteInput {
+  prNumber: number;
+  /** `undefined` con `--yes`; si no, pregunta y devuelve si la persona confirma. */
+  confirm?: (question: string) => Promise<boolean>;
+}
+
+/** Marca la tarea como hecha. `null` si la persona cancela. El PR lo da ella: togi no lo verifica. */
+export async function completeTask(
+  home: string,
+  n: string,
+  input: CompleteInput,
+  hooks: FlowHooks = {},
+) {
+  const client = createClient(home);
+  const { etag, title } = await readTask(client, n);
+  if (input.confirm !== undefined) {
+    const name = title === null ? say("text_erased") : clean(title);
+    const question = say("done_confirm", { n: Number(n), title: name, pr: input.prNumber });
+    if (!(await input.confirm(question))) return null;
+  }
+  await hooks.afterRead?.();
+  return client.checked<{ number: number; state: string }>(
+    await client.api.v1.tasks[":n"].done.$post(
+      { param: { n } },
+      {
+        headers: { "if-match": etag, "content-type": "application/json" },
+        init: { body: JSON.stringify({ prNumber: input.prNumber }) },
+      },
+    ),
+    { n: Number(n) },
+  );
+}
+
+const done: Command = {
+  summary: "Marca como hecha una tarea construida fuera de togi (definitivo).",
+  example: "togi task done 12 --pr 125",
+  options: {
+    pr: { type: "string" },
+    yes: { type: "boolean", short: "y" },
+  },
+  usage: `Uso: togi task done <número> --pr <número del PR> [--yes]
+
+Marca como hecha (merged) una tarea en building que construiste fuera de togi. Es definitivo.
+
+El número del PR es una referencia tuya: togi no tiene acceso a GitHub y no comprueba que exista.
+
+Ejemplo:
+  togi task done 12 --pr 125
+`,
+  async run({ home, json, out, values, args, interactive, confirm }) {
+    const command = "togi task done --help";
+    const n = taskNumber(args, command);
+    const pr = values.pr;
+    if (typeof pr !== "string") throw usageError("missing_option", { field: "--pr", command });
+    const prNumber = Number(pr);
+    if (!NUMBER.test(pr) || !Number.isSafeInteger(prNumber)) {
+      throw usageError("invalid_option", {
+        field: "--pr",
+        detail: "un número entero positivo",
+        command,
+      });
+    }
+    const yes = values.yes === true;
+    if (!yes && !interactive) {
+      throw usageError("done_confirmation_required", { n: Number(n), command });
+    }
+    const result = await completeTask(home, n, { prNumber, ...(yes ? {} : { confirm }) });
+    if (result === null) return `${say("reject_cancelled")}\n`;
+    if (json) return `${JSON.stringify(result)}\n`;
+    return `${out.mark("ok", say("task_done", { n: result.number, pr: prNumber }))}\n`;
+  },
+};
+
 const submit: Command = {
   summary: "Envía una tarea a planificación.",
   example: "togi task submit 12",
@@ -321,4 +394,4 @@ Ejemplo:
   },
 };
 
-export const flow = { submit, reject, edit };
+export const flow = { submit, reject, edit, done };

@@ -63,6 +63,13 @@ export interface RejectTaskInput {
   text: string;
 }
 
+/** El número del PR lo da el humano y no lleva blobs: va en claro. */
+export interface CompleteTaskInput {
+  type: "completeTask";
+  number: number;
+  prNumber: number;
+}
+
 /** Sesión de planificación: el prompt y la política llegan en claro y se guardan como blobs `prompt`. */
 export interface RequestPlanRetryInput {
   type: "requestPlanRetry";
@@ -106,6 +113,7 @@ export type CommandInput =
   | CreateTaskInput
   | EditTaskInput
   | SubmitTaskInput
+  | CompleteTaskInput
   | RequestPlanRetryInput
   | RejectTaskInput
   | StartSessionInput
@@ -234,6 +242,8 @@ export function createHandler(deps: HandlerDeps) {
           return { type: "submit", actor, at };
         case "requestPlanRetry":
           return { type: "requestPlanRetry", actor, at };
+        case "completeTask":
+          return { type: "completeTask", actor, at, prNumber: cmd.prNumber };
         case "reject": {
           const reason = { category: cmd.category, text: await blob(cmd.text) };
           return { type: "reject", actor, at, reason };

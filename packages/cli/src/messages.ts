@@ -29,6 +29,8 @@ export interface MessageParams {
   path?: string;
   /** Rama base. */
   base?: string;
+  /** Número de un PR que da la persona (`togi task done`). */
+  pr?: number;
   /** Etiquetas instaladas del daemon y de la CLI. */
   daemonRelease?: string;
   cliRelease?: string;
@@ -303,6 +305,16 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `¿Rechazar ${task(p)} «${p.title ?? ""}»? Es definitivo: la tarea queda cerrada. [s/N]`,
   }),
   reject_cancelled: () => ({ text: "Cancelado. No se ha cambiado nada." }),
+  done_confirm: (p) => ({
+    text: `¿Marcar ${task(p)} «${p.title ?? ""}» como hecha, con el PR #${p.pr ?? "?"}? Es definitivo: la tarea queda en merged y togi no comprueba el PR. [s/N]`,
+  }),
+  done_confirmation_required: (p) => ({
+    text: `Marcar ${task(p)} como hecha necesita confirmación y esto no es una terminal.`,
+    next: { label: "Repite con", command: "--yes" },
+  }),
+  task_done: (p) => ({
+    text: `Hecha ${task(p)} · PR #${p.pr ?? "?"} (referencia tuya; togi no la verifica)`,
+  }),
   confirmation_required: (p) => ({
     text: `Rechazar ${task(p)} necesita confirmación y esto no es una terminal.`,
     next: { label: "Repite con", command: "--yes" },

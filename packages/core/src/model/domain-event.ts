@@ -206,6 +206,9 @@ const TASK_PAYLOADS = {
   "task.rejected": z.strictObject({ reason }) satisfies z.ZodType<
     Extract<TaskEvent, { type: "task.rejected" }>["payload"]
   >,
+  "task.completed": z.strictObject({ prNumber: z.number().int().positive() }) satisfies z.ZodType<
+    Extract<TaskEvent, { type: "task.completed" }>["payload"]
+  >,
 };
 const ADMIN_PAYLOADS = {
   "data.erased": z.strictObject({

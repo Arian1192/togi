@@ -46,7 +46,11 @@ export const RejectTask = z.object({
   reason: z.object({ category: z.enum(REASON_CATEGORIES), text: z.string().min(1).max(5_000) }),
 });
 
+/** El número del PR lo da el humano; togi no lo verifica. */
+export const CompleteTask = z.object({ prNumber: z.number().int().positive() });
+
 export type CreateTask = z.infer<typeof CreateTask>;
+export type CompleteTask = z.infer<typeof CompleteTask>;
 export type RegisterRepo = z.infer<typeof RegisterRepo>;
 export type EditTask = z.infer<typeof EditTask>;
 export type RejectTask = z.infer<typeof RejectTask>;
