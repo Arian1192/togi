@@ -3,7 +3,7 @@ import type { Output } from "../output.ts";
 import { admin } from "./admin.ts";
 import { auth } from "./auth.ts";
 import { daemon } from "./daemon.ts";
-import { install } from "./install.ts";
+import { install, uninstall } from "./install.ts";
 import { newTaskWithEditor } from "./new.ts";
 import { plan } from "./plan.ts";
 import { repo } from "./repo.ts";
@@ -61,4 +61,5 @@ export const SHORTCUTS: Record<string, Command> = {
   watch,
   new: newTaskWithEditor,
   install,
+  uninstall,
 };
