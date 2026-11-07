@@ -381,6 +381,19 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
   notify_unavailable: (p) => ({
     text: `notificaciones no disponibles (${plain(p.reason, "sin motivo")})`,
   }),
+  install_done: (p) => ({
+    text: `Instalado ${plain(p.cliRelease, "?")}; el daemon corre bajo launchd.`,
+    next: {
+      label: "Usa la CLI instalada con",
+      command: `alias togi='${plain(p.path, "?").replace(/'/g, `'\\''`)}'`,
+    },
+  }),
+  install_unsupported: () => ({
+    text: "togi install solo funciona en macOS (usa launchd).",
+  }),
+  install_failed: (p) => ({
+    text: `No se pudo instalar.${p.detail ? `\n${plain(p.detail, "")}` : ""}`,
+  }),
   launchagent_managed: () => ({
     text: "El daemon lo gestiona launchd (LaunchAgent com.togi.daemon), así que togi no lo arranca ni lo para a mano.",
     next: { label: "Para quitarlo", command: "launchctl bootout gui/$(id -u)/com.togi.daemon" },
