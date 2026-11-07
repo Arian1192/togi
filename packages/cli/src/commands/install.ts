@@ -1,8 +1,22 @@
 import { usageError } from "../errors.ts";
-import { install as installRelease, supportDirOf } from "../install.ts";
+import {
+  type InstallDeps,
+  install as installRelease,
+  supportDirOf,
+  uninstall as uninstallAgent,
+} from "../install.ts";
 import { defaultAgentsDir, realRun } from "../launchd.ts";
 import { MESSAGES } from "../messages.ts";
 import type { Command } from "./index.ts";
+
+const realDeps = (): InstallDeps => ({
+  run: realRun,
+  supportDir: supportDirOf(),
+  agentsDir: defaultAgentsDir(),
+  uid: process.getuid?.() ?? 0,
+  node: process.execPath,
+  platform: process.platform,
+});
 
 export const install: Command = {
   summary: "Instala una versión etiquetada y deja el daemon bajo launchd.",
@@ -25,16 +39,35 @@ Ejemplo:
         command: "togi install --help",
       });
     }
-    const done = await installRelease(home, tag, {
-      run: realRun,
-      supportDir: supportDirOf(),
-      agentsDir: defaultAgentsDir(),
-      uid: process.getuid?.() ?? 0,
-      node: process.execPath,
-      platform: process.platform,
-    });
+    const done = await installRelease(home, tag, realDeps());
     if (json) return `${JSON.stringify(done)}\n`;
     const m = MESSAGES.install_done?.({ cliRelease: done.tag, path: done.launcher });
     return `${out.mark("ok", m?.text ?? "")}\n  ${m?.next?.label} ${out.paint("accent", m?.next?.command ?? "")}\n`;
+  },
+};
+
+export const uninstall: Command = {
+  summary: "Quita el LaunchAgent del daemon.",
+  example: "togi uninstall",
+  usage: `Uso: togi uninstall [--json]
+
+Para el daemon y borra el plist del LaunchAgent (com.togi.daemon). No toca TOGI_HOME, las versiones
+instaladas ni el lanzador de la CLI. Si no había LaunchAgent, lo dice y termina bien.
+
+Ejemplo:
+  togi uninstall
+`,
+  async run({ json, out, args }) {
+    if (args.length > 0) {
+      throw usageError("invalid_option", {
+        field: "un argumento",
+        detail: "togi uninstall no admite ninguno",
+        command: "togi uninstall --help",
+      });
+    }
+    const done = await uninstallAgent(realDeps());
+    if (json) return `${JSON.stringify(done)}\n`;
+    const key = done.removed ? "uninstall_done" : "uninstall_none";
+    return `${out.mark("ok", MESSAGES[key]?.({}).text ?? "")}\n`;
   },
 };

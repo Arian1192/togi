@@ -90,3 +90,13 @@ export async function install(home: string, tag: string, deps: InstallDeps): Pro
   }
   return { tag, commit, release, launcher };
 }
+
+/** Quita el LaunchAgent. No toca TOGI_HOME, las versiones instaladas ni el lanzador. */
+export async function uninstall(deps: InstallDeps): Promise<{ removed: boolean }> {
+  if (deps.platform !== "darwin") throw new CliError("install_unsupported", 1);
+  const plist = plistPath(deps.agentsDir);
+  if (!existsSync(plist)) return { removed: false };
+  await deps.run("launchctl", ["bootout", `gui/${deps.uid}/${LABEL}`]).catch(() => "");
+  rmSync(plist, { force: true });
+  return { removed: true };
+}

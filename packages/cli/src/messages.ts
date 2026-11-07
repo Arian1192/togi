@@ -388,15 +388,19 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
       command: `alias togi='${plain(p.path, "?").replace(/'/g, `'\\''`)}'`,
     },
   }),
+  uninstall_done: () => ({
+    text: "LaunchAgent quitado; TOGI_HOME y las versiones instaladas siguen donde estaban.",
+  }),
+  uninstall_none: () => ({ text: "No había ningún LaunchAgent instalado." }),
   install_unsupported: () => ({
-    text: "togi install solo funciona en macOS (usa launchd).",
+    text: "togi install y togi uninstall solo funcionan en macOS (usan launchd).",
   }),
   install_failed: (p) => ({
     text: `No se pudo instalar.${p.detail ? `\n${plain(p.detail, "")}` : ""}`,
   }),
   launchagent_managed: () => ({
     text: "El daemon lo gestiona launchd (LaunchAgent com.togi.daemon), así que togi no lo arranca ni lo para a mano.",
-    next: { label: "Para quitarlo", command: "launchctl bootout gui/$(id -u)/com.togi.daemon" },
+    next: { label: "Para quitarlo", command: "togi uninstall" },
   }),
   release_mismatch: (p) => ({
     text: `El daemon es ${plain(p.daemonRelease, "?")} y la CLI ${plain(p.cliRelease, "?")}.`,

@@ -50,7 +50,7 @@ test("togi daemon start con el LaunchAgent activo lo dice y no arranca otro daem
     const r = await runCli(["daemon", "start", "--no-color"], s.home, { HOME: s.userHome });
     assert.equal(r.code, 1);
     assert.match(r.stderr, /lo gestiona launchd/);
-    assert.match(r.stderr, /launchctl bootout/);
+    assert.match(r.stderr, /togi uninstall/);
     assert.ok(!existsSync(paths(s.home).socket));
   } finally {
     rmSync(s.root, { recursive: true, force: true });
