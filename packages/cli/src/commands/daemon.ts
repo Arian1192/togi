@@ -7,7 +7,7 @@ import { clean } from "../format.ts";
 import { managesHome } from "../launchd.ts";
 import { startDaemon, stopDaemon } from "../lifecycle.ts";
 import { MESSAGES } from "../messages.ts";
-import { releaseNotice } from "../release-notice.ts";
+import { releaseNotice, versionText } from "../release-notice.ts";
 import type { Command } from "./index.ts";
 
 const status: Command = {
@@ -20,6 +20,7 @@ const status: Command = {
       schema: number;
       pid: number;
       release?: string;
+      commit?: string;
     }>(await client.api.v1.health.$get());
     if (json) return `${JSON.stringify(health)}\n`;
     const planner = await client.checked<{ state: string; reason: string }>(
@@ -36,7 +37,7 @@ const status: Command = {
     } catch {}
     const parts = [
       "Daemon en marcha",
-      `versión ${health.daemon}`,
+      `versión ${versionText(health)}`,
       `pid ${health.pid}`,
       plannerText ?? clean(planner.state),
       ...(notify === undefined ? [] : [notify]),
