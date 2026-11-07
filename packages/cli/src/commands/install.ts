@@ -4,6 +4,7 @@ import {
   install as installRelease,
   supportDirOf,
   uninstall as uninstallAgent,
+  update as updateRelease,
 } from "../install.ts";
 import { defaultAgentsDir, realRun } from "../launchd.ts";
 import { MESSAGES } from "../messages.ts";
@@ -18,6 +19,18 @@ const realDeps = (): InstallDeps => ({
   platform: process.platform,
 });
 
+function oneTag(args: string[], verb: string): string {
+  const [tag, ...extra] = args;
+  if (tag === undefined || extra.length > 0) {
+    throw usageError("invalid_option", {
+      field: "<etiqueta>",
+      detail: `togi ${verb} admite exactamente una`,
+      command: `togi ${verb} --help`,
+    });
+  }
+  return tag;
+}
+
 export const install: Command = {
   summary: "Instala una versión etiquetada y deja el daemon bajo launchd.",
   example: "togi install v0.1.0",
@@ -31,18 +44,29 @@ Ejemplo:
   togi install v0.1.0
 `,
   async run({ home, json, out, args }) {
-    const [tag, ...extra] = args;
-    if (tag === undefined || extra.length > 0) {
-      throw usageError("invalid_option", {
-        field: "<etiqueta>",
-        detail: "togi install admite exactamente una",
-        command: "togi install --help",
-      });
-    }
-    const done = await installRelease(home, tag, realDeps());
+    const done = await installRelease(home, oneTag(args, "install"), realDeps());
     if (json) return `${JSON.stringify(done)}\n`;
     const m = MESSAGES.install_done?.({ cliRelease: done.tag, path: done.launcher });
     return `${out.mark("ok", m?.text ?? "")}\n  ${m?.next?.label} ${out.paint("accent", m?.next?.command ?? "")}\n`;
+  },
+};
+
+export const update: Command = {
+  summary: "Instala otra versión etiquetada y reinicia el daemon con ella.",
+  example: "togi update v0.2.0",
+  usage: `Uso: togi update <etiqueta> [--json]
+
+Instala la etiqueta como togi install, reescribe el plist del LaunchAgent y reinicia el daemon con ella.
+Las versiones anteriores no se tocan. Si la instalación falla, no cambia nada ni se reinicia; si falla al
+activarla, se restaura el plist anterior. Hace falta haber instalado antes con togi install.
+
+Ejemplo:
+  togi update v0.2.0
+`,
+  async run({ home, json, out, args }) {
+    const done = await updateRelease(home, oneTag(args, "update"), realDeps());
+    if (json) return `${JSON.stringify(done)}\n`;
+    return `${out.mark("ok", MESSAGES.update_done?.({ cliRelease: done.tag }).text ?? "")}\n`;
   },
 };
 

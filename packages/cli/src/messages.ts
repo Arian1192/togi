@@ -388,12 +388,22 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
       command: `alias togi='${plain(p.path, "?").replace(/'/g, `'\\''`)}'`,
     },
   }),
+  update_done: (p) => ({
+    text: `Actualizado a ${plain(p.cliRelease, "?")}; el daemon se reinició bajo launchd.`,
+  }),
+  update_failed: (p) => ({
+    text: `No se pudo actualizar.${p.detail ? `\n${plain(p.detail, "")}` : ""}`,
+  }),
+  not_installed: () => ({
+    text: "No hay ninguna instalación que actualizar.",
+    next: { label: "Instala una versión con", command: "togi install <etiqueta>" },
+  }),
   uninstall_done: () => ({
     text: "LaunchAgent quitado; TOGI_HOME y las versiones instaladas siguen donde estaban.",
   }),
   uninstall_none: () => ({ text: "No había ningún LaunchAgent instalado." }),
   install_unsupported: () => ({
-    text: "togi install y togi uninstall solo funcionan en macOS (usan launchd).",
+    text: "togi install, togi update y togi uninstall solo funcionan en macOS (usan launchd).",
   }),
   install_failed: (p) => ({
     text: `No se pudo instalar.${p.detail ? `\n${plain(p.detail, "")}` : ""}`,
