@@ -31,11 +31,11 @@ test("el frontend no pinta contenido como HTML", () => {
   }
 });
 
-test("el frontend solo invoca los comandos del estado del daemon y de la lista de tareas", () => {
+test("el frontend solo invoca los comandos del estado, de la lista de tareas y de los eventos", () => {
   const invoked = sources.flatMap(({ text }) =>
     [...text.matchAll(/invoke(?:<[^>]*>)?\(\s*"([^"]+)"/g)].map((m) => m[1]),
   );
-  assert.deepEqual(invoked, ["get_daemon_status", "list_tasks"]);
+  assert.deepEqual(invoked, ["get_daemon_status", "list_tasks", "watch_events"]);
 });
 
 test("la página no tiene recursos remotos ni scripts en línea", () => {

@@ -1,6 +1,12 @@
 {
   "identifier": "default",
-  "description": "El webview solo puede pedir el estado del daemon y la lista de tareas.",
+  "description": "El webview solo puede pedir el estado del daemon y la lista de tareas, arrancar el reenvío de eventos y escucharlos.",
   "windows": ["main"],
-  "permissions": ["allow-get-daemon-status", "allow-list-tasks"]
+  "permissions": [
+    "allow-get-daemon-status",
+    "allow-list-tasks",
+    "allow-watch-events",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
 }
