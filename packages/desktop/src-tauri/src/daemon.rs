@@ -69,7 +69,9 @@ fn version(body: &[u8], token: &str) -> Option<String> {
     let clean = !tag.is_empty()
         && tag.len() <= 64
         && !tag.contains(token)
-        && tag.chars().all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c));
+        && tag
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c));
     if !clean {
         return None;
     }
@@ -122,11 +124,16 @@ pub(crate) fn request(
         head.push_str(&format!("{name}: {value}\r\n"));
     }
     if let Some(body) = body {
-        head.push_str(&format!("Content-Type: application/json\r\nContent-Length: {}\r\n", body.len()));
+        head.push_str(&format!(
+            "Content-Type: application/json\r\nContent-Length: {}\r\n",
+            body.len()
+        ));
     }
     head.push_str("\r\n");
     stream.write_all(head.as_bytes()).map_err(|_| "io")?;
-    stream.write_all(body.unwrap_or_default()).map_err(|_| "io")?;
+    stream
+        .write_all(body.unwrap_or_default())
+        .map_err(|_| "io")?;
 
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
