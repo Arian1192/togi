@@ -1,6 +1,14 @@
-import type { TaskState } from "@togi/core";
+import { type BrandToken, STATE_BRAND, type TaskState } from "@togi/core";
 import { oneLine, relativeTime, say } from "./format.ts";
-import type { Output } from "./output.ts";
+import type { Output, Token } from "./output.ts";
+
+/** Tokens de marca de los estados → tokens de la CLI; `done` va sin color. */
+const CLI_TOKEN: Record<BrandToken, Token | undefined> = {
+  human: "attention",
+  agent: "muted",
+  "ink-muted": "muted",
+  done: undefined,
+};
 
 /** Máximo que pide `togi status`; la API no devuelve más (200). */
 export const PAGE = 200;
@@ -68,9 +76,9 @@ export function renderStatus(
   }
   const showClosed = opts.all || opts.state !== undefined;
   const groups = [
-    { title: say("group_pending"), states: PENDING, tone: "attention" as const },
-    { title: say("group_active"), states: ACTIVE, tone: "muted" as const },
-    ...(showClosed ? [{ title: say("group_closed"), states: CLOSED, tone: "muted" as const }] : []),
+    { title: say("group_pending"), states: PENDING },
+    { title: say("group_active"), states: ACTIVE },
+    ...(showClosed ? [{ title: say("group_closed"), states: CLOSED }] : []),
   ]
     .map((g) => ({ ...g, rows: tasks.filter((t) => g.states.includes(t.state)) }))
     .filter((g) => g.rows.length > 0);
@@ -80,7 +88,14 @@ export function renderStatus(
       ? { text: relativeTime(t.updatedAt, now), paint: (s) => out.paint("muted", s) }
       : { text: say("missing_criteria_short"), paint: (s) => out.paint("attention", s) };
   const numberW = width(rows.map((t) => ({ text: `#${t.number}` })));
-  const stateW = width(rows.map((t) => ({ text: t.state })));
+  // Glifo y estado forman una celda, separados por un espacio (manual de marca).
+  // Sin Unicode (cli-estilo.md) el glifo no se muestra y queda solo el estado.
+  const stateCell = (t: StatusTask): Cell => {
+    const token = CLI_TOKEN[STATE_BRAND[t.state].token];
+    const text = out.unicode ? `${STATE_BRAND[t.state].glyph} ${t.state}` : t.state;
+    return token === undefined ? { text } : { text, paint: (s) => out.paint(token, s) };
+  };
+  const stateW = width(rows.map(stateCell));
   const riskW = width(rows.map((t) => ({ text: say(`risk_${t.risk}`) })));
   const tailW = width(rows.map(tail));
   // 2 de sangría + 4 separadores de 2 espacios entre las 5 columnas.
@@ -94,8 +109,8 @@ export function renderStatus(
     const lines = g.rows.map((t) =>
       [
         pad({ text: `#${t.number}`, paint: (s) => out.paint("accent", s) }, numberW),
+        pad(stateCell(t), stateW),
         pad(title(t), titleW),
-        pad({ text: t.state, paint: (s) => out.paint(g.tone, s) }, stateW),
         pad({ text: say(`risk_${t.risk}`) }, riskW),
         tail(t).paint?.(tail(t).text),
       ]

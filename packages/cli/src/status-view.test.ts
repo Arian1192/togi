@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { STATE_BRAND } from "@togi/core";
 import { relativeTime } from "./format.ts";
 import { createOutput } from "./output.ts";
 import { PAGE, renderStatus, type StatusTask } from "./status-view.ts";
@@ -7,8 +8,14 @@ import { PAGE, renderStatus, type StatusTask } from "./status-view.ts";
 const NOW = new Date("2026-11-03T12:00:00Z");
 const ago = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
 const MIN = 60_000;
-const plain = createOutput({ env: {}, isTTY: false, noColorFlag: true });
-const colored = createOutput({ env: { FORCE_COLOR: "1" }, isTTY: false, noColorFlag: false });
+const UTF8 = { LANG: "es_ES.UTF-8" };
+const plain = createOutput({ env: UTF8, isTTY: false, noColorFlag: true });
+const colored = createOutput({
+  env: { ...UTF8, FORCE_COLOR: "1" },
+  isTTY: false,
+  noColorFlag: false,
+});
+const ascii = createOutput({ env: { TERM: "dumb" }, isTTY: false, noColorFlag: true });
 
 const task = (n: number, over: Partial<StatusTask> = {}): StatusTask => ({
   number: n,
@@ -43,11 +50,11 @@ test("dos grupos alineados, falta criterio y el resumen, como en la guía", () =
     out,
     [
       "Pendiente de ti",
-      "  #15  Migración de perfiles       draft     alto   falta criterio",
+      "  #15  ○ draft     Migración de perfiles       alto   falta criterio",
       "",
       "En curso",
-      "  #12  Filtro por fecha en envíos  planning  bajo   hace 2 h",
-      "  #13  Paginación de pedidos       planning  medio  hace 1 d",
+      "  #12  ◐ planning  Filtro por fecha en envíos  bajo   hace 2 h",
+      "  #13  ◐ planning  Paginación de pedidos       medio  hace 1 d",
       "",
       "3 tareas · 2 rechazadas ocultas (togi status --all)",
       "",
@@ -57,7 +64,7 @@ test("dos grupos alineados, falta criterio y el resumen, como en la guía", () =
 
 test("--all y --state muestran las cerradas y no hay línea de ocultas", () => {
   const tasks = [task(1), task(2, { state: "merged" })];
-  assert.match(view(tasks, { all: true }), /\nCerradas\n {2}#2 .* merged /);
+  assert.match(view(tasks, { all: true }), /\nCerradas\n {2}#2 +● merged /);
   assert.ok(!view(tasks, { all: true }).includes("ocultas"));
   assert.match(view([tasks[1] as StatusTask], { state: "merged" }), /Cerradas\n {2}#2 /);
 });
@@ -87,7 +94,43 @@ test("la fila cabe en 80 columnas y el título largo se recorta con …", () => 
   const out = view([task(7, { title: "x".repeat(200), hasCriteria: false })]);
   const row = out.split("\n").find((l) => l.includes("#7")) as string;
   assert.ok([...row].length <= 80, row);
-  assert.match(row, /x… {2}planning/);
+  assert.match(row, /x… {2}bajo/);
+});
+
+test("las columnas salen en el orden id, glifo, estado, título, riesgo y nota", () => {
+  const out = view([task(1)]);
+  assert.match(out, /^ {2}#1 +◐ planning +Tarea 1 +bajo +hace 2 h$/m);
+});
+
+test("sin color cada fila lleva el glifo de su estado y el significado no depende del color", () => {
+  const states = ["draft", "plan_review", "review", "failed", "planning", "building", "verifying"];
+  const tasks = states.map((state, i) => task(i + 1, { state: state as StatusTask["state"] }));
+  const out = view(tasks);
+  assert.ok(!out.includes("\x1b"), out);
+  for (const t of tasks) {
+    const glyph = STATE_BRAND[t.state].glyph;
+    assert.match(out, new RegExp(`#${t.number} +${glyph} ${t.state} `), t.state);
+  }
+});
+
+test("sin Unicode no se muestra el glifo y queda solo el estado, alineado y en 80 columnas", () => {
+  const tasks = Object.keys(STATE_BRAND).map((state, i) =>
+    task(i + 1, { state: state as StatusTask["state"], title: "x".repeat(200) }),
+  );
+  const out = view(tasks, { all: true }, ascii);
+  for (const { glyph } of Object.values(STATE_BRAND)) assert.ok(!out.includes(glyph), glyph);
+  assert.match(out, /^ {2}#1 +draft +x+…/m);
+  for (const line of out.split("\n")) assert.ok([...line].length <= 80, line);
+});
+
+test("con color el glifo y el estado se pintan juntos con el token del manual", () => {
+  const paint = (state: StatusTask["state"]) => view([task(1, { state })], { all: true }, colored);
+  assert.ok(paint("plan_review").includes("\x1b[33m◆ plan_review\x1b[0m"), "human");
+  assert.ok(paint("failed").includes("\x1b[33m✕ failed\x1b[0m"), "human");
+  assert.ok(paint("building").includes("\x1b[90m◐ building\x1b[0m"), "agent");
+  assert.ok(paint("draft").includes("\x1b[90m○ draft\x1b[0m"), "ink-muted");
+  assert.ok(paint("rejected").includes("\x1b[90m— rejected\x1b[0m"), "ink-muted");
+  assert.ok(paint("merged").includes("  ● merged  "), "done sin color");
 });
 
 test("el texto de la tarea no mueve la terminal ni parte la fila", () => {

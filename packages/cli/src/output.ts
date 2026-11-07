@@ -40,14 +40,15 @@ function wantsUnicode(env: Record<string, string | undefined>): boolean {
 
 export function createOutput(options: OutputOptions) {
   const color = wantsColor(options);
-  const symbols = wantsUnicode(options.env) ? UNICODE : ASCII;
+  const unicode = wantsUnicode(options.env);
+  const symbols = unicode ? UNICODE : ASCII;
   const paint = (token: Token, text: string): string =>
     color ? `\x1b[${ANSI[token]}m${text}\x1b[0m` : text;
   const symbol = (token: Token): string => symbols[token];
   /** Símbolo y texto, pintados juntos; `accent` no lleva símbolo. */
   const mark = (token: Token, text: string): string =>
     paint(token, symbol(token) === "" ? text : `${symbol(token)} ${text}`);
-  return { color, paint, symbol, mark };
+  return { color, unicode, paint, symbol, mark };
 }
 
 export type Output = ReturnType<typeof createOutput>;
