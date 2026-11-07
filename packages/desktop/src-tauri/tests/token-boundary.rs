@@ -98,6 +98,43 @@ fn sin_socket_el_daemon_no_responde_y_el_motivo_no_lleva_el_token() {
     assert_eq!(assert_clean(&status), r#"{"state":"unreachable","reason":"no_socket"}"#);
 }
 
+/// Lo que responde un daemon con `release` y `commit`, con la forma de `GET /v1/health`.
+fn release_body(release: &str, commit: &str) -> String {
+    format!(
+        r#"{{"daemon":"0.0.0","schema":11,"pid":1,"lastSeq":0,"release":"{release}","commit":"{commit}","echo":"{SENTINEL}"}}"#
+    )
+}
+
+const COMMIT: &str = "aae6fce0281e345c3a36973d0bb6502f4ace847f";
+
+fn version_of(body: String) -> String {
+    let home = home(Some(SENTINEL));
+    let daemon = fake_daemon(&home, "200 OK", body);
+    let status = status_at(&home);
+    daemon.join().unwrap();
+    assert_clean(&status)
+}
+
+#[test]
+fn un_daemon_instalado_da_su_etiqueta_y_el_commit_corto() {
+    let json = version_of(release_body("v0.2.5", COMMIT));
+    assert_eq!(json, r#"{"state":"running","version":"v0.2.5 (aae6fce)"}"#);
+}
+
+#[test]
+fn un_daemon_desde_el_repo_da_dev_y_no_la_version_del_package() {
+    let json = version_of(release_body("dev", ""));
+    assert_eq!(json, r#"{"state":"running","version":"dev"}"#);
+}
+
+#[test]
+fn un_commit_que_no_es_un_sha_se_omite_y_una_etiqueta_con_el_token_se_rechaza() {
+    let json = version_of(release_body("v0.2.5", "no-es-un-sha"));
+    assert_eq!(json, r#"{"state":"running","version":"v0.2.5"}"#);
+    let json = version_of(release_body(SENTINEL, COMMIT));
+    assert_eq!(json, r#"{"state":"unreachable","reason":"bad_response"}"#);
+}
+
 #[test]
 fn sin_credenciales_no_se_intenta_conectar() {
     let home = home(None);
