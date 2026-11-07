@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::cell::RefCell;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::net::UnixListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -30,7 +30,7 @@ fn home(token: Option<&str>) -> PathBuf {
 
 /// Daemon falso: lee la petición y responde `status` con `etag` y `body` en trozos de 7 bytes.
 /// Devuelve la petición que recibió.
-fn fake_daemon(home: &PathBuf, status: &str, etag: Option<&str>, body: String) -> JoinHandle<String> {
+fn fake_daemon(home: &Path, status: &str, etag: Option<&str>, body: String) -> JoinHandle<String> {
     let listener = UnixListener::bind(home.join("run").join("togi.sock")).unwrap();
     let (status, etag) = (status.to_owned(), etag.map(str::to_owned));
     thread::spawn(move || {
@@ -78,7 +78,10 @@ fn read(status: &str, etag: Option<&str>, body: String) -> (PlanRead, String) {
 /// El JSON que recibiría el webview; no puede contener el token.
 fn clean(plan: &PlanRead) -> String {
     let json = serde_json::to_string(plan).unwrap();
-    assert!(!json.contains(SENTINEL), "el plan contiene el token: {json}");
+    assert!(
+        !json.contains(SENTINEL),
+        "el plan contiene el token: {json}"
+    );
     json
 }
 
@@ -91,25 +94,50 @@ fn reason(plan: &PlanRead) -> &'static str {
 
 #[test]
 fn read_plan_devuelve_el_plan_y_la_version_del_etag_sin_el_token_ni_campos_de_mas() {
-    let (plan, request) = read("200 OK", Some("\"7\""), plan_json("hacer A\ny luego B").to_string());
-    assert!(request.starts_with("GET /v1/tasks/12/plan HTTP/1.1\r\n"), "{request}");
-    let PlanRead::Ok { plan: view, version } = &plan else { panic!("{plan:?}") };
+    let (plan, request) = read(
+        "200 OK",
+        Some("\"7\""),
+        plan_json("hacer A\ny luego B").to_string(),
+    );
+    assert!(
+        request.starts_with("GET /v1/tasks/12/plan HTTP/1.1\r\n"),
+        "{request}"
+    );
+    let PlanRead::Ok {
+        plan: view,
+        version,
+    } = &plan
+    else {
+        panic!("{plan:?}")
+    };
     assert_eq!((view.plan_version, *version), (2, 7));
     assert_eq!(view.approach, "hacer A\ny luego B");
     assert_eq!(view.new_tests, ["src/a.test.ts"]);
-    assert_eq!((view.estimated_lines.production, view.estimated_lines.tests), (10, 20));
+    assert_eq!(
+        (view.estimated_lines.production, view.estimated_lines.tests),
+        (10, 20)
+    );
     let json = clean(&plan);
-    assert!(json.contains(r#""status":"ok""#) && json.contains(r#""version":7"#), "{json}");
+    assert!(
+        json.contains(r#""status":"ok""#) && json.contains(r#""version":7"#),
+        "{json}"
+    );
     for extra in ["sessionId", "baseSha", "previous", "proposedAt"] {
-        assert!(!json.contains(extra), "{extra} no debe llegar a la vista: {json}");
+        assert!(
+            !json.contains(extra),
+            "{extra} no debe llegar a la vista: {json}"
+        );
     }
 }
 
 #[test]
 fn un_enfoque_con_html_llega_byte_a_byte_como_texto() {
-    let approach = "<script>alert(1)</script><img src=x onerror=alert(2)>\n  &amp; <b>negrita</b> \u{1F600}";
+    let approach =
+        "<script>alert(1)</script><img src=x onerror=alert(2)>\n  &amp; <b>negrita</b> \u{1F600}";
     let (plan, _) = read("200 OK", Some("\"7\""), plan_json(approach).to_string());
-    let PlanRead::Ok { plan: view, .. } = &plan else { panic!("{plan:?}") };
+    let PlanRead::Ok { plan: view, .. } = &plan else {
+        panic!("{plan:?}")
+    };
     assert_eq!(view.approach.as_bytes(), approach.as_bytes());
     let round: Value = serde_json::from_str(&clean(&plan)).unwrap();
     assert_eq!(round["plan"]["approach"], approach);
@@ -171,7 +199,10 @@ fn sin_credenciales_sin_socket_o_con_un_numero_invalido_no_se_intenta_nada() {
     let with_credentials = home(Some(SENTINEL));
     assert_eq!(reason(&plan_at(&with_credentials, 12)), "no_socket");
     for number in [0, 1 << 53] {
-        assert_eq!(reason(&plan_at(&with_credentials, number)), "invalid_request");
+        assert_eq!(
+            reason(&plan_at(&with_credentials, number)),
+            "invalid_request"
+        );
     }
 }
 
@@ -179,7 +210,10 @@ fn sin_credenciales_sin_socket_o_con_un_numero_invalido_no_se_intenta_nada() {
 fn el_comando_solo_acepta_el_numero_de_tarea() {
     let source = include_str!("../src/plan.rs");
     let rest = &source[source.find("pub async fn read_plan(").unwrap()..];
-    assert!(rest.starts_with("pub async fn read_plan(number: u64) -> PlanRead"), "{rest}");
+    assert!(
+        rest.starts_with("pub async fn read_plan(number: u64) -> PlanRead"),
+        "{rest}"
+    );
 }
 
 // Decisiones sobre el plan: aprobar y rechazar piden confirmación con un diálogo nativo desde Rust
@@ -192,7 +226,7 @@ struct Seen {
 }
 
 /// Daemon falso para un POST: lee la petición con su cuerpo y responde en trozos de 5 bytes.
-fn post_daemon(home: &PathBuf, status: &str) -> JoinHandle<Seen> {
+fn post_daemon(home: &Path, status: &str) -> JoinHandle<Seen> {
     let listener = UnixListener::bind(home.join("run").join("togi.sock")).unwrap();
     let status = status.to_owned();
     thread::spawn(move || {
@@ -206,7 +240,11 @@ fn post_daemon(home: &PathBuf, status: &str) -> JoinHandle<Seen> {
         let head = String::from_utf8(head).unwrap();
         let length = head
             .lines()
-            .find_map(|l| l.to_lowercase().strip_prefix("content-length:").map(|v| v.trim().parse().unwrap()))
+            .find_map(|l| {
+                l.to_lowercase()
+                    .strip_prefix("content-length:")
+                    .map(|v| v.trim().parse().unwrap())
+            })
             .unwrap_or(0);
         let mut sent = vec![0; length];
         stream.read_exact(&mut sent).unwrap();
@@ -221,7 +259,10 @@ fn post_daemon(home: &PathBuf, status: &str) -> JoinHandle<Seen> {
             stream.flush().unwrap();
             thread::sleep(Duration::from_millis(1));
         }
-        Seen { head, body: String::from_utf8(sent).unwrap() }
+        Seen {
+            head,
+            body: String::from_utf8(sent).unwrap(),
+        }
     })
 }
 
@@ -233,7 +274,10 @@ struct Answer {
 
 impl Answer {
     fn new(yes: bool) -> Answer {
-        Answer { yes, asked: RefCell::new(Vec::new()) }
+        Answer {
+            yes,
+            asked: RefCell::new(Vec::new()),
+        }
     }
 }
 
@@ -259,7 +303,10 @@ fn decide(status: &str, action: &Action, confirm: &Answer) -> (Decision, Seen) {
 /// El JSON que recibiría el webview; no puede contener el token.
 fn clean_json<T: serde::Serialize>(value: &T) -> String {
     let json = serde_json::to_string(value).unwrap();
-    assert!(!json.contains(SENTINEL), "lo que sale hacia el webview contiene el token: {json}");
+    assert!(
+        !json.contains(SENTINEL),
+        "lo que sale hacia el webview contiene el token: {json}"
+    );
     json
 }
 
@@ -268,11 +315,20 @@ fn aprobar_confirma_y_manda_post_con_if_match_de_la_version_vista() {
     let confirm = Answer::new(true);
     let (decision, seen) = decide("200 OK", &Action::Approve, &confirm);
     assert_eq!(decision, Decision::Ok);
-    assert!(seen.head.starts_with("POST /v1/tasks/12/plan/approve HTTP/1.1\r\n"), "{}", seen.head);
+    assert!(
+        seen.head
+            .starts_with("POST /v1/tasks/12/plan/approve HTTP/1.1\r\n"),
+        "{}",
+        seen.head
+    );
     assert!(seen.head.contains("If-Match: \"7\"\r\n"), "{}", seen.head);
     assert_eq!(seen.body, "");
     assert_eq!(confirm.asked.borrow().len(), 1);
-    assert!(confirm.asked.borrow()[0].contains("tarea 12"), "{:?}", confirm.asked);
+    assert!(
+        confirm.asked.borrow()[0].contains("tarea 12"),
+        "{:?}",
+        confirm.asked
+    );
     assert_eq!(clean_json(&decision), r#"{"status":"ok"}"#);
 }
 
@@ -283,25 +339,41 @@ fn pedir_cambios_manda_el_motivo_recortado_y_no_pide_confirmacion() {
     let (decision, seen) = decide("200 OK", &action, &confirm);
     assert_eq!(decision, Decision::Ok);
     assert!(
-        seen.head.starts_with("POST /v1/tasks/12/plan/request-changes HTTP/1.1\r\n"),
+        seen.head
+            .starts_with("POST /v1/tasks/12/plan/request-changes HTTP/1.1\r\n"),
         "{}",
         seen.head
     );
     assert!(seen.head.contains("If-Match: \"7\"\r\n"), "{}", seen.head);
     let body: Value = serde_json::from_str(&seen.body).unwrap();
-    assert_eq!(body, json!({ "reason": { "category": "tests", "text": "faltan casos" } }));
+    assert_eq!(
+        body,
+        json!({ "reason": { "category": "tests", "text": "faltan casos" } })
+    );
     assert!(confirm.asked.borrow().is_empty());
 }
 
 #[test]
 fn rechazar_confirmado_manda_post_con_if_match_y_el_motivo() {
     let confirm = Answer::new(true);
-    let (decision, seen) = decide("200 OK", &Action::Reject(scope("fuera de alcance")), &confirm);
+    let (decision, seen) = decide(
+        "200 OK",
+        &Action::Reject(scope("fuera de alcance")),
+        &confirm,
+    );
     assert_eq!(decision, Decision::Ok);
-    assert!(seen.head.starts_with("POST /v1/tasks/12/plan/reject HTTP/1.1\r\n"), "{}", seen.head);
+    assert!(
+        seen.head
+            .starts_with("POST /v1/tasks/12/plan/reject HTTP/1.1\r\n"),
+        "{}",
+        seen.head
+    );
     assert!(seen.head.contains("If-Match: \"7\"\r\n"), "{}", seen.head);
     let body: Value = serde_json::from_str(&seen.body).unwrap();
-    assert_eq!(body, json!({ "reason": { "category": "scope", "text": "fuera de alcance" } }));
+    assert_eq!(
+        body,
+        json!({ "reason": { "category": "scope", "text": "fuera de alcance" } })
+    );
     assert_eq!(confirm.asked.borrow().len(), 1);
 }
 
@@ -326,7 +398,11 @@ fn si_no_se_confirma_no_se_llama_al_daemon() {
 
 #[test]
 fn un_412_es_plan_changed_en_las_tres_decisiones_y_no_se_reintenta() {
-    for action in [Action::Approve, Action::RequestChanges(scope("x")), Action::Reject(scope("x"))] {
+    for action in [
+        Action::Approve,
+        Action::RequestChanges(scope("x")),
+        Action::Reject(scope("x")),
+    ] {
         let (decision, _) = decide("412 Precondition Failed", &action, &Answer::new(true));
         assert_eq!(decision, Decision::PlanChanged);
         assert_eq!(clean_json(&decision), r#"{"status":"plan_changed"}"#);
@@ -342,7 +418,11 @@ fn otros_codigos_son_motivos_cerrados_sin_el_texto_del_daemon() {
         ("428 Precondition Required", "bad_response"),
         ("500 Oops", "bad_response"),
     ] {
-        let (decision, _) = decide(status, &Action::RequestChanges(scope("x")), &Answer::new(true));
+        let (decision, _) = decide(
+            status,
+            &Action::RequestChanges(scope("x")),
+            &Answer::new(true),
+        );
         assert_eq!(decision, Decision::Failed { reason: expected });
         clean_json(&decision);
     }
@@ -353,11 +433,21 @@ fn sin_credenciales_o_con_numeros_invalidos_no_se_pregunta_ni_se_llama() {
     let confirm = Answer::new(true);
     let none = home(None);
     let no_credentials = decide_at(&none, 12, 7, &Action::Approve, &confirm);
-    assert_eq!(no_credentials, Decision::Failed { reason: "no_credentials" });
+    assert_eq!(
+        no_credentials,
+        Decision::Failed {
+            reason: "no_credentials"
+        }
+    );
     let some = home(Some(SENTINEL));
     for (number, version) in [(0, 7), (12, 0), (1 << 53, 7), (12, 1 << 53)] {
         let decision = decide_at(&some, number, version, &Action::Approve, &confirm);
-        assert_eq!(decision, Decision::Failed { reason: "invalid_request" });
+        assert_eq!(
+            decision,
+            Decision::Failed {
+                reason: "invalid_request"
+            }
+        );
     }
     assert!(confirm.asked.borrow().is_empty());
 }
@@ -378,7 +468,13 @@ fn el_motivo_exige_categoria_de_la_lista_cerrada_y_texto_no_vacio_y_acotado() {
 fn las_categorias_son_las_de_core() {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../core/src/model/task.ts");
     let source = std::fs::read_to_string(path).unwrap();
-    let list = source.split("REASON_CATEGORIES = [").nth(1).unwrap().split("] as const").next().unwrap();
+    let list = source
+        .split("REASON_CATEGORIES = [")
+        .nth(1)
+        .unwrap()
+        .split("] as const")
+        .next()
+        .unwrap();
     let core: Vec<&str> = list.split('"').skip(1).step_by(2).collect();
     assert_eq!(CATEGORIES.to_vec(), core);
 }
@@ -390,9 +486,17 @@ fn los_comandos_de_decision_solo_aceptan_numero_version_categoria_y_motivo() {
         let rest = &source[source.find(&format!("pub async fn {name}(")).unwrap()..];
         let args = &rest[rest.find('(').unwrap() + 1..rest.find(')').unwrap()];
         let names = args.split(',').filter(|a| !a.trim().is_empty());
-        names.map(|a| a.split(':').next().unwrap().trim().to_owned()).collect()
+        names
+            .map(|a| a.split(':').next().unwrap().trim().to_owned())
+            .collect()
     };
     assert_eq!(params("approve_plan"), ["app", "number", "version"]);
-    assert_eq!(params("request_plan_changes"), ["app", "number", "version", "category", "text"]);
-    assert_eq!(params("reject_plan"), ["app", "number", "version", "category", "text"]);
+    assert_eq!(
+        params("request_plan_changes"),
+        ["app", "number", "version", "category", "text"]
+    );
+    assert_eq!(
+        params("reject_plan"),
+        ["app", "number", "version", "category", "text"]
+    );
 }

@@ -5,7 +5,7 @@
 use serde_json::{json, Value};
 use std::io::{Read, Write};
 use std::os::unix::net::UnixListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -27,7 +27,7 @@ fn home(token: Option<&str>) -> PathBuf {
 
 /// Daemon falso: lee la petición y responde `status` con `body` en trozos de `chunk` bytes.
 /// Devuelve la petición que recibió.
-fn fake_daemon(home: &PathBuf, status: &str, body: String, chunk: usize) -> JoinHandle<String> {
+fn fake_daemon(home: &Path, status: &str, body: String, chunk: usize) -> JoinHandle<String> {
     let listener = UnixListener::bind(home.join("run").join("togi.sock")).unwrap();
     let status = status.to_owned();
     thread::spawn(move || {
@@ -76,7 +76,10 @@ fn ask(status: &str, body: String, chunk: usize) -> (TaskList, String) {
 /// El JSON que recibiría el webview; no puede contener el token.
 fn clean(list: &TaskList) -> String {
     let json = serde_json::to_string(list).unwrap();
-    assert!(!json.contains(SENTINEL), "la lista contiene el token: {json}");
+    assert!(
+        !json.contains(SENTINEL),
+        "la lista contiene el token: {json}"
+    );
     json
 }
 
@@ -91,7 +94,10 @@ fn titles(list: &TaskList) -> Vec<Option<String>> {
 fn la_lista_trae_solo_los_campos_de_la_fila_y_nunca_el_token() {
     let body = tasks_body(vec![task(1, "draft", "Uno"), task(2, "planning", "Dos")]);
     let (list, request) = ask("200 OK", body, 7);
-    assert!(request.starts_with("GET /v1/tasks?limit=200 HTTP/1.1\r\n"), "{request}");
+    assert!(
+        request.starts_with("GET /v1/tasks?limit=200 HTTP/1.1\r\n"),
+        "{request}"
+    );
     assert!(request.contains(&format!("Authorization: Bearer {SENTINEL}\r\n")));
     let row = |n: u64, title: &str, state: &str| {
         format!(
@@ -128,7 +134,11 @@ fn un_titulo_borrado_sale_nulo_y_un_titulo_largo_o_con_control_sale_en_una_linea
 #[test]
 fn con_200_tareas_hay_truncado_y_con_199_no_aunque_pase_de_64_kib() {
     // Títulos de 120 caracteres acentuados (2 bytes cada uno): el cuerpo pasa de 64 KiB.
-    let rows = |n: u64| (1..=n).map(|i| task(i, "building", &"é".repeat(120))).collect::<Vec<_>>();
+    let rows = |n: u64| {
+        (1..=n)
+            .map(|i| task(i, "building", &"é".repeat(120)))
+            .collect::<Vec<_>>()
+    };
     let full = tasks_body(rows(200));
     assert!(full.len() > 64 * 1024, "el cuerpo mide {}", full.len());
     let (list, _) = ask("200 OK", full, 8192);
@@ -151,12 +161,27 @@ fn daemon_caido_401_o_respuesta_no_valida_dan_un_motivo_cerrado_sin_texto_del_da
         ),
         (reflected("500 Internal Server Error", SENTINEL), bad),
         (reflected("200 OK", &format!("no es json {SENTINEL}")), bad),
-        (reflected("200 OK", &json!({ "tasks": SENTINEL }).to_string()), bad),
+        (
+            reflected("200 OK", &json!({ "tasks": SENTINEL }).to_string()),
+            bad,
+        ),
         // Un solo dato fuera de contrato invalida toda la lista: nunca una lista a medias.
-        (reflected("200 OK", &tasks_body(vec![task(1, "Plan_Review", "x")])), bad),
-        (reflected("200 OK", &tasks_body(vec![task(0, "draft", "x")])), bad),
-        (reflected("200 OK", &tasks_body(vec![task(1, "draft", SENTINEL)])), bad),
-        (reflected("200 OK", &tasks_body(vec![json!({ "number": 1 })])), bad),
+        (
+            reflected("200 OK", &tasks_body(vec![task(1, "Plan_Review", "x")])),
+            bad,
+        ),
+        (
+            reflected("200 OK", &tasks_body(vec![task(0, "draft", "x")])),
+            bad,
+        ),
+        (
+            reflected("200 OK", &tasks_body(vec![task(1, "draft", SENTINEL)])),
+            bad,
+        ),
+        (
+            reflected("200 OK", &tasks_body(vec![json!({ "number": 1 })])),
+            bad,
+        ),
     ];
     for (list, expected) in &cases {
         assert_eq!(clean(list), *expected);
