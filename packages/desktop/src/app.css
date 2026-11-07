@@ -30,7 +30,87 @@ body {
   height: var(--logo-mark);
 }
 
+.muted {
+  color: var(--ink-muted);
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-self: stretch;
+}
+
+.task-group h2,
+.task-group summary {
+  margin: 0 0 var(--space-2);
+  font: 600 13px / 20px var(--font-sans);
+  color: var(--ink-muted);
+}
+
+.task-group summary {
+  cursor: pointer;
+}
+
+.task-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  font: 400 13px / 20px var(--font-sans);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Glifo y estado forman una pieza, con el color del estado (manual de marca). */
+.task-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* Ancho fijo: el del estado más largo (plan_review, 11 caracteres) más el glifo y su hueco. */
+  flex: none;
+  width: calc(11ch + 1em + var(--space-1));
+  font: 400 12.5px / 20px var(--font-mono);
+}
+
+.tone-human {
+  color: var(--human);
+}
+.tone-agent {
+  color: var(--agent);
+}
+.tone-ink-muted {
+  color: var(--ink-muted);
+}
+.tone-done {
+  color: var(--done);
+}
+
+.task-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-flag {
+  flex: none;
+  color: var(--human);
+}
+
 /* Identificadores (versión, commit): font-mono, estilo `code` de la tipografía. */
 .ident {
   font: 400 14px / 22px var(--font-mono);
+}
+
+/* Densidad de escritorio (manual de marca): mono a 12,5 / 20 px dentro de las filas. */
+.task-row .ident {
+  flex: none;
+  font: 400 12.5px / 20px var(--font-mono);
 }
