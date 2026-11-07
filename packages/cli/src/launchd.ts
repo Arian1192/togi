@@ -1,8 +1,20 @@
+import { execFile } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 export const LABEL = "com.togi.daemon";
+
+/** Ejecuta un programa sin shell y devuelve su salida; lo cambian los tests. */
+export type Runner = (cmd: string, args: string[]) => Promise<string>;
+
+export const realRun: Runner = (cmd, args) =>
+  new Promise((resolve, reject) => {
+    execFile(cmd, args, (error, stdout, stderr) => {
+      if (error === null) resolve(stdout);
+      else reject(new Error((stderr || error.message).trim().slice(-500)));
+    });
+  });
 
 export const defaultAgentsDir = (): string => join(homedir(), "Library", "LaunchAgents");
 export const plistPath = (agentsDir: string): string => join(agentsDir, `${LABEL}.plist`);

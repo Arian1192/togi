@@ -15,6 +15,9 @@ export const DEV_RELEASE = "dev";
 const TAG = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 const COMMIT = /^[0-9a-f]{40}$/;
 
+/** ¿Es una etiqueta segura para usarla como ruta y como argumento de git? */
+export const isValidTag = (tag: string): boolean => TAG.test(tag) && !tag.includes("..");
+
 /** La raíz de este código: la instalación, o el repo si se ejecuta sin instalar. */
 export const CODE_ROOT = new URL("../../../../", import.meta.url).pathname;
 
@@ -23,7 +26,7 @@ export function readRelease(root: string = CODE_ROOT): Release | undefined {
   try {
     const data = JSON.parse(readFileSync(join(root, RELEASE_FILE), "utf8")) as Partial<Release>;
     const { tag, commit } = data;
-    if (typeof tag !== "string" || !TAG.test(tag) || tag.includes("..")) return undefined;
+    if (typeof tag !== "string" || !isValidTag(tag)) return undefined;
     if (typeof commit !== "string" || !COMMIT.test(commit)) return undefined;
     return { tag, commit };
   } catch {
