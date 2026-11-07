@@ -6,11 +6,23 @@ import { test } from "node:test";
 const ROOT = join(import.meta.dirname, "..", "..");
 const read = (...parts: string[]) => readFileSync(join(ROOT, ...parts), "utf8");
 
-test("package.json usa versiones exactas, sin ^ ni ~ ni rangos", () => {
+// Las dependencias externas, en versión exacta; los paquetes del monorrepo (@togi/…), con workspace:*.
+const isPinned = (name: string, version: string) =>
+  name.startsWith("@togi/") ? version === "workspace:*" : /^\d+\.\d+\.\d+$/.test(version);
+
+test("package.json usa versiones exactas, sin ^ ni ~ ni rangos, y workspace:* solo en @togi/…", () => {
   const pkg = JSON.parse(read("package.json")) as Record<string, Record<string, string>>;
-  const versions = Object.values({ ...pkg.dependencies, ...pkg.devDependencies });
-  assert.ok(versions.length > 0);
-  for (const v of versions) assert.match(v, /^\d+\.\d+\.\d+$/);
+  const deps = Object.entries({ ...pkg.dependencies, ...pkg.devDependencies });
+  assert.ok(deps.length > 0);
+  for (const [name, version] of deps) assert.ok(isPinned(name, version), `${name}: ${version}`);
+});
+
+test("workspace:* solo se admite en @togi/…; las externas exigen versión exacta", () => {
+  assert.ok(isPinned("@togi/core", "workspace:*"));
+  assert.ok(isPinned("react", "19.3.1"));
+  assert.ok(!isPinned("react", "workspace:*"));
+  assert.ok(!isPinned("react", "^19.3.1"));
+  assert.ok(!isPinned("@togi/core", "^0.0.0"));
 });
 
 test("Cargo.toml fija cada dependencia con =, y rust-toolchain.toml fija la versión", () => {

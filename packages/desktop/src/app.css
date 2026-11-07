@@ -1,14 +1,36 @@
-:root {
-  color-scheme: dark light;
-}
-
 body {
   margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px / 24px var(--font-sans);
 }
 
 .shell {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6);
+}
+
+/*
+ * Logotipo (manual de marca): el monograma mide 1,2 veces el cuerpo de la letra y la separación es
+ * 0,28 veces el monograma. Todo en em del cuerpo del logotipo, así que escala con font-size.
+ */
+.logo {
+  --logo-mark: 1.2em;
+  display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 24px;
+  gap: calc(var(--logo-mark) * 0.28);
+  font: 600 40px / 1 var(--font-display);
+}
+
+.monogram {
+  width: var(--logo-mark);
+  height: var(--logo-mark);
+}
+
+/* Identificadores (versión, commit): font-mono, estilo `code` de la tipografía. */
+.ident {
+  font: 400 14px / 22px var(--font-mono);
 }
