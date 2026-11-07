@@ -104,6 +104,7 @@ export type TaskEvent =
   | E<"base.integrated", { baseSha: string; result: "clean" | "conflict"; touchesTaskFiles: boolean }>
   | E<"decision.recorded", Decision>                                 // gates 1 y 2
   | E<"task.merged", { prNumber: number; mergeSha: string }>
+  | E<"task.completed", { prNumber: number }>                        // building → merged; un humano marca como hecha una tarea construida fuera de togi. prNumber lo da el humano y no se verifica (togi no accede a GitHub)
   | E<"task.failed", { cycle: number; failedGates: GateRunId[] }>
   | E<"failure.classified", { reason: Reason }>
   | E<"task.rejected", { reason: Reason }>
@@ -305,7 +306,7 @@ Qué entra en cada rebanada, sin cambiar el esquema:
 
 | Rebanada | Eventos | Proyecciones |
 | --- | --- | --- |
-| 1. Tareas y log | `task.created`, `task.edited`, `task.submitted`, `task.rejected` | `tasks` |
+| 1. Tareas y log | `task.created`, `task.edited`, `task.submitted`, `task.rejected`, `task.completed` (versión 1; se añadió después, sin tocar el esquema) | `tasks` |
 | 2. Planificación | `session.*`, `plan.proposed`, `plan.retry_requested`, `decision.recorded` (gate 1) | `plans`, `sessions`, `decisions` |
 | 3. Construcción y verificación | `workspace.*`, `build.submitted`, `gate.completed`, `verification.completed`, `task.failed`, `failure.classified`, `task.risk_changed` | `workspaces`, `gate_runs`, `unclassified_failures` |
 | 4. PR y merge | `pr.opened`, `base.integrated`, `decision.recorded` (gate 2), `task.merged` | `shadow_agreement` (desde el paso 8) |

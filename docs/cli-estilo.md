@@ -183,7 +183,15 @@ Filtro por fecha en envíos
 ...
 ```
 
-**Confirmaciones.** `togi task reject` pide confirmación nombrando la tarea; `--yes` la omite. Rechazar es definitivo: la tarea queda cerrada. Crear, editar y enviar no preguntan, porque no cierran nada.
+**Confirmaciones.** `togi task reject` y `togi task done` piden confirmación nombrando la tarea; `--yes` la omite, y fuera de una terminal hace falta `--yes` (sale con 2). Rechazar y marcar como hecha son definitivos: la tarea queda cerrada. Crear, editar y enviar no preguntan, porque no cierran nada.
+
+**`togi task done 12 --pr 125`** marca como hecha (`merged`) una tarea en `building` que construiste fuera de togi. El número del PR es una referencia tuya: togi no tiene acceso a GitHub y no comprueba que exista, y la pregunta de confirmación y el mensaje final lo dicen.
+
+```
+$ togi task done 12 --pr 125
+¿Marcar #12 «Exportar CSV» como hecha, con el PR #125? Es definitivo: la tarea queda en merged y togi no comprueba el PR. [s/N] s
+✓ Hecha #12 · PR #125 (referencia tuya; togi no la verifica)
+```
 
 Si respondes que no (o dejas la respuesta vacía), la CLI imprime «Cancelado. No se ha cambiado nada.» y sale con 0: cancelar no es un error.
 

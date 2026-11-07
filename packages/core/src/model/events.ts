@@ -46,7 +46,12 @@ export type TaskEvent =
   | E<"plan.retry_requested", Record<string, never>>
   | E<"plan.proposed", Plan>
   | E<"decision.recorded", PlanDecision>
-  | E<"task.rejected", { reason: Reason }>;
+  | E<"task.rejected", { reason: Reason }>
+  /**
+   * Un humano marca como hecha una tarea construida fuera de togi; building → merged. `prNumber` es una
+   * referencia que da el humano: togi no tiene acceso a GitHub y no la verifica.
+   */
+  | E<"task.completed", { prNumber: number }>;
 
 /** Stream `admin`: operaciones de administración que no pertenecen a una tarea. */
 export type AdminEvent = E<

@@ -38,6 +38,7 @@ Los comandos son `POST` sobre subrecursos de acción y cada uno corresponde a un
 | `POST /v1/tasks` | Crea la tarea en `draft` | `201` con la tarea |
 | `PATCH /v1/tasks/:n` | Edita título, descripción o criterio (solo en `draft`) | `200` |
 | `POST /v1/tasks/:n/submit` | `draft` → `planning` | `200` |
+| `POST /v1/tasks/:n/done` | `building` → `merged`: un humano marca como hecha una tarea construida fuera de togi. Cuerpo `{ "prNumber": n }`, una referencia que da el humano y que togi no verifica (no accede a GitHub) | `200` |
 | `POST /v1/tasks/:n/reject` | Rechaza, con motivo obligatorio | `200` |
 | `GET /v1/tasks?state=&limit=` | Lista desde la proyección `tasks` | `200` |
 | `GET /v1/tasks/:n` | Detalle, con los textos descifrados | `200` |
@@ -94,6 +95,7 @@ togi task new "Añadir filtro por fecha" --risk low --repo Arian1192/promos [--b
 togi task edit 12 [--title …] [--criteria-file criterio.md]   # sin flags abre $EDITOR
 togi task submit 12
 togi task reject 12 --category scope --reason "…"
+togi task done 12 --pr 125 [--yes]                            # el PR es una referencia tuya; togi no la verifica
 togi task show 12 [--events]
 togi status [--state draft]
 togi watch                                                    # sigue el SSE

@@ -54,6 +54,14 @@ export function decide(
       }
       return [{ ...meta, type: "task.rejected", payload: { reason: { category, text } } }];
     }
+    case "completeTask": {
+      // Una tarea construida fuera de togi, ya con su plan aprobado. El PR lo da el humano y no se verifica.
+      if (cmd.actor.kind !== "human") return notAllowed("human");
+      if (view.state !== "building") {
+        return domainError("invalid_state", "solo se marca como hecha una tarea en building");
+      }
+      return [{ ...meta, type: "task.completed", payload: { prNumber: cmd.prNumber } }];
+    }
     case "requestPlanRetry": {
       // Un humano reintenta sin límite. El sistema solo reintenta un fallo pasajero, una vez (U5).
       if (cmd.actor.kind === "system") {

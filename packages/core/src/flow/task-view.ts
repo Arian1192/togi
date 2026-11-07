@@ -55,6 +55,8 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
       return view.exists ? { ...view, state: "planning" } : view;
     case "task.rejected":
       return view.exists ? { ...view, state: "rejected" } : view;
+    case "task.completed":
+      return view.exists ? { ...view, state: "merged" } : view;
     case "plan.retry_requested": {
       // La tarea sigue donde estaba. Solo cuenta el reintento automático; uno humano reinicia la cuenta.
       if (!view.exists) return view;
