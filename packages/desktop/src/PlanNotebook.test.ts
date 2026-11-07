@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { REASON_CATEGORIES } from "@togi/core";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { type PlanData, PlanNotebook, type TaskCover } from "./PlanNotebook.ts";
+import { type PlanData, PlanNotebook, ReasonForm, type TaskCover } from "./PlanNotebook.ts";
+import type { FormState } from "./planDecision.ts";
 
 const task = (extra: Partial<TaskCover> = {}): TaskCover => ({
   number: 12,
@@ -27,8 +29,9 @@ const plan = (extra: Partial<PlanData> = {}): PlanData => ({
   estimatedLines: { production: 40, tests: 90 },
   ...extra,
 });
-const html = (t = task(), p = plan()) =>
-  renderToStaticMarkup(createElement(PlanNotebook, { task: t, plan: p }));
+const html = (t = task(), p = plan(), busy = false) =>
+  renderToStaticMarkup(createElement(PlanNotebook, { task: t, plan: p, busy, onDecide: () => {} }));
+const count = (out: string, re: RegExp) => (out.match(re) ?? []).length;
 
 test("la portada lleva la línea de contexto en mono, el título y el criterio como entradilla", () => {
   assert.match(
@@ -47,7 +50,7 @@ test("un título o criterio borrado o ausente se ve con un marcador, no se ocult
   assert.match(html(task({ risk: "raro" })), /riesgo desconocido/);
 });
 
-test("hay tres secciones numeradas con kanji, en orden", () => {
+test("hay cuatro secciones numeradas con kanji, en orden", () => {
   const sections = [
     ...html().matchAll(/<h2><span class="kanji" aria-hidden="true">(.)<\/span>([^<]+)<\/h2>/g),
   ];
@@ -57,6 +60,7 @@ test("hay tres secciones numeradas con kanji, en orden", () => {
       ["一", "El enfoque"],
       ["二", "Los ficheros"],
       ["三", "El tamaño"],
+      ["四", "La decisión"],
     ],
   );
 });
@@ -102,6 +106,47 @@ test("el tamaño muestra los números y sus límites", () => {
   assert.match(html(), /producción 40 de 200 · tests 90 · total 130 de 500/);
 });
 
-test("la vista de lectura no trae botones: la decisión es de la parte siguiente", () => {
-  assert.doesNotMatch(html(), /<button/);
+test("sin decidir hay un único botón principal, con verbo, y dos secundarios", () => {
+  const out = html();
+  assert.equal(count(out, /btn btn-primary/g), 1);
+  assert.match(out, /btn btn-primary">Aprobar el plan</);
+  assert.match(out, /btn btn-secondary">Pedir cambios</);
+  assert.match(out, /btn btn-secondary">Rechazar el plan</);
+  assert.equal(count(out, /disabled/g), 0);
+});
+
+test("un plan que pasa de los límites no se puede aprobar y dice por qué al lado", () => {
+  const out = html(task(), plan({ estimatedLines: { production: 250, tests: 10 } }));
+  assert.match(
+    out,
+    /No se puede aprobar: el plan supera las 200 líneas de producción\. Pide cambios o rechaza\./,
+  );
+  assert.match(out, /<button type="button" class="btn btn-primary" disabled="">Aprobar el plan</);
+  assert.equal(count(out, /disabled/g), 1);
+});
+
+test("ocupado, todos los botones se desactivan", () => {
+  assert.equal(count(html(task(), plan(), true), /disabled=""/g), 3);
+});
+
+const form = (state: FormState) =>
+  renderToStaticMarkup(
+    createElement(ReasonForm, { state, busy: false, dispatch: () => {}, onSubmit: () => {} }),
+  );
+
+test("el formulario ofrece las categorías de core y el verbo de cada decisión", () => {
+  const out = form({ kind: "reject", category: "", text: "" });
+  const options = [...out.matchAll(/<option value="([^"]*)"/g)].map((m) => m[1]);
+  assert.deepEqual(options, ["", ...REASON_CATEGORIES]);
+  assert.match(out, /btn btn-primary" disabled="">Rechazar el plan</);
+  assert.equal(count(out, /btn btn-primary/g), 1);
+  assert.match(out, /btn btn-secondary">Cancelar</);
+  assert.match(form({ kind: "request_changes", category: "", text: "" }), />Enviar los cambios</);
+});
+
+test("el botón del formulario se activa con un motivo válido", () => {
+  const out = form({ kind: "request_changes", category: "logic", text: "no cubre el caso vacío" });
+  assert.match(out, /<button type="button" class="btn btn-primary">Enviar los cambios</);
+  assert.match(out, /<textarea[^>]*maxLength="5000"/);
+  assert.match(out, /<option value="logic" selected="">Lógica</);
 });
