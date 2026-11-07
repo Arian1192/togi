@@ -1,18 +1,24 @@
-//! Comando de lectura del plan vigente de una tarea (ADR-010 §3). Pide `GET /v1/tasks/:n/plan` por
-//! el socket del daemon y devuelve solo lo que pinta la vista, con el texto sin transformar y sin
-//! el token. El webview solo pasa el número de tarea: la ruta y el método los pone este módulo.
+//! Comandos del plan (ADR-010 §3): leer el plan vigente de una tarea y decidir sobre él. El webview
+//! solo pasa número de tarea, versión vista, categoría y motivo; la ruta, el método y `If-Match`
+//! los pone este módulo. Aprobar y rechazar piden confirmación con un diálogo nativo desde Rust, que
+//! un script del webview no puede pulsar, y sin confirmar no se llama al daemon.
 
 use crate::daemon::{connection, home, request, Reply};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::path::Path;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 const MAX_BODY: usize = 1024 * 1024;
 const MAX_ITEMS: usize = 500;
 const MAX_PATH: usize = 1024;
 const MAX_APPROACH: usize = 100_000;
+/// El límite del motivo en el daemon, que cuenta unidades UTF-16.
+const MAX_REASON: usize = 5_000;
 /// El mayor entero que JavaScript representa sin perder precisión.
 const MAX_SAFE: u64 = (1 << 53) - 1;
+/// `REASON_CATEGORIES` de `@togi/core`; plan-boundary.rs vigila que sigan siendo las mismas.
+pub const CATEGORIES: [&str; 6] = ["misunderstanding", "scope", "logic", "tests", "style", "other"];
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct PlanFile {
@@ -38,12 +44,37 @@ pub struct PlanView {
     pub estimated_lines: Lines,
 }
 
-/// `version` es la del `ETag` de la tarea: la que una decisión devolverá en `If-Match`.
+/// `version` es la del `ETag` de la tarea: la que las decisiones devuelven en `If-Match`.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
 pub enum PlanRead {
     Ok { plan: PlanView, version: u64 },
     Unreachable { reason: &'static str },
+}
+
+/// Resultado de una decisión. `PlanChanged` es un 412: hay que releer el plan antes de decidir, y
+/// no se reintenta. Los motivos son cerrados, nunca texto del daemon.
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum Decision {
+    Ok,
+    PlanChanged,
+    Cancelled,
+    Failed { reason: &'static str },
+}
+
+fn failed(reason: &'static str) -> Decision {
+    Decision::Failed { reason }
+}
+
+/// Motivo cerrado para un código HTTP que no es el esperado.
+fn closed_reason(code: u16) -> &'static str {
+    match code {
+        401 => "unauthorized",
+        404 => "not_found",
+        409 => "conflict",
+        _ => "bad_response",
+    }
 }
 
 fn valid_id(n: u64) -> bool {
@@ -70,9 +101,7 @@ pub fn plan_at(home: &Path, number: u64) -> PlanRead {
                 _ => unreachable("bad_response"),
             }
         }
-        Ok(Reply { code: 401, .. }) => unreachable("unauthorized"),
-        Ok(Reply { code: 404, .. }) => unreachable("not_found"),
-        Ok(_) => unreachable("bad_response"),
+        Ok(reply) => unreachable(closed_reason(reply.code)),
         Err(reason) => unreachable(reason),
     }
 }
@@ -113,8 +142,106 @@ fn parse(body: &[u8], token: &str) -> Option<PlanView> {
     })
 }
 
-/// Tercer comando que ve el webview, junto a `get_daemon_status` y `list_tasks`. El trabajo
-/// bloqueante va a otro hilo.
+#[derive(Debug, PartialEq)]
+pub struct Reason {
+    category: &'static str,
+    text: String,
+}
+
+impl Reason {
+    /// Categoría de la lista cerrada y motivo no vacío, recortado y de a lo sumo `MAX_REASON`.
+    pub fn new(category: &str, text: &str) -> Option<Reason> {
+        let category = CATEGORIES.iter().find(|c| **c == category)?;
+        let text = text.trim();
+        (!text.is_empty() && text.encode_utf16().count() <= MAX_REASON)
+            .then(|| Reason { category, text: text.to_owned() })
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Action {
+    Approve,
+    RequestChanges(Reason),
+    Reject(Reason),
+}
+
+impl Action {
+    /// La ruta del daemon, la pregunta de confirmación (`None`: no hace falta) y el cuerpo.
+    fn parts(&self, number: u64) -> (&'static str, Option<String>, Vec<u8>) {
+        let body = |r: &Reason| json!({ "reason": { "category": r.category, "text": r.text } }).to_string();
+        match self {
+            Action::Approve => {
+                let question = format!("¿Aprobar el plan de la tarea {number}? El agente empezará a construir.");
+                ("approve", Some(question), Vec::new())
+            }
+            Action::RequestChanges(r) => ("request-changes", None, body(r).into_bytes()),
+            Action::Reject(r) => {
+                let question = format!("¿Rechazar el plan de la tarea {number}? La tarea queda rechazada.");
+                ("reject", Some(question), body(r).into_bytes())
+            }
+        }
+    }
+}
+
+/// Quien confirma una acción. En la app es un diálogo nativo; en los tests, un doble.
+pub trait Confirm {
+    fn ask(&self, question: &str) -> bool;
+}
+
+/// Diálogo nativo del sistema, abierto desde Rust: ningún permiso de diálogo llega al webview, así
+/// que un script de la página no puede ni abrirlo ni pulsarlo. Bloquea: va en un hilo aparte.
+struct Native(tauri::AppHandle);
+
+impl Confirm for Native {
+    fn ask(&self, question: &str) -> bool {
+        self.0
+            .dialog()
+            .message(question)
+            .title("togi")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom("Confirmar".into(), "Cancelar".into()))
+            .blocking_show()
+    }
+}
+
+/// Decide sobre el plan de `number` que la persona vio en `version` (el `ETag` de `plan_at`). Pide
+/// confirmación antes de llamar al daemon y no la pide si no puede conectar. Un 412 es `PlanChanged`
+/// y no se reintenta.
+pub fn decide_at(home: &Path, number: u64, version: u64, action: &Action, confirm: &dyn Confirm) -> Decision {
+    if !valid_id(number) || !valid_id(version) {
+        return failed("invalid_request");
+    }
+    let (token, socket) = match connection(home) {
+        Ok(connection) => connection,
+        Err(reason) => return failed(reason),
+    };
+    let (verb, question, body) = action.parts(number);
+    if question.is_some_and(|q| !confirm.ask(&q)) {
+        return Decision::Cancelled;
+    }
+    let path = format!("/v1/tasks/{number}/plan/{verb}");
+    let if_match = format!("\"{version}\"");
+    match request(&socket, &token, "POST", &path, &[("If-Match", &if_match)], Some(&body), MAX_BODY) {
+        Ok(Reply { code: 200, .. }) => Decision::Ok,
+        Ok(Reply { code: 412, .. }) => Decision::PlanChanged,
+        Ok(reply) => failed(closed_reason(reply.code)),
+        Err(reason) => failed(reason),
+    }
+}
+
+/// El trabajo bloqueante (red y diálogo) va a otro hilo para no congelar la ventana.
+async fn decide(app: tauri::AppHandle, number: u64, version: u64, action: Option<Action>) -> Decision {
+    let Some(action) = action else {
+        return failed("invalid_request");
+    };
+    let Some(home) = home() else {
+        return failed("no_home");
+    };
+    tauri::async_runtime::spawn_blocking(move || decide_at(&home, number, version, &action, &Native(app)))
+        .await
+        .unwrap_or_else(|_| failed("internal"))
+}
+
 #[tauri::command]
 pub async fn read_plan(number: u64) -> PlanRead {
     let Some(home) = home() else {
@@ -123,4 +250,28 @@ pub async fn read_plan(number: u64) -> PlanRead {
     tauri::async_runtime::spawn_blocking(move || plan_at(&home, number))
         .await
         .unwrap_or(PlanRead::Unreachable { reason: "internal" })
+}
+
+/// Pide confirmación con un diálogo nativo.
+#[tauri::command]
+pub async fn approve_plan(app: tauri::AppHandle, number: u64, version: u64) -> Decision {
+    decide(app, number, version, Some(Action::Approve)).await
+}
+
+/// No pide confirmación: pedir cambios no cierra la tarea.
+#[tauri::command]
+pub async fn request_plan_changes(
+    app: tauri::AppHandle,
+    number: u64,
+    version: u64,
+    category: String,
+    text: String,
+) -> Decision {
+    decide(app, number, version, Reason::new(&category, &text).map(Action::RequestChanges)).await
+}
+
+/// Pide confirmación con un diálogo nativo.
+#[tauri::command]
+pub async fn reject_plan(app: tauri::AppHandle, number: u64, version: u64, category: String, text: String) -> Decision {
+    decide(app, number, version, Reason::new(&category, &text).map(Action::Reject)).await
 }

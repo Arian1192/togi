@@ -45,15 +45,38 @@ test("las capacidades solo permiten los comandos concretos del daemon y escuchar
     "allow-list-tasks",
     "allow-watch-events",
     "allow-read-plan",
+    "allow-approve-plan",
+    "allow-request-plan-changes",
+    "allow-reject-plan",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
   ]);
 });
 
+test("ni tauri-plugin-dialog ni tauri-plugin-fs dan ningún permiso al webview: el diálogo es de Rust", () => {
+  const capability = JSON.parse(read(TAURI, "capabilities", "default.json")) as {
+    permissions: string[];
+  };
+  // Los únicos permisos con «:» son los de eventos del núcleo; los de plugins serían «dialog:…» o «fs:…».
+  assert.deepEqual(
+    capability.permissions.filter((p) => p.includes(":") && !p.startsWith("core:event:")),
+    [],
+  );
+  assert.deepEqual(
+    capability.permissions.filter((p) => /dialog|(^|[:-])fs([:-]|$)/.test(p)),
+    [],
+  );
+  assert.equal((config as Record<string, unknown>).plugins, undefined);
+  const lib = read(TAURI, "src", "lib.rs");
+  assert.match(lib, /\.plugin\(tauri_plugin_dialog::init\(\)\)/);
+  assert.doesNotMatch(lib, /tauri_plugin_fs/);
+  assert.match(read(TAURI, "Cargo.toml"), /^tauri-plugin-dialog = \{ version = "=\d+\.\d+\.\d+"/m);
+});
+
 test("los comandos están declarados en build.rs y son los únicos registrados en el invoke handler", () => {
   assert.match(
     read(TAURI, "build.rs"),
-    /\.commands\(&\["get_daemon_status", "list_tasks", "watch_events", "read_plan"\]\)/,
+    /\.commands\(&\[\s*"get_daemon_status",\s*"list_tasks",\s*"watch_events",\s*"read_plan",\s*"approve_plan",\s*"request_plan_changes",\s*"reject_plan",?\s*\]\)/,
   );
   const handler = /generate_handler!\[([^\]]*)\]/.exec(read(TAURI, "src", "lib.rs"))?.[1];
   assert.deepEqual(
@@ -61,6 +84,14 @@ test("los comandos están declarados en build.rs y son los únicos registrados e
       ?.split(",")
       .map((c) => c.trim())
       .filter(Boolean),
-    ["daemon::get_daemon_status", "tasks::list_tasks", "events::watch_events", "plan::read_plan"],
+    [
+      "daemon::get_daemon_status",
+      "tasks::list_tasks",
+      "events::watch_events",
+      "plan::read_plan",
+      "plan::approve_plan",
+      "plan::request_plan_changes",
+      "plan::reject_plan",
+    ],
   );
 });
