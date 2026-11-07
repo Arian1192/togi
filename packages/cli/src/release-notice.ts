@@ -1,5 +1,16 @@
 import { DEV_RELEASE } from "@togi/daemon/release";
+import { clean } from "./format.ts";
 import { MESSAGES } from "./messages.ts";
+
+/**
+ * La versión que enseña `togi daemon status`: la etiqueta instalada con su commit corto
+ * (`v0.2.0 (0123456)`), o la del package.json si el daemon corre desde el repo o es muy viejo.
+ */
+export function versionText(health: { daemon: string; release?: string; commit?: string }): string {
+  const { release, commit } = health;
+  if (release === undefined || release === DEV_RELEASE) return clean(health.daemon);
+  return commit === undefined ? clean(release) : `${clean(release)} (${clean(commit).slice(0, 7)})`;
+}
 
 /**
  * El aviso de que el daemon y la CLI son versiones distintas, o `undefined` si no procede: un daemon
