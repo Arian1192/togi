@@ -42,3 +42,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: node --test "packages/worker/src/**/*.test.ts" "packages/daemon/src/worker/**/*.test.ts" packages/daemon/src/orchestrator/runtime-paths.test.ts "packages/*/src/**/*.srt.test.ts"
+
+  rust:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # rustup no instala solo el toolchain de rust-toolchain.toml
+      - run: rustup toolchain install 1.99.0 --profile minimal
+      # Tauri exige que frontendDist exista al compilar. Se quita en A1b, cuando `pnpm build` lo genere.
+      - run: mkdir -p packages/desktop/dist
+      - run: cargo test --locked
+        working-directory: packages/desktop/src-tauri
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo audit
+        working-directory: packages/desktop/src-tauri
