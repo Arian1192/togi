@@ -3,7 +3,7 @@
 # Uso: tools/merge-pr.sh <número del PR>
 set -euo pipefail
 
-REQUIRED=("check (22.18.0)" "check (24.22.1)" "sandbox-macos")
+REQUIRED=("check (22.18.0)" "check (24.22.1)" "sandbox-macos" "rust")
 pr="${1:?Uso: tools/merge-pr.sh <número del PR>}"
 
 state=$(gh pr view "$pr" --json state --jq '.state')
