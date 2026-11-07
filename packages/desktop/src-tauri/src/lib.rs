@@ -1,4 +1,5 @@
 pub mod daemon;
+pub mod events;
 pub mod tasks;
 
 pub fn run() {
