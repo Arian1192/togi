@@ -32,7 +32,17 @@ interface SessionRow {
   failure_reason: string | null;
 }
 
+interface EventRow {
+  seq: number;
+  at: string;
+  kind: string;
+  payload: string;
+}
+
 const ERASED = "[borrado]";
+const COUNT = /^\d+$/;
+const DEFAULT_PAGE = 50;
+const MAX_PAGE = 200;
 
 /**
  * Consultas de planes y sesiones. Salen de las proyecciones; el enfoque se descifra al leerlo y
@@ -51,6 +61,12 @@ export function planRoutes(
   const plans = db.prepare("SELECT * FROM plans WHERE task_number = ? ORDER BY plan_version DESC");
   const sessions = db.prepare(
     "SELECT * FROM sessions WHERE task_number = ? ORDER BY started_at, session_id",
+  );
+  const sessionState = db.prepare(
+    "SELECT state FROM sessions WHERE task_number = ? AND session_id = ?",
+  );
+  const trajectory = db.prepare(
+    "SELECT seq, at, kind, payload FROM agent_events WHERE session_id = ? AND seq > ? ORDER BY seq LIMIT ?",
   );
   const summary = (p: PlanRow) => ({
     planVersion: p.plan_version,
@@ -86,6 +102,47 @@ export function planRoutes(
         });
       } catch {
         return problem(500, "integrity_error", "no se pudo leer el enfoque del plan");
+      }
+    })
+    .get("/v1/tasks/:n/sessions/:id/trajectory", async (c) => {
+      if (exists(c.req.param("n")) === undefined) {
+        return problem(404, "task_not_found", "tarea inexistente");
+      }
+      const session = sessionState.get(Number(c.req.param("n")), c.req.param("id")) as
+        | { state: string }
+        | undefined;
+      if (session === undefined) return problem(404, "session_not_found", "sesión inexistente");
+      const rawAfter = c.req.query("after") ?? "0";
+      const rawLimit = c.req.query("limit") ?? String(DEFAULT_PAGE);
+      const after = COUNT.test(rawAfter) ? Number(rawAfter) : -1;
+      const limit = COUNT.test(rawLimit) ? Number(rawLimit) : 0;
+      if (after < 0 || !Number.isSafeInteger(after)) {
+        return problem(400, "validation_error", "after debe ser un entero >= 0");
+      }
+      if (limit < 1 || limit > MAX_PAGE) {
+        return problem(400, "validation_error", `limit debe ser un entero entre 1 y ${MAX_PAGE}`);
+      }
+      if (reader === undefined) return problem(503, "not_configured", "consultas no disponibles");
+      // Una fila de más dice si hay otra página sin contar toda la trayectoria.
+      const rows = trajectory.all(c.req.param("id"), after, limit + 1) as EventRow[];
+      const page = rows.slice(0, limit);
+      try {
+        const events = await Promise.all(
+          page.map(async (e) => {
+            const ref = JSON.parse(e.payload) as BlobRef;
+            const erased = keyExists.get(ref.keyId) === undefined;
+            const content = erased ? ERASED : (JSON.parse(await reader(ref)) as unknown);
+            return { seq: e.seq, at: e.at, kind: e.kind, content, contentErased: erased };
+          }),
+        );
+        return c.json({
+          events,
+          nextAfter: page.at(-1)?.seq ?? after,
+          hasMore: rows.length > limit,
+          sessionState: session.state,
+        });
+      } catch {
+        return problem(500, "integrity_error", "no se pudo leer un evento de la trayectoria");
       }
     })
     .get("/v1/tasks/:n/sessions", (c) => {
