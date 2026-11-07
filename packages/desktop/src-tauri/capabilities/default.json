@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "El webview solo puede pedir el estado del daemon.",
+  "description": "El webview solo puede pedir el estado del daemon y la lista de tareas.",
   "windows": ["main"],
-  "permissions": ["allow-get-daemon-status"]
+  "permissions": ["allow-get-daemon-status", "allow-list-tasks"]
 }
