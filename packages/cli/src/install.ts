@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { paths } from "@togi/daemon/config";
 import { CODE_ROOT, isValidTag, RELEASE_FILE, readRelease } from "@togi/daemon/release";
 import { CliError, usageError } from "./errors.ts";
-import { LABEL, plistPath, type Runner, renderPlist } from "./launchd.ts";
+import { LABEL, managesHome, plistPath, type Runner, renderPlist } from "./launchd.ts";
 import { stopDaemon } from "./lifecycle.ts";
 
 export interface InstallDeps {
@@ -25,6 +25,11 @@ export interface InstallDeps {
   platform: NodeJS.Platform;
   /** Origen del que se clona; sin él, el `origin` del código que se está ejecutando. */
   source?: string;
+  /**
+   * Cuánto esperar a que macOS quite el servicio tras un `bootout`, y cuánto reintentar un `bootstrap`
+   * que da el error 5. Lo pone el comando real; sin él (los tests) no se espera ni se reintenta.
+   */
+  settle?: { pollMs: number; limitMs: number };
 }
 
 export const supportDirOf = (home: string = homedir()): string =>
@@ -91,20 +96,54 @@ function writeLauncher(release: string, deps: InstallDeps): void {
   chmodSync(launcher, 0o755);
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** El error 5 de `launchctl bootstrap` justo después de un `bootout`: macOS aún no ha quitado el servicio. */
+const STILL_REMOVING = /Bootstrap failed: 5\b|Input\/output error/;
+
+/**
+ * Descarga el servicio, espera (con tope) a que macOS lo haya quitado de verdad y lo carga, reintentando
+ * si `bootstrap` da el error 5. Un `bootstrap` inmediato tras el `bootout` falla.
+ */
+async function reload(deps: InstallDeps, plist: string): Promise<void> {
+  const domain = `gui/${deps.uid}`;
+  const service = `${domain}/${LABEL}`;
+  const { run, settle } = deps;
+  await run("launchctl", ["bootout", service]).catch(() => "");
+  if (settle === undefined) return void (await run("launchctl", ["bootstrap", domain, plist]));
+  const end = Date.now() + settle.limitMs;
+  while (Date.now() < end) {
+    const present = await run("launchctl", ["print", service]).then(
+      () => true,
+      () => false,
+    );
+    if (!present) break;
+    await sleep(settle.pollMs);
+  }
+  for (;;) {
+    try {
+      return void (await run("launchctl", ["bootstrap", domain, plist]));
+    } catch (error) {
+      if (!STILL_REMOVING.test(message(error)) || Date.now() >= end) throw error;
+      await sleep(settle.pollMs);
+    }
+  }
+}
+
 /** Pone el lanzador y el plist apuntando a `release` y (re)carga el LaunchAgent. */
 async function activate(home: string, release: string, deps: InstallDeps): Promise<void> {
-  const { run, agentsDir } = deps;
+  const { agentsDir } = deps;
+  // Si launchd ya gestiona este daemon, lo para el `bootout`: `stopDaemon` solo conoce el que arrancó
+  // `togi daemon start` (fichero de pid) y rechazaría el de launchd con daemon_pid_mismatch.
+  const managed = managesHome(home, agentsDir);
   writeLauncher(release, deps);
   // Un daemon manual choca con el socket del que va a gestionar launchd.
-  await stopDaemon(home);
+  if (!managed) await stopDaemon(home);
   mkdirSync(agentsDir, { recursive: true });
   const plist = plistPath(agentsDir);
   writeFileSync(plist, renderPlist({ node: deps.node, release, home, log: paths(home).log }), {
     mode: 0o600,
   });
-  const domain = `gui/${deps.uid}`;
-  await run("launchctl", ["bootout", `${domain}/${LABEL}`]).catch(() => "");
-  await run("launchctl", ["bootstrap", domain, plist]);
+  await reload(deps, plist);
 }
 
 /** Instala la etiqueta y activa el LaunchAgent. */
@@ -149,11 +188,11 @@ export async function update(home: string, tag: string, deps: InstallDeps): Prom
       writeFileSync(launcher, before.launcher);
       chmodSync(launcher, 0o755);
     }
-    const domain = `gui/${deps.uid}`;
-    await deps.run("launchctl", ["bootout", `${domain}/${LABEL}`]).catch(() => "");
-    const restored = await deps.run("launchctl", ["bootstrap", domain, plist]).then(
+    const restored = await reload(deps, plist).then(
       () => "Se restauró la versión anterior.",
-      (e: unknown) => `No se pudo reactivar la anterior: ${message(e)}`,
+      (e: unknown) =>
+        `No se pudo reactivar la anterior: ${message(e)}\n` +
+        `Arráncalo a mano con: launchctl bootstrap gui/${deps.uid} ${plist}`,
     );
     throw new CliError("update_failed", 1, { detail: `${message(error)}\n${restored}` });
   }

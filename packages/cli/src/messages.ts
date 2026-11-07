@@ -51,6 +51,9 @@ export interface Message {
 /** Sin caracteres de control: una ruta o un nombre no pueden mover la terminal. */
 const plain = (text: string | undefined, fallback: string): string =>
   text === undefined ? fallback : text.replace(/\p{Cc}/gu, "");
+/** Como `plain`, pero conserva los saltos de línea y los tabuladores (un detalle de varias líneas). */
+const multiline = (text: string | undefined, fallback: string): string =>
+  text === undefined ? fallback : text.replace(/(?![\n\t])\p{Cc}/gu, "");
 const repoName = (p: MessageParams) => plain(p.repo, "<owner/repo>");
 const repoPath = (p: MessageParams) => plain(p.path, "<ruta>");
 const listRepos = { label: "Mira los que hay con", command: "togi repo list" };
@@ -392,7 +395,7 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: `Actualizado a ${plain(p.cliRelease, "?")}; el daemon se reinició bajo launchd.`,
   }),
   update_failed: (p) => ({
-    text: `No se pudo actualizar.${p.detail ? `\n${plain(p.detail, "")}` : ""}`,
+    text: `No se pudo actualizar.${p.detail ? `\n${multiline(p.detail, "")}` : ""}`,
   }),
   not_installed: () => ({
     text: "No hay ninguna instalación que actualizar.",
@@ -406,7 +409,7 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     text: "togi install, togi update y togi uninstall solo funcionan en macOS (usan launchd).",
   }),
   install_failed: (p) => ({
-    text: `No se pudo instalar.${p.detail ? `\n${plain(p.detail, "")}` : ""}`,
+    text: `No se pudo instalar.${p.detail ? `\n${multiline(p.detail, "")}` : ""}`,
   }),
   launchagent_managed: () => ({
     text: "El daemon lo gestiona launchd (LaunchAgent com.togi.daemon), así que togi no lo arranca ni lo para a mano.",
