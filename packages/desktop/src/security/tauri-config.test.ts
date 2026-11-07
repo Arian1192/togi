@@ -34,19 +34,32 @@ test("el webview carga solo el bundle propio: sin URL remota ni servidor de desa
   for (const w of config.app.windows) assert.equal(w.url, undefined);
 });
 
-test("las capacidades solo permiten los comandos concretos del estado del daemon y de la lista de tareas", () => {
+test("las capacidades solo permiten los comandos concretos del daemon y escuchar eventos de Tauri", () => {
   const files = readdirSync(join(TAURI, "capabilities"));
   assert.deepEqual(files, ["default.json"]);
   const capability = JSON.parse(read(TAURI, "capabilities", "default.json")) as {
     permissions: unknown[];
   };
-  assert.deepEqual(capability.permissions, ["allow-get-daemon-status", "allow-list-tasks"]);
+  assert.deepEqual(capability.permissions, [
+    "allow-get-daemon-status",
+    "allow-list-tasks",
+    "allow-watch-events",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+  ]);
 });
 
 test("los comandos están declarados en build.rs y son los únicos registrados en el invoke handler", () => {
-  assert.match(read(TAURI, "build.rs"), /\.commands\(&\["get_daemon_status", "list_tasks"\]\)/);
   assert.match(
-    read(TAURI, "src", "lib.rs"),
-    /generate_handler!\[daemon::get_daemon_status, tasks::list_tasks\]/,
+    read(TAURI, "build.rs"),
+    /\.commands\(&\["get_daemon_status", "list_tasks", "watch_events"\]\)/,
+  );
+  const handler = /generate_handler!\[([^\]]*)\]/.exec(read(TAURI, "src", "lib.rs"))?.[1];
+  assert.deepEqual(
+    handler
+      ?.split(",")
+      .map((c) => c.trim())
+      .filter(Boolean),
+    ["daemon::get_daemon_status", "tasks::list_tasks", "events::watch_events"],
   );
 });

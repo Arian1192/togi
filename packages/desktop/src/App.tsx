@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import { TaskList, type TaskRow } from "./TaskList.ts";
+import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
 
 type DaemonStatus =
   | { state: "running"; version: string }
@@ -28,6 +29,9 @@ type TaskResult =
   | { status: "ok"; tasks: TaskRow[]; truncated: boolean }
   | { status: "unreachable"; reason: string };
 
+/** Lo que reenvía el lado Rust del stream del daemon: un resumen, nunca el evento (ver events.rs). */
+type DaemonEvent = { kind: "open" } | { kind: "task" } | { kind: "closed" };
+
 /** Estado del daemon y lista de tareas. Sin datos viejos: si deja de responder, lo dice y suelta ambos. */
 export function App() {
   const [status, setStatus] = useState<DaemonStatus | null>(null);
@@ -35,19 +39,61 @@ export function App() {
 
   useEffect(() => {
     let live = true;
-    const poll = () => {
+    const poll = () =>
       invoke<DaemonStatus>("get_daemon_status")
         .then((s) => live && setStatus(s))
         .catch(() => live && setStatus({ state: "unreachable", reason: "app" }));
-      invoke<TaskResult>("list_tasks")
-        .then((l) => live && setList(l))
-        .catch(() => live && setList({ status: "unreachable", reason: "app" }));
-    };
     poll();
     const timer = setInterval(poll, POLL_MS);
     return () => {
       live = false;
       clearInterval(timer);
+    };
+  }, []);
+
+  // La lista se recarga al conectar y con cada evento de una tarea, y se funde por número y versión.
+  // Las recargas que llegan mientras hay una en curso se juntan en una sola.
+  useEffect(() => {
+    let live = true;
+    let busy = false;
+    let again = false;
+    const refresh = (): void => {
+      if (busy) {
+        again = true;
+        return;
+      }
+      busy = true;
+      invoke<TaskResult>("list_tasks")
+        .catch((): TaskResult => ({ status: "unreachable", reason: "app" }))
+        .then((next) => {
+          if (live)
+            setList((prev) =>
+              next.status === "ok" && prev?.status === "ok"
+                ? { ...next, tasks: mergeRows(prev.tasks, next.tasks) }
+                : next,
+            );
+          busy = false;
+          if (again) {
+            again = false;
+            refresh();
+          }
+        });
+    };
+    const unlisten = listen<DaemonEvent>("daemon-event", ({ payload }) => {
+      if (payload.kind === "closed") setList(null);
+      else refresh();
+    }).then((stop) => {
+      if (!live) {
+        stop();
+        return () => {};
+      }
+      invoke("watch_events");
+      return stop;
+    });
+    refresh();
+    return () => {
+      live = false;
+      unlisten.then((stop) => stop());
     };
   }, []);
 

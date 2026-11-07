@@ -29,6 +29,19 @@ export const GROUP_LABEL: Record<AttentionGroup, string> = {
   closed: "Cerradas",
 };
 
+/**
+ * Funde filas nuevas en la lista, por número: una fila solo se reemplaza por otra de igual o mayor
+ * versión, así que una respuesta lenta y vieja no deshace una más reciente. Orden por número.
+ */
+export function mergeRows(current: TaskRow[], incoming: TaskRow[]): TaskRow[] {
+  const rows = new Map(current.map((row) => [row.number, row]));
+  for (const row of incoming) {
+    const old = rows.get(row.number);
+    if (old === undefined || row.version >= old.version) rows.set(row.number, row);
+  }
+  return [...rows.values()].sort((a, b) => a.number - b.number);
+}
+
 /** Las tareas por grupo, en el orden en que llegan. */
 export function groupTasks(tasks: TaskRow[]): Record<AttentionGroup, TaskRow[]> {
   const groups: Record<AttentionGroup, TaskRow[]> = { pending: [], active: [], closed: [] };
