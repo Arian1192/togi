@@ -34,16 +34,19 @@ test("el webview carga solo el bundle propio: sin URL remota ni servidor de desa
   for (const w of config.app.windows) assert.equal(w.url, undefined);
 });
 
-test("las capacidades solo permiten el comando concreto del estado del daemon", () => {
+test("las capacidades solo permiten los comandos concretos del estado del daemon y de la lista de tareas", () => {
   const files = readdirSync(join(TAURI, "capabilities"));
   assert.deepEqual(files, ["default.json"]);
   const capability = JSON.parse(read(TAURI, "capabilities", "default.json")) as {
     permissions: unknown[];
   };
-  assert.deepEqual(capability.permissions, ["allow-get-daemon-status"]);
+  assert.deepEqual(capability.permissions, ["allow-get-daemon-status", "allow-list-tasks"]);
 });
 
-test("el comando está declarado en build.rs y es el único registrado en el invoke handler", () => {
-  assert.match(read(TAURI, "build.rs"), /\.commands\(&\["get_daemon_status"\]\)/);
-  assert.match(read(TAURI, "src", "lib.rs"), /generate_handler!\[daemon::get_daemon_status\]/);
+test("los comandos están declarados en build.rs y son los únicos registrados en el invoke handler", () => {
+  assert.match(read(TAURI, "build.rs"), /\.commands\(&\["get_daemon_status", "list_tasks"\]\)/);
+  assert.match(
+    read(TAURI, "src", "lib.rs"),
+    /generate_handler!\[daemon::get_daemon_status, tasks::list_tasks\]/,
+  );
 });
