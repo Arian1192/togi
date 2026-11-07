@@ -1,0 +1,14 @@
+:root {
+  color-scheme: dark light;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px;
+}

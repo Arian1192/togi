@@ -50,14 +50,26 @@ pub fn status_at(home: &Path) -> DaemonStatus {
     }
 }
 
-/// Versión del daemon si es un valor corto y limpio que no contiene el token.
+/// La versión como la cuenta `togi daemon status`: `v0.2.5 (aae6fce)` si hay instalación, `dev` si
+/// corre desde el repo y, en un daemon viejo sin `release`, la de su package.json. La etiqueta debe
+/// ser corta y limpia y no contener el token.
 fn version(body: &[u8], token: &str) -> Option<String> {
     let json: serde_json::Value = serde_json::from_slice(body).ok()?;
-    let version = json.get("daemon")?.as_str()?;
-    let clean = !version.is_empty()
-        && version.len() <= 32
-        && version.chars().all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c));
-    (clean && !version.contains(token)).then(|| version.to_owned())
+    let field = |name: &str| json.get(name).and_then(serde_json::Value::as_str);
+    let tag = field("release").or_else(|| field("daemon"))?;
+    let clean = !tag.is_empty()
+        && tag.len() <= 64
+        && !tag.contains(token)
+        && tag.chars().all(|c| c.is_ascii_alphanumeric() || ".-+".contains(c));
+    if !clean {
+        return None;
+    }
+    match field("commit") {
+        Some(c) if c.len() == 40 && c.chars().all(|c| c.is_ascii_hexdigit()) => {
+            Some(format!("{tag} ({})", &c[..7]))
+        }
+        _ => Some(tag.to_owned()),
+    }
 }
 
 /// HTTP/1.1 a mano: una petición, `Connection: close`, respuesta con `Content-Length`. Lee con
