@@ -44,6 +44,7 @@ test("las capacidades solo permiten los comandos concretos del daemon y escuchar
     "allow-get-daemon-status",
     "allow-list-tasks",
     "allow-watch-events",
+    "allow-read-plan",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
   ]);
@@ -52,7 +53,7 @@ test("las capacidades solo permiten los comandos concretos del daemon y escuchar
 test("los comandos están declarados en build.rs y son los únicos registrados en el invoke handler", () => {
   assert.match(
     read(TAURI, "build.rs"),
-    /\.commands\(&\["get_daemon_status", "list_tasks", "watch_events"\]\)/,
+    /\.commands\(&\["get_daemon_status", "list_tasks", "watch_events", "read_plan"\]\)/,
   );
   const handler = /generate_handler!\[([^\]]*)\]/.exec(read(TAURI, "src", "lib.rs"))?.[1];
   assert.deepEqual(
@@ -60,6 +61,6 @@ test("los comandos están declarados en build.rs y son los únicos registrados e
       ?.split(",")
       .map((c) => c.trim())
       .filter(Boolean),
-    ["daemon::get_daemon_status", "tasks::list_tasks", "events::watch_events"],
+    ["daemon::get_daemon_status", "tasks::list_tasks", "events::watch_events", "plan::read_plan"],
   );
 });

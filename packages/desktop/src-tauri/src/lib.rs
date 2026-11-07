@@ -1,5 +1,6 @@
 pub mod daemon;
 pub mod events;
+pub mod plan;
 pub mod tasks;
 
 pub fn run() {
@@ -7,7 +8,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             daemon::get_daemon_status,
             tasks::list_tasks,
-            events::watch_events
+            events::watch_events,
+            plan::read_plan
         ])
         .run(tauri::generate_context!())
         .expect("la app de togi no pudo arrancar");
