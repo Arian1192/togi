@@ -14,7 +14,7 @@ const POLL_MS = 5000;
 
 function Monogram() {
   return (
-    <svg viewBox="0 0 64 64" width={48} height={48} role="img" aria-label="togi">
+    <svg className="monogram" viewBox="0 0 64 64" aria-hidden="true">
       <path
         fill="currentColor"
         d="M25 12 L35 6 L35 20 L49 20 L49 29 L35 29 L35 42 Q35 48 41 48 L49 48 L49 58 L41 58 Q25 58 25 42 L25 29 L15 29 L15 20 L25 20 Z"
@@ -42,14 +42,22 @@ export function App() {
   }, []);
 
   const text =
-    status === null
-      ? "comprobando el daemon…"
-      : status.state === "running"
-        ? `daemon en marcha · ${status.version}`
-        : `daemon sin respuesta: ${REASONS[status.reason] ?? "respuesta no válida"}`;
+    status === null ? (
+      "comprobando el daemon…"
+    ) : status.state === "running" ? (
+      // La versión y el commit son identificadores: van en font-mono (manual de marca, tipografía).
+      <>
+        daemon en marcha · <code className="ident">{status.version}</code>
+      </>
+    ) : (
+      `daemon sin respuesta: ${REASONS[status.reason] ?? "respuesta no válida"}`
+    );
   return (
     <main className="shell">
-      <Monogram />
+      <div className="logo">
+        <Monogram />
+        <span>togi</span>
+      </div>
       <p role="status">{text}</p>
     </main>
   );

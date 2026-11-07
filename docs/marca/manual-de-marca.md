@@ -138,6 +138,7 @@ Esta tabla es la única definición visual de los estados: la web UI, la CLI y c
 | `rejected` | — | `ink-muted` | Nadie | Rechazada: \[motivo\] |
 
 - El glifo va antes del nombre del estado, separado por `space-1`, en `font-mono`.
+- **Dónde se dibuja cada glifo.** En las interfaces gráficas (web UI y app de escritorio) los glifos se dibujan como SVG en línea, con trazo de 1,5 px, esquinas rectas y `currentColor` para que tomen el color del token del estado. Ninguna de las tres fuentes de la marca los trae: faltan ◐ ◑ y ✕, y M PLUS 1 Code tampoco trae ◆ ni ●, así que un carácter suelto saldría de la fuente de reserva del sistema y cambiaría de forma. En la terminal son los caracteres de la tabla.
 - Las listas de tareas se agrupan por quién tiene que actuar (te esperan, en marcha, el resto), no por estado ni por fecha.
 - Un resultado de gate usa la misma lógica: ● en `ink` si pasa, ◆ en `human` si necesita tu atención (por ejemplo, mutantes que sobreviven), ✕ en `human` si falla.
 
@@ -167,7 +168,7 @@ Las pantallas de togi se diseñan como un cuaderno de taller: un documento prepa
 | Bloque de código o diff | `surface`, borde, `radius-lg`, `code` | Líneas añadidas con fondo tenue (`surface` un paso más oscuro) y signo +; eliminadas en `ink-muted` con − |
 | Etiqueta de estado | Glifo + estado en `font-mono` 13 px, en el token del estado | Sin fondo ni borde |
 
-Iconos: no hay set propio todavía. Si hacen falta, trazo de 1,5 px, esquinas rectas y del color del texto; nunca emoji.
+Iconos: los glifos de estado son el único set propio (SVG en línea, ver «Estados de una tarea»). Para cualquier otro icono, si hace falta, trazo de 1,5 px, esquinas rectas y del color del texto; nunca emoji.
 
 ## La CLI
 
@@ -231,7 +232,7 @@ Los tokens se consumen como variables CSS generadas desde `tokens.json`; ningún
 ```
 
 - **Tema:** se respeta `prefers-color-scheme` y la persona puede fijarlo con `data-theme` en `<html>`. Los dos temas son de primera clase: cada pantalla se revisa en ambos.
-- **Estados:** un único módulo exporta el mapa estado → glifo, token y texto (la tabla de Estados de una tarea). Web UI y CLI lo importan del mismo paquete.
+- **Estados:** un único módulo exporta el mapa estado → glifo, token y texto (la tabla de Estados de una tarea). Web UI y CLI lo importan del mismo paquete; la CLI imprime el carácter y las interfaces gráficas lo dibujan como SVG.
 - **Monograma:** SVG en línea con `fill="currentColor"` dentro de la interfaz; los ficheros del sistema de diseño, para favicon y exportaciones.
 
 Lista de accesibilidad antes de cada PR de interfaz:

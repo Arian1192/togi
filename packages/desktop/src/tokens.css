@@ -1,0 +1,57 @@
+/*
+ * Tokens de docs/marca/tokens.json como variables CSS (manual de marca, «Espaciado, retícula y
+ * formas»). Claro por defecto; oscuro con prefers-color-scheme o con data-theme="dark" en <html>;
+ * data-theme="light" fija el claro. tokens.test.ts comprueba que siguen a tokens.json.
+ */
+:root,
+:root[data-theme="light"] {
+  --bg: #f4f2ed;
+  --surface: #fbfaf7;
+  --border: #dedad2;
+  --ink: #141619;
+  --ink-muted: #5c626a;
+  --human: #b4421d;
+  --agent: #2f5f91;
+  --done: var(--ink);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #141619;
+  --surface: #1d2025;
+  --border: #2c3036;
+  --ink: #e6e8ea;
+  --ink-muted: #8b9199;
+  --human: #e2622f;
+  --agent: #6f9ac7;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141619;
+    --surface: #1d2025;
+    --border: #2c3036;
+    --ink: #e6e8ea;
+    --ink-muted: #8b9199;
+    --human: #e2622f;
+    --agent: #6f9ac7;
+    color-scheme: dark;
+  }
+}
+
+:root {
+  --font-display: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-sans: "Zen Kaku Gothic New", "Hiragino Sans", system-ui, sans-serif;
+  --font-mono: "M PLUS 1 Code", ui-monospace, "SF Mono", monospace;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
