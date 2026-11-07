@@ -31,9 +31,12 @@ const unstaged = execFileSync("git", ["status", "--porcelain"], { encoding: "utf
   .filter((line) => line !== "" && line[1] !== " ").length;
 
 const isTest = (p) =>
-  /\.test\.[cm]?[jt]sx?$/.test(p) || /(^|\/)testing\//.test(p) || p.startsWith("packages/e2e/");
+  /\.test\.[cm]?[jt]sx?$/.test(p) ||
+  /(^|\/)testing\//.test(p) ||
+  /(^|\/)src-tauri\/tests\//.test(p) ||
+  p.startsWith("packages/e2e/");
 const isDoc = (p) => p.endsWith(".md") || p.startsWith("docs/");
-const isIgnored = (p) => p === "pnpm-lock.yaml";
+const isIgnored = (p) => p === "pnpm-lock.yaml" || /(^|\/)Cargo\.lock$/.test(p);
 
 const totals = { prod: 0, tests: 0, docs: 0, ignored: 0 };
 for (const line of numstat.split("\n")) {
