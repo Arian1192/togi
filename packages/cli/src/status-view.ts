@@ -1,4 +1,4 @@
-import { type BrandToken, STATE_BRAND, type TaskState } from "@togi/core";
+import { attentionGroup, type BrandToken, STATE_BRAND, type TaskState } from "@togi/core";
 import { oneLine, relativeTime, say } from "./format.ts";
 import type { Output, Token } from "./output.ts";
 
@@ -24,10 +24,6 @@ export interface StatusTask {
   updatedAt: string;
 }
 
-const PENDING: TaskState[] = ["draft", "plan_review", "review", "failed"];
-const ACTIVE: TaskState[] = ["planning", "building", "verifying"];
-const CLOSED: TaskState[] = ["merged", "rejected"];
-
 interface Cell {
   text: string;
   paint?: (s: string) => string;
@@ -46,7 +42,7 @@ function truncate(text: string, max: number): string {
 
 /** Texto del resumen final: recuento (o aviso de truncado) y ocultas, nunca un total falso. */
 function footer(shown: number, tasks: StatusTask[], showClosed: boolean): string {
-  const hidden = showClosed ? [] : tasks.filter((t) => CLOSED.includes(t.state));
+  const hidden = showClosed ? [] : tasks.filter((t) => attentionGroup(t.state) === "closed");
   const truncated = tasks.length >= PAGE;
   const count = truncated
     ? say("status_truncated", { n: PAGE })
@@ -76,11 +72,11 @@ export function renderStatus(
   }
   const showClosed = opts.all || opts.state !== undefined;
   const groups = [
-    { title: say("group_pending"), states: PENDING },
-    { title: say("group_active"), states: ACTIVE },
-    ...(showClosed ? [{ title: say("group_closed"), states: CLOSED }] : []),
+    { title: say("group_pending"), group: "pending" },
+    { title: say("group_active"), group: "active" },
+    ...(showClosed ? [{ title: say("group_closed"), group: "closed" }] : []),
   ]
-    .map((g) => ({ ...g, rows: tasks.filter((t) => g.states.includes(t.state)) }))
+    .map((g) => ({ ...g, rows: tasks.filter((t) => attentionGroup(t.state) === g.group) }))
     .filter((g) => g.rows.length > 0);
   const rows = groups.flatMap((g) => g.rows);
   const tail = (t: StatusTask): Cell =>
