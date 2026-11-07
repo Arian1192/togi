@@ -4,6 +4,7 @@ fn main() {
     let manifest = tauri_build::AppManifest::new().commands(&[
         "get_daemon_status",
         "list_tasks",
+        "read_task",
         "watch_events",
         "read_plan",
         "approve_plan",

@@ -10,6 +10,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             daemon::get_daemon_status,
             tasks::list_tasks,
+            tasks::read_task,
             events::watch_events,
             plan::read_plan,
             plan::approve_plan,
