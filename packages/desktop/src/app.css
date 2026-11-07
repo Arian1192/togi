@@ -114,3 +114,74 @@ body {
   flex: none;
   font: 400 12.5px / 20px var(--font-mono);
 }
+
+/* Cuaderno (manual de marca, «Patrones de interfaz»): un documento para decidir, no un panel. */
+.notebook {
+  align-self: stretch;
+  max-width: 72ch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.notebook-context,
+.notebook-size {
+  margin: 0;
+  font: 400 12.5px / 20px var(--font-mono);
+}
+
+.notebook-context {
+  color: var(--ink-muted);
+}
+
+.notebook h1 {
+  margin: var(--space-2) 0;
+  font: 600 40px / 48px var(--font-display);
+}
+
+/* El texto del daemon conserva sus saltos de línea y sus espacios; nada se interpreta como HTML. */
+.notebook-lede,
+.notebook-approach {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notebook-section h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  font: 600 22px / 32px var(--font-display);
+}
+
+.kanji {
+  color: var(--ink-muted);
+}
+
+.notebook-subtitle {
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--ink-muted);
+  font: 400 13px / 20px var(--font-sans);
+}
+
+.notebook-files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 400 12.5px / 20px var(--font-mono);
+}
+
+.notebook-files li {
+  display: flex;
+  gap: var(--space-3);
+  min-height: 32px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.notebook-files .sign {
+  flex: none;
+  width: 1ch;
+  color: var(--ink-muted);
+}
