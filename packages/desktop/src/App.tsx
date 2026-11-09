@@ -6,6 +6,7 @@ import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
 import { TaskNotebookPane } from "./TaskNotebookPane.tsx";
+import { TitleBar } from "./TitleBar.ts";
 import { isToggleShortcut, PENDING, tasksFor, toggled, type View } from "./viewState.ts";
 
 type DaemonStatus =
@@ -44,6 +45,19 @@ export function App() {
   const [view, setView] = useState<View>(PENDING);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+
+  // Rust avisa al entrar y salir de pantalla completa (lib.rs): la barra deja de reservar sitio a
+  // los semáforos, que macOS oculta.
+  useEffect(() => {
+    let live = true;
+    const unlisten = listen<boolean>("window-fullscreen", ({ payload }) => setFullscreen(payload));
+    unlisten.then((stop) => !live && stop());
+    return () => {
+      live = false;
+      unlisten.then((stop) => stop());
+    };
+  }, []);
 
   // ⌘\ pliega y despliega la columna. Un atajo del webview: no pasa por Tauri.
   useEffect(() => {
@@ -141,6 +155,11 @@ export function App() {
     view.kind === "project" ? projects?.projects.find((p) => p.repo === view.repo) : undefined;
   return (
     <div className="workbench">
+      <TitleBar
+        collapsed={collapsed && projects !== null}
+        onCollapse={() => setCollapsed((prev) => !prev)}
+        fullscreen={fullscreen}
+      />
       {/* Siempre montada: si el daemon deja de responder no hay lista, pero el estado se sigue viendo. */}
       <ProjectColumn
         data={projects}
@@ -149,7 +168,6 @@ export function App() {
         onView={setView}
         onToggle={(repo) => setClosed((prev) => toggled(prev, repo))}
         collapsed={collapsed && projects !== null}
-        onCollapse={() => setCollapsed((prev) => !prev)}
         head={
           <div className="logo">
             <Monogram />
