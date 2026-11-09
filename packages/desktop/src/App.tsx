@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
-import { ProjectColumn } from "./ProjectColumn.ts";
+import { ProjectColumn, useSettled } from "./ProjectColumn.ts";
 import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
@@ -130,6 +130,8 @@ export function App() {
     () => (list?.status === "ok" ? buildProjects(list.tasks, list.truncated) : null),
     [list],
   );
+  // El ancho de la columna se anima; su contenido plegado llega al final de la transición.
+  const settled = useSettled(collapsed && projects !== null);
   // El resumen del proyecto elegido; si ya no existe (la lista se recargó), la lista vacía de siempre.
   const shown =
     view.kind === "project" ? projects?.projects.find((p) => p.repo === view.repo) : undefined;
@@ -143,6 +145,7 @@ export function App() {
         onView={setView}
         onToggle={(repo) => setClosed((prev) => toggled(prev, repo))}
         collapsed={collapsed && projects !== null}
+        settled={settled}
         onCollapse={() => setCollapsed((prev) => !prev)}
         head={
           <div className="logo">

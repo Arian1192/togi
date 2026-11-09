@@ -1,5 +1,5 @@
 import { stateColor } from "@togi/core";
-import { createElement, type ReactNode } from "react";
+import { createElement, type ReactNode, useEffect, useState } from "react";
 import { closedLabel } from "./ProjectSummary.ts";
 import { openTasks, type Project, type Projects } from "./projects.ts";
 import { StateGlyph } from "./StateGlyph.ts";
@@ -23,6 +23,8 @@ interface Props {
   collapsed?: boolean;
   /** Pliega o despliega la columna; sin él no hay botón. */
   onCollapse?: () => void;
+  /** Lleva ya plegada el tiempo de la transición (`useSettled`); sin él, se supone que sí. */
+  settled?: boolean;
 }
 
 const SHORTCUT = "⌘\\";
@@ -165,6 +167,14 @@ function collapseButton({ collapsed, onCollapse }: Props): ReactNode {
 /** La columna plegada: «Pendiente de ti» y la inicial de cada proyecto, con su ◆ si algo te espera. */
 function rail(props: Props & { data: Projects }): ReactNode {
   const { data, view, onView } = props;
+  // Una insignia sobre la esquina de la letra, como una notificación: así la inicial queda sola y
+  // centrada y todas se alinean. Decorativa: el nombre accesible del botón no cambia.
+  const badge = (...content: ReactNode[]) =>
+    createElement(
+      "span",
+      { key: "badge", className: "rail-badge tone-human", "aria-hidden": true },
+      createElement("span", { className: "rail-badge-body" }, ...content),
+    );
   const diamond = createElement(
     "span",
     { key: "d", className: "tone-human" },
@@ -183,6 +193,7 @@ function rail(props: Props & { data: Projects }): ReactNode {
         onClick: () => onView({ kind: "pending" }),
       },
       diamond,
+      badge(data.pending.length),
     ),
     ...data.projects.map((project) =>
       createElement(
@@ -192,26 +203,71 @@ function rail(props: Props & { data: Projects }): ReactNode {
           type: "button",
           className: "rail-project",
           "aria-label": project.name,
-          title: project.name,
+          title:
+            project.counts.waiting > 0
+              ? `${project.name} · ${project.counts.waiting} esperan`
+              : project.name,
           "aria-current": on(view.kind === "project" && view.repo === project.repo),
           onClick: () => onView({ kind: "project", repo: project.repo }),
         },
         createElement("span", { className: "rail-initial" }, project.name.charAt(0).toUpperCase()),
-        project.counts.waiting > 0 && diamond,
+        project.counts.waiting > 0 &&
+          badge(createElement(StateGlyph, { state: "plan_review" }), project.counts.waiting),
       ),
     ),
   ];
 }
 
+/** La duración de la transición del ancho; app.css usa los mismos 240ms. */
+export const TRANSITION_MS = 240;
+
+/**
+ * Qué se pinta al plegar o desplegar. El ancho (`is-rail`) cambia en cuanto cambia `collapsed` y lo
+ * anima el CSS; el contenido plegado (`is-rolled`, `showRail`) llega al final de la transición al
+ * plegar y desaparece de inmediato al desplegar, así nada se deforma mientras el ancho cambia.
+ */
+export function railState(collapsed: boolean, settled: boolean) {
+  return {
+    className: ["project-col", collapsed && "is-rail", collapsed && settled && "is-rolled"]
+      .filter(Boolean)
+      .join(" "),
+    showRail: collapsed && settled,
+  };
+}
+
+/**
+ * `true` cuando la columna lleva ya plegada el tiempo de la transición. Lo calcula `App` y lo pasa
+ * como `settled`: así `ProjectColumn` sigue siendo una función pura, que los tests recorren sin React.
+ */
+export function useSettled(collapsed: boolean): boolean {
+  const [settled, setSettled] = useState(collapsed);
+  useEffect(() => {
+    if (!collapsed) {
+      setSettled(false);
+      return;
+    }
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const timer = setTimeout(() => setSettled(true), reduced ? 0 : TRANSITION_MS);
+    return () => clearTimeout(timer);
+  }, [collapsed]);
+  return settled;
+}
+
 export function ProjectColumn(props: Props): ReactNode {
-  const { data, view, onView, head, foot, collapsed } = props;
-  const rolled = collapsed === true && data !== null;
+  const { data, view, onView, head, foot } = props;
+  const target = props.collapsed === true && data !== null;
+  // Sin `settled` el contenido plegado aparece a la vez que el ancho (sin transición de contenido).
+  const { className, showRail } = railState(target, props.settled ?? true);
+  const rolled = showRail;
   return createElement(
     "nav",
-    { className: rolled ? "project-col is-rail" : "project-col", "aria-label": "Proyectos" },
+    { className, "aria-label": "Proyectos" },
     (head || props.onCollapse) &&
       createElement("div", { key: "head", className: "col-head" }, head, collapseButton(props)),
     rolled &&
+      data !== null &&
       createElement("div", { key: "rail", className: "col-scroll" }, rail({ ...props, data })),
     !rolled &&
       // Sin lista (el daemon no responde) no hay datos de tareas, pero sí cabecera y pie.
