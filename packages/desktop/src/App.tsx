@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ProjectColumn } from "./ProjectColumn.ts";
 import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
-import { PENDING, tasksFor, toggled, type View } from "./viewState.ts";
+import { isToggleShortcut, PENDING, tasksFor, toggled, type View } from "./viewState.ts";
 
 type DaemonStatus =
   | { state: "running"; version: string }
@@ -41,6 +41,18 @@ export function App() {
   const [list, setList] = useState<TaskResult | null>(null);
   const [view, setView] = useState<View>(PENDING);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const [collapsed, setCollapsed] = useState(false);
+
+  // ⌘\ pliega y despliega la columna. Un atajo del webview: no pasa por Tauri.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!isToggleShortcut(e)) return;
+      e.preventDefault();
+      setCollapsed((prev) => !prev);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -126,6 +138,8 @@ export function App() {
         closed={closed}
         onView={setView}
         onToggle={(repo) => setClosed((prev) => toggled(prev, repo))}
+        collapsed={collapsed && projects !== null}
+        onCollapse={() => setCollapsed((prev) => !prev)}
         head={
           <div className="logo">
             <Monogram />

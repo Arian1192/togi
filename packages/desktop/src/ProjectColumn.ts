@@ -18,7 +18,13 @@ interface Props {
   closed: ReadonlySet<string>;
   onView: (view: View) => void;
   onToggle: (repo: string) => void;
+  /** Plegada a un riel con la inicial de cada proyecto. */
+  collapsed?: boolean;
+  /** Pliega o despliega la columna; sin él no hay botón. */
+  onCollapse?: () => void;
 }
+
+const SHORTCUT = "⌘\\";
 
 const on = (selected: boolean) => (selected ? "true" : undefined);
 
@@ -119,34 +125,109 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
   );
 }
 
+/** El botón de la cabecera que pliega o despliega la columna. */
+function collapseButton({ collapsed, onCollapse }: Props): ReactNode {
+  if (onCollapse === undefined) return null;
+  const label = collapsed ? "Desplegar la columna" : "Plegar la columna";
+  return createElement(
+    "button",
+    {
+      key: "collapse",
+      type: "button",
+      className: "col-collapse",
+      "aria-label": label,
+      "aria-expanded": !collapsed,
+      title: `${label} (${SHORTCUT})`,
+      onClick: onCollapse,
+    },
+    createElement(
+      "svg",
+      { viewBox: "0 0 16 16", width: "1em", height: "1em", "aria-hidden": true },
+      createElement("path", {
+        d: "M2.75 3.25h10.5v9.5H2.75zM6.25 3.25v9.5",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: 1.5,
+      }),
+    ),
+  );
+}
+
+/** La columna plegada: «Pendiente de ti» y la inicial de cada proyecto, con su ◆ si algo te espera. */
+function rail(props: Props & { data: Projects }): ReactNode {
+  const { data, view, onView } = props;
+  const diamond = createElement(
+    "span",
+    { key: "d", className: "tone-human" },
+    createElement(StateGlyph, { state: "plan_review" }),
+  );
+  return [
+    createElement(
+      "button",
+      {
+        key: "pending",
+        type: "button",
+        className: "rail-project",
+        "aria-label": `Pendiente de ti, ${data.pending.length}`,
+        title: "Pendiente de ti",
+        "aria-current": on(view.kind === "pending"),
+        onClick: () => onView({ kind: "pending" }),
+      },
+      diamond,
+    ),
+    ...data.projects.map((project) =>
+      createElement(
+        "button",
+        {
+          key: project.repo,
+          type: "button",
+          className: "rail-project",
+          "aria-label": project.name,
+          title: project.name,
+          "aria-current": on(view.kind === "project" && view.repo === project.repo),
+          onClick: () => onView({ kind: "project", repo: project.repo }),
+        },
+        createElement("span", { className: "rail-initial" }, project.name.charAt(0).toUpperCase()),
+        project.counts.waiting > 0 && diamond,
+      ),
+    ),
+  ];
+}
+
 export function ProjectColumn(props: Props): ReactNode {
-  const { data, view, onView, head, foot } = props;
+  const { data, view, onView, head, foot, collapsed } = props;
+  const rolled = collapsed === true && data !== null;
   return createElement(
     "nav",
-    { className: "project-col", "aria-label": "Proyectos" },
-    head && createElement("div", { key: "head", className: "col-head" }, head),
-    // Sin lista (el daemon no responde) no hay datos de tareas, pero sí cabecera y pie.
-    createElement(
-      "div",
-      { key: "scroll", className: "col-scroll" },
-      data &&
-        createElement(
-          "button",
-          {
-            type: "button",
-            className: "col-pending",
-            "aria-current": on(view.kind === "pending"),
-            onClick: () => onView({ kind: "pending" }),
-          },
-          createElement("span", null, "Pendiente de ti"),
-          createElement("span", { className: "col-counts tone-human" }, [
-            createElement(StateGlyph, { key: "g", state: "plan_review" }),
-            data.pending.length,
-            data.partial && createElement("span", { key: "p", className: "col-partial" }, "+"),
-          ]),
-        ),
-      data?.projects.map((project) => projectBlock(project, { ...props, data })),
-    ),
-    foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
+    { className: rolled ? "project-col is-rail" : "project-col", "aria-label": "Proyectos" },
+    (head || props.onCollapse) &&
+      createElement("div", { key: "head", className: "col-head" }, head, collapseButton(props)),
+    rolled &&
+      createElement("div", { key: "rail", className: "col-scroll" }, rail({ ...props, data })),
+    !rolled &&
+      // Sin lista (el daemon no responde) no hay datos de tareas, pero sí cabecera y pie.
+      createElement(
+        "div",
+        { key: "scroll", className: "col-scroll" },
+        data &&
+          createElement(
+            "button",
+            {
+              type: "button",
+              className: "col-pending",
+              "aria-current": on(view.kind === "pending"),
+              onClick: () => onView({ kind: "pending" }),
+            },
+            createElement("span", null, "Pendiente de ti"),
+            createElement("span", { className: "col-counts tone-human" }, [
+              createElement(StateGlyph, { key: "g", state: "plan_review" }),
+              data.pending.length,
+              data.partial && createElement("span", { key: "p", className: "col-partial" }, "+"),
+            ]),
+          ),
+        data?.projects.map((project) => projectBlock(project, { ...props, data })),
+      ),
+    // El estado del daemon no cabe en 56 px: con el riel no se pinta (App despliega sola si cae).
+    !rolled && foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
   );
 }
