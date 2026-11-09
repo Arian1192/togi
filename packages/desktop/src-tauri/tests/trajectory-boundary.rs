@@ -290,11 +290,22 @@ fn datos_fuera_de_contrato_se_rechazan() {
 }
 
 #[test]
-fn un_cuerpo_demasiado_grande_es_bad_response() {
+fn un_cuerpo_demasiado_grande_se_salta_con_una_fila_marcadora() {
     let list = json!([session("ses_1", "active", "2026-11-07T11:00:00.000Z")]);
-    let events = json!([event(1, "message", json!("x".repeat(2 * 1024 * 1024)))]);
-    let (result, _) = read(vec![sessions(list), page(events, false, "active")], 0);
-    assert_eq!(reason(&result), "bad_response");
+    let big = || {
+        let events = json!([event(1, "message", json!("x".repeat(2 * 1024 * 1024)))]);
+        page(events, false, "active")
+    };
+    // La página de 20 no cabe y el reintento con un evento tampoco (más en trajectory-oversize.rs).
+    let (result, _) = read(vec![sessions(list), big(), big()], 0);
+    assert!(matches!(
+        result,
+        TrajectoryRead::Ok {
+            next_after: 1,
+            has_more: true,
+            ..
+        }
+    ));
 }
 
 #[test]
