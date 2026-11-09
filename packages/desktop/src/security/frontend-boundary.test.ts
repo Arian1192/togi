@@ -31,7 +31,7 @@ test("el frontend no pinta contenido como HTML", () => {
   }
 });
 
-test("el frontend solo invoca los comandos del estado, las tareas, el plan y los eventos", () => {
+test("el frontend solo invoca los comandos del estado, las tareas, el plan, la trayectoria y los eventos", () => {
   const invoked = sources.flatMap(({ text }) =>
     [...text.matchAll(/invoke(?:<[^>]*>)?\(\s*"([^"]+)"/g)].map((m) => m[1]),
   );
@@ -44,6 +44,7 @@ test("el frontend solo invoca los comandos del estado, las tareas, el plan y los
       "list_tasks",
       "read_plan",
       "read_task",
+      "read_trajectory",
       "reject_plan",
       "request_plan_changes",
       "watch_events",

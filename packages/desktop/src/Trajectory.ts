@@ -96,6 +96,14 @@ export function applyPage(state: TrajectoryState, result: TrajectoryResult): Tra
   }
 }
 
+/**
+ * Lo que se manda para pedir la página siguiente: el cursor y la marca de su sesión, para que Rust
+ * avise si la sesión ya es otra. Sin nada leído (INITIAL, sin sesión) es «desde el principio».
+ */
+export function pageRequest(state: TrajectoryState): { after: number; mark: string | null } {
+  return { after: state.after, mark: state.mark };
+}
+
 function text(event: TrajectoryEvent): ReactNode {
   if (event.erased) return createElement("span", { className: "muted" }, "[borrado]");
   if (event.kind === "oversized") {
