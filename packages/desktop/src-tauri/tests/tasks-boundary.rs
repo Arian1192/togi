@@ -56,7 +56,7 @@ fn fake_daemon(home: &Path, status: &str, body: String, chunk: usize) -> JoinHan
 fn task(number: u64, state: &str, title: &str) -> Value {
     json!({
         "number": number, "title": title, "titleErased": false, "state": state, "risk": "low",
-        "repo": SENTINEL, "baseBranch": "main", "hasCriteria": true,
+        "repo": "arian1192/togi", "baseBranch": "main", "description": SENTINEL, "hasCriteria": true,
         "updatedAt": "2026-11-07T12:00:00.000Z", "version": 3
     })
 }
@@ -101,7 +101,7 @@ fn la_lista_trae_solo_los_campos_de_la_fila_y_nunca_el_token() {
     assert!(request.contains(&format!("Authorization: Bearer {SENTINEL}\r\n")));
     let row = |n: u64, title: &str, state: &str| {
         format!(
-            r#"{{"number":{n},"title":"{title}","titleErased":false,"state":"{state}","hasCriteria":true,"updatedAt":"2026-11-07T12:00:00.000Z","version":3}}"#
+            r#"{{"number":{n},"title":"{title}","titleErased":false,"state":"{state}","repo":"arian1192/togi","baseBranch":"main","hasCriteria":true,"updatedAt":"2026-11-07T12:00:00.000Z","version":3}}"#
         )
     };
     let expected = format!(
