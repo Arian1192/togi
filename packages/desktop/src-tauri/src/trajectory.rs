@@ -24,6 +24,8 @@ pub struct Row {
     pub at: String,
     pub kind: &'static str,
     pub text: String,
+    /// El texto se recortó a `MAX_TEXT` caracteres.
+    pub truncated: bool,
     pub erased: bool,
 }
 
@@ -36,8 +38,12 @@ pub enum TrajectoryRead {
         next_after: u64,
         has_more: bool,
         session_state: &'static str,
+        /// Identifica la sesión de `nextAfter` (su `startedAt`); el webview la devuelve con el cursor.
+        session_mark: String,
     },
     NoSession,
+    /// La sesión elegida ya no es la del cursor: hay que volver a leer desde 0.
+    SessionChanged,
     Unreachable {
         reason: &'static str,
     },
@@ -50,6 +56,12 @@ fn unreachable(reason: &'static str) -> TrajectoryRead {
 /// Pide la trayectoria de la sesión elegida de la tarea `number`, a partir de `after`. Nunca
 /// devuelve el token: un evento con el token en cualquier texto invalida la página entera.
 pub fn trajectory_at(home: &Path, number: u64, after: u64) -> TrajectoryRead {
+    trajectory_for(home, number, after, None)
+}
+
+/// Como `trajectory_at`, con la marca de la sesión de la que viene `after`: si Rust elige ahora otra,
+/// devuelve `SessionChanged` sin pedir la trayectoria, porque el `seq` de una sesión no vale en otra.
+pub fn trajectory_for(home: &Path, number: u64, after: u64, mark: Option<&str>) -> TrajectoryRead {
     if !(1..=MAX_SAFE).contains(&number) || after > MAX_SAFE {
         return unreachable("invalid_request");
     }
@@ -68,22 +80,27 @@ pub fn trajectory_at(home: &Path, number: u64, after: u64) -> TrajectoryRead {
         Ok(json) => json,
         Err(reason) => return unreachable(reason),
     };
-    let session = match pick_session(&listed) {
-        Ok(Some(id)) => id,
+    let (session, started) = match pick_session(&listed, &token) {
+        Ok(Some(picked)) => picked,
         Ok(None) => return TrajectoryRead::NoSession,
         Err(reason) => return unreachable(reason),
     };
+    if mark.is_some_and(|m| m != started) {
+        return TrajectoryRead::SessionChanged;
+    }
     let path =
         format!("/v1/tasks/{number}/sessions/{session}/trajectory?after={after}&limit={PAGE}");
     match get(&path) {
-        Ok(json) => parse(&json, &token).unwrap_or_else(|| unreachable("bad_response")),
+        Ok(json) => {
+            parse(&json, &token, after, started).unwrap_or_else(|| unreachable("bad_response"))
+        }
         Err(reason) => unreachable(reason),
     }
 }
 
 /// La sesión activa o, si no hay, la de `startedAt` más reciente. Un id que no sea `ses_` más
 /// caracteres seguros invalida la lista: va a la ruta de la petición.
-fn pick_session(json: &Value) -> Result<Option<String>, &'static str> {
+fn pick_session(json: &Value, token: &str) -> Result<Option<(String, String)>, &'static str> {
     let list = json
         .get("sessions")
         .and_then(Value::as_array)
@@ -103,7 +120,8 @@ fn pick_session(json: &Value) -> Result<Option<String>, &'static str> {
             && id
                 .chars()
                 .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
-        if !safe {
+        // `startedAt` es la marca que sale al webview: corta y sin el token.
+        if !safe || started.len() > 40 || started.contains(token) {
             return Err("bad_response");
         }
         let key = (state == "active", started, id);
@@ -111,12 +129,19 @@ fn pick_session(json: &Value) -> Result<Option<String>, &'static str> {
             best = Some(key);
         }
     }
-    Ok(best.map(|(_, _, id)| id.to_owned()))
+    Ok(best.map(|(_, started, id)| (id.to_owned(), started.to_owned())))
+}
+
+/// Caracteres de formato que no se ven y permiten que un texto se lea de otra forma (bidi, anchura
+/// cero, guion blando, BOM).
+fn invisible(c: char) -> bool {
+    matches!(c, '\u{00ad}' | '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}'
+        | '\u{2060}'..='\u{2064}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
 }
 
 /// El texto de un evento: la cadena, o el primer `text`, `tool` o `reason` que sea una cadena.
 /// Sin caracteres de control y de a lo sumo `MAX_TEXT` caracteres.
-fn text_of(content: &Value) -> String {
+fn text_of(content: &Value) -> (String, bool) {
     let raw = match content {
         Value::String(s) => Some(s.as_str()),
         Value::Object(o) => ["text", "tool", "reason"]
@@ -124,15 +149,21 @@ fn text_of(content: &Value) -> String {
             .find_map(|k| o.get(*k).and_then(Value::as_str)),
         _ => None,
     };
-    raw.unwrap_or_default()
+    let mut text: String = raw
+        .unwrap_or_default()
         .chars()
-        .filter(|c| !c.is_control() || *c == '\n')
-        .take(MAX_TEXT)
-        .collect()
+        .filter(|c| (!c.is_control() || *c == '\n') && !invisible(*c))
+        .take(MAX_TEXT + 1)
+        .collect();
+    let truncated = text.chars().count() > MAX_TEXT;
+    if truncated {
+        text = text.chars().take(MAX_TEXT).collect();
+    }
+    (text, truncated)
 }
 
 /// Todo o nada: un dato fuera de contrato invalida la página.
-fn parse(json: &Value, token: &str) -> Option<TrajectoryRead> {
+fn parse(json: &Value, token: &str, after: u64, mark: String) -> Option<TrajectoryRead> {
     let int = |v: Option<&Value>| v?.as_u64().filter(|n| *n <= MAX_SAFE);
     let events = json
         .get("events")?
@@ -151,15 +182,17 @@ fn parse(json: &Value, token: &str) -> Option<TrajectoryRead> {
             let wanted = e.get("kind")?.as_str()?;
             let kind = KINDS.iter().find(|k| **k == wanted)?;
             let erased = e.get("contentErased")?.as_bool()?;
+            let (text, truncated) = if erased {
+                (String::new(), false)
+            } else {
+                text_of(content)
+            };
             Some(Row {
                 seq: int(e.get("seq")).filter(|n| *n >= 1)?,
                 at: at.to_owned(),
                 kind,
-                text: if erased {
-                    String::new()
-                } else {
-                    text_of(content)
-                },
+                text,
+                truncated,
                 erased,
             })
         })
@@ -169,21 +202,36 @@ fn parse(json: &Value, token: &str) -> Option<TrajectoryRead> {
         "ended" => "ended",
         _ => return None,
     };
+    // El cursor solo avanza: los `seq` crecen desde `after` y `nextAfter` es el último (o `after`).
+    let next_after = int(json.get("nextAfter"))?;
+    let mut last = after;
+    for row in &events {
+        if row.seq <= last {
+            return None;
+        }
+        last = row.seq;
+    }
+    if next_after != last {
+        return None;
+    }
     Some(TrajectoryRead::Ok {
         events,
-        next_after: int(json.get("nextAfter"))?,
+        next_after,
         has_more: json.get("hasMore")?.as_bool()?,
         session_state,
+        session_mark: mark,
     })
 }
 
 /// Comando que ve el webview. El trabajo bloqueante va a otro hilo para no congelar la ventana.
 #[tauri::command]
-pub async fn read_trajectory(number: u64, after: u64) -> TrajectoryRead {
+pub async fn read_trajectory(number: u64, after: u64, mark: Option<String>) -> TrajectoryRead {
     let Some(home) = home() else {
         return unreachable("no_home");
     };
-    tauri::async_runtime::spawn_blocking(move || trajectory_at(&home, number, after))
-        .await
-        .unwrap_or_else(|_| unreachable("internal"))
+    tauri::async_runtime::spawn_blocking(move || {
+        trajectory_for(&home, number, after, mark.as_deref())
+    })
+    .await
+    .unwrap_or_else(|_| unreachable("internal"))
 }
