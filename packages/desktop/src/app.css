@@ -274,10 +274,41 @@ body {
   height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   padding: var(--space-3) var(--space-2);
   background: var(--surface);
   border-right: 1px solid var(--border);
   font: 400 13px / 20px var(--font-sans);
+}
+
+/* La marca arriba, la lista en medio (se desplaza sola) y el estado del daemon abajo. */
+.col-head {
+  flex: none;
+  padding: var(--space-1) var(--space-2) var(--space-3);
+}
+
+.col-head .logo {
+  font-size: 20px;
+}
+
+.col-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.col-foot {
+  flex: none;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-2) 0;
+  border-top: 1px solid var(--border);
+  font: 400 11.5px / 20px var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.col-foot p {
+  margin: 0;
 }
 
 /* Filas de 32 px (manual de marca): todo lo que se pulsa en la columna es un botón. */
