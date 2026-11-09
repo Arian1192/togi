@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
 import { ProjectColumn } from "./ProjectColumn.ts";
+import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
 import { isToggleShortcut, PENDING, tasksFor, toggled, type View } from "./viewState.ts";
@@ -129,6 +130,9 @@ export function App() {
     () => (list?.status === "ok" ? buildProjects(list.tasks, list.truncated) : null),
     [list],
   );
+  // El resumen del proyecto elegido; si ya no existe (la lista se recargó), la lista vacía de siempre.
+  const shown =
+    view.kind === "project" ? projects?.projects.find((p) => p.repo === view.repo) : undefined;
   return (
     <div className="workbench">
       {/* Siempre montada: si el daemon deja de responder no hay lista, pero el estado se sigue viendo. */}
@@ -150,7 +154,11 @@ export function App() {
       />
       <main className="shell">
         {list?.status === "ok" ? (
-          <TaskList tasks={tasksFor(view, list.tasks)} truncated={list.truncated} />
+          shown !== undefined ? (
+            <ProjectSummary project={shown} partial={list.truncated} />
+          ) : (
+            <TaskList tasks={tasksFor(view, list.tasks)} truncated={list.truncated} />
+          )
         ) : (
           <p className="muted">Sin lista de tareas.</p>
         )}
