@@ -4,6 +4,7 @@ import { outcomeEffect, type Review } from "./notebook.ts";
 import { loadReview, sendDecision } from "./notebookApi.ts";
 import type { Decision } from "./planDecision.ts";
 import { TaskNotebook } from "./TaskNotebook.ts";
+import { TrajectoryPane } from "./TrajectoryPane.tsx";
 
 /**
  * Lee la tarea elegida y deja decidir sobre su plan. Se vuelve a leer cuando cambia su estado o su
@@ -57,6 +58,9 @@ export function TaskNotebookPane({
   };
 
   return (
-    <TaskNotebook review={review} state={state} notice={notice} busy={busy} onDecide={decide} />
+    <>
+      <TaskNotebook review={review} state={state} notice={notice} busy={busy} onDecide={decide} />
+      <TrajectoryPane number={number} version={version} />
+    </>
   );
 }
