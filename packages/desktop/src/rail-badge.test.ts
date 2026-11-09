@@ -12,6 +12,18 @@ import { PENDING } from "./viewState.ts";
 
 const css = readFileSync(join(import.meta.dirname, "app.css"), "utf8");
 
+/** Todas las declaraciones de las reglas cuyo selector (de una lista) es exactamente `selector`. */
+const declarations = (selector: string): string =>
+  css
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("}")
+    .map((chunk) => chunk.split("{"))
+    .filter(
+      ([sel, body]) => body !== undefined && sel?.split(",").some((s) => s.trim() === selector),
+    )
+    .map(([, body]) => body)
+    .join(";");
+
 const row = (number: number, state: string, repo: string): TaskRow => ({
   number,
   title: `tarea ${number}`,
@@ -29,55 +41,64 @@ const TASKS = [
   row(3, "draft", "o/togi"),
   row(4, "building", "o/promos"),
 ];
-const html = renderToStaticMarkup(
-  createElement(ProjectColumn, {
-    data: buildProjects(TASKS, false),
-    view: PENDING,
-    closed: new Set<string>(),
-    onView: () => {},
-    onToggle: () => {},
-    collapsed: true,
-  }),
-);
-const button = (label: string): string => {
-  const start = html.indexOf(`aria-label="${label}`);
-  assert.notEqual(start, -1, label);
+const render = (collapsed: boolean) =>
+  renderToStaticMarkup(
+    createElement(ProjectColumn, {
+      data: buildProjects(TASKS, false),
+      view: PENDING,
+      closed: new Set<string>(),
+      onView: () => {},
+      onToggle: () => {},
+      collapsed,
+    }),
+  );
+const button = (html: string, title: string): string => {
+  const start = html.indexOf(`title="${title}`);
+  assert.notEqual(start, -1, title);
   return html.slice(start, html.indexOf("</button>", start));
 };
 
-test("en el riel lo que te espera es una insignia con el ◆ y el número, sobre la letra", () => {
-  const togi = button("togi");
-  assert.match(
-    togi,
-    /class="rail-badge tone-human"[^>]*aria-hidden="true"><span class="rail-badge-body"><svg[^>]*class="glyph"[^>]*>.*<\/svg>2<\/span>/,
-  );
-});
-
-test("la inicial va sola y centrada: la insignia no la desplaza, así que todas se alinean", () => {
-  for (const label of ["togi", "promos"]) {
-    const b = button(label);
-    assert.match(b, /^[^>]*>\s*<span class="rail-initial">[A-Z]<\/span>/, label);
+test("lo que te espera es una insignia con el ◆ y el número, sobre la esquina del icono", () => {
+  for (const collapsed of [false, true]) {
+    const togi = button(render(collapsed), "togi · 2 esperan");
+    assert.match(
+      togi,
+      /class="rail-badge tone-human"[^>]*aria-hidden="true"><span class="rail-badge-body"><svg[^>]*class="glyph"[^>]*>.*<\/svg>2<\/span>/,
+    );
   }
 });
 
 test("un proyecto sin nada que te espere no lleva insignia", () => {
-  assert.doesNotMatch(button("promos"), /rail-badge/);
+  assert.doesNotMatch(button(render(true), "promos"), /rail-badge/);
 });
 
-test("«Pendiente de ti» lleva su ◆ con el número de tareas como insignia", () => {
-  const pending = button("Pendiente de ti");
+test("«Pendiente de ti» lleva el número de tareas en su insignia", () => {
+  const pending = button(render(true), "Pendiente de ti");
   assert.match(pending, /class="rail-badge[^"]*"[^>]*><span class="rail-badge-body">3<\/span>/);
-  assert.match(pending, /class="glyph"/);
 });
 
-test("el nombre accesible no cambia y el título dice cuántas esperan", () => {
-  assert.match(html, /aria-label="togi"/);
-  assert.match(html, /title="togi · 2 esperan"/);
+test("el icono y la insignia están siempre en el DOM y solo se ven plegada: opacidad, no cambio de contenido", () => {
+  for (const sel of [".col-initial", ".rail-badge"]) {
+    assert.match(declarations(sel), /opacity: 0/, `${sel} desplegada`);
+    assert.match(declarations(`.is-collapsed ${sel}`), /opacity: 1/, `${sel} plegada`);
+    assert.match(declarations(sel), /pointer-events: none/, sel);
+  }
 });
 
-test("la insignia va pegada a la esquina de la letra, sobre ella", () => {
-  assert.match(css, /\.rail-project \{[^}]*position: relative/);
-  assert.match(css, /\.rail-badge \{[^}]*position: absolute[^}]*top: 0[^}]*right: 0/);
-  assert.match(css, /\.rail-badge \{[^}]*background: currentColor/);
-  assert.match(css, /\.rail-badge-body \{[^}]*color: var\(--bg\)/);
+test("el icono ocupa todo el botón y va centrado, así que todas las iniciales se alinean", () => {
+  const icon = declarations(".col-initial");
+  assert.match(icon, /position: absolute/);
+  assert.match(icon, /inset: 0/);
+  assert.match(icon, /place-items: center/);
+  assert.match(declarations(".col-name"), /position: relative/);
+  assert.match(declarations(".col-pending"), /position: relative/);
+});
+
+test("la insignia va pegada a la esquina, sobre el icono, con el color del estado", () => {
+  const badge = declarations(".rail-badge");
+  assert.match(badge, /position: absolute/);
+  assert.match(badge, /top: 0/);
+  assert.match(badge, /right: 0/);
+  assert.match(badge, /background: currentColor/);
+  assert.match(declarations(".rail-badge-body"), /color: var\(--bg\)/);
 });

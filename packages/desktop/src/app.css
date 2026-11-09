@@ -279,9 +279,10 @@ body {
   display: flex;
   flex-direction: column;
   padding: var(--space-3) var(--space-2);
+  /* Como el Sidebar de shadcn: solo el ancho (y el relleno), 200 ms, lineal. */
   transition:
-    width 240ms cubic-bezier(0.65, 0, 0.35, 1),
-    padding-inline 240ms cubic-bezier(0.65, 0, 0.35, 1);
+    width 200ms linear,
+    padding-inline 200ms linear;
   background: var(--surface);
   border-right: 1px solid var(--border);
   font: 400 13px / 20px var(--font-sans);
@@ -304,43 +305,27 @@ body {
   gap: var(--space-2);
 }
 
-.rail-project:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: -2px;
-}
-
-.rail-project {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  box-sizing: border-box;
-  width: 100%;
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  cursor: pointer;
-}
-
-.rail-project[aria-current="true"] {
-  background: var(--border);
-}
-
-.rail-initial {
+/* El icono de cada botón (la inicial del proyecto, el ◆ de «Pendiente de ti»): ocupa todo el botón,
+   centrado, y solo se ve plegada. Va siempre en el DOM; lo único que cambia es su opacidad. */
+.col-initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   font: 600 13px / 20px var(--font-display);
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* La insignia: pegada a la esquina de la letra, como una notificación. El fondo es el color del
-   estado (human) y el contenido va en el del fondo de la app para que contraste en los dos temas. */
+/* La insignia: pegada a la esquina del icono, como una notificación. El fondo es el color del
+   estado (human) y el contenido va en el del fondo de la app para que contraste en los dos temas.
+   También solo se ve plegada (desplegada, los contadores van en línea). */
 .rail-badge {
   position: absolute;
   top: 0;
   right: 0;
+  opacity: 0;
+  pointer-events: none;
   display: inline-flex;
   min-width: 14px;
   height: 14px;
@@ -529,52 +514,6 @@ body {
   white-space: nowrap;
 }
 
-/* El contenido que llega aparece con un fundido (keyframes más abajo). `backwards` y no `both`: al
-   acabar manda la regla que lo desvanece al plegar. */
-.project-col > .col-scroll,
-.project-col > .col-foot {
-  animation: col-fade-in 160ms ease-out backwards;
-}
-
-/* Plegada: un riel de 56 px con «Pendiente de ti» y la inicial de cada proyecto. */
-/* El ancho (y el relleno) se animan con ease-in-out; el contenido cambia al final al plegar y de
-   inmediato al desplegar. TRANSITION_MS (ProjectColumn.ts) debe valer lo mismo que estos 240ms. */
-.project-col.is-rail {
-  width: 56px;
-  padding-inline: var(--space-1);
-}
-
-/* El estilo del riel va con el contenido plegado (is-rolled), no con el ancho que está en curso. */
-.project-col.is-rolled {
-  align-items: center;
-}
-
-.is-rolled .col-head {
-  flex-direction: column;
-  justify-content: flex-start;
-  padding-inline: 0;
-}
-
-.is-rolled .col-head .logo span {
-  display: none;
-}
-
-.is-rolled .col-scroll {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  width: 100%;
-}
-
-/* Desplegada, el contenido tiene su ancho fijo: mientras el ancho cambia se recorta como un cajón en
-   vez de deformarse. */
-.project-col:not(.is-rolled) > .col-head,
-.project-col:not(.is-rolled) > .col-scroll,
-.project-col:not(.is-rolled) > .col-foot {
-  min-width: 272px;
-}
-
 /* El asa que pliega y despliega: sin ancho, pegada al borde de la columna (es hermana suya en el
    flex, así que sigue su transición) y con una pestaña fina que cabalga sobre la línea. */
 .col-handle {
@@ -614,33 +553,149 @@ body {
   outline-offset: 1px;
 }
 
-/* El contenido nuevo aparece con un fundido en vez de golpe: al plegar llega el riel y al desplegar
-   la columna completa. `backwards` y no `both`: al acabar manda la regla de abajo, que lo desvanece. */
-@keyframes col-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Columna lateral: transiciones. Como el Sidebar de shadcn, todo dura lo mismo (200 ms) y es lineal.
+   Plegada es la misma columna: lo que no cabe se recorta (overflow), se desvanece (opacidad) o se
+   pliega en vertical (grid 1fr → 0fr); nada cambia de sitio en el DOM, así que no hay saltos. */
+.project-col.is-collapsed {
+  width: 56px;
+  padding-inline: var(--space-1);
 }
 
-/* Al plegar, el contenido desplegado se desvanece rápido (menos que la transición del ancho) y, al
-   acabar esta, cambia por el riel, que ya aparece con su fundido. */
-.project-col.is-rail:not(.is-rolled) > .col-scroll,
-.project-col.is-rail:not(.is-rolled) > .col-foot {
+/* Las etiquetas y los contadores se desvanecen; el botón (overflow: hidden) recorta lo que sobra. */
+.col-pending,
+.col-name {
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Escalonado para que no se solapen (en el punto medio se verían las dos cosas a medias, como un
+   fantasma): plegando, la etiqueta se va en los primeros 100 ms y el icono entra a partir de los 100;
+   desplegando, al revés. Suman los 200 ms del ancho. */
+.col-label,
+.col-counts {
+  transition: opacity 100ms linear 100ms;
+}
+
+.is-collapsed .col-label,
+.is-collapsed .col-counts {
   opacity: 0;
-  transition: opacity 120ms ease-in;
+  transition: opacity 100ms linear;
+}
+
+/* El icono y la insignia hacen lo contrario: solo se ven plegada. */
+.col-initial,
+.rail-badge {
+  transition: opacity 100ms linear;
+}
+
+.is-collapsed .col-initial,
+.is-collapsed .rail-badge {
+  opacity: 1;
+  transition: opacity 100ms linear 100ms;
+}
+
+/* La flecha de plegar un proyecto se recoge (ancho 0) y deja de ser enfocable al acabar. */
+.col-toggle {
+  width: 28px;
+  transition:
+    width 200ms linear,
+    padding-inline 200ms linear,
+    opacity 200ms linear,
+    visibility 0s linear 0s;
+}
+
+.is-collapsed .col-toggle {
+  width: 0;
+  padding-inline: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    width 200ms linear,
+    padding-inline 200ms linear,
+    opacity 200ms linear,
+    visibility 0s linear 200ms;
+}
+
+/* Las tareas de cada proyecto pliegan su altura: no se pueden recortar en horizontal, y así las
+   filas de debajo suben sin saltar. */
+.col-tasks-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows 200ms linear,
+    opacity 200ms linear,
+    visibility 0s linear 0s;
+}
+
+.col-tasks-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.is-collapsed .col-tasks-wrap {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 200ms linear,
+    opacity 200ms linear,
+    visibility 0s linear 200ms;
+}
+
+/* El estado del daemon no cabe en 56 px: se recoge por abajo. */
+.col-foot {
+  max-height: 60px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-height 200ms linear,
+    opacity 200ms linear,
+    padding 200ms linear,
+    margin 200ms linear;
+}
+
+.is-collapsed .col-foot {
+  max-height: 0;
+  margin-top: 0;
+  padding-block: 0;
+  opacity: 0;
+}
+
+/* La marca: el texto se recoge y el monograma se queda, centrado en el riel. */
+.col-head .logo span {
+  max-width: 6em;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 200ms linear,
+    opacity 200ms linear;
+}
+
+.col-head .logo {
+  transition: gap 200ms linear;
+}
+
+.is-collapsed .col-head .logo {
+  gap: 0;
+}
+
+.is-collapsed .col-head .logo span {
+  max-width: 0;
+  opacity: 0;
+}
+
+.col-head {
+  transition: padding-inline 200ms linear;
+}
+
+.is-collapsed .col-head {
+  padding-inline: calc(var(--space-2) + var(--space-1));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .project-col {
-    transition: none;
-  }
-
-  .project-col > .col-scroll,
-  .project-col > .col-foot {
-    animation: none;
+  .project-col,
+  .project-col * {
     transition: none;
   }
 }
