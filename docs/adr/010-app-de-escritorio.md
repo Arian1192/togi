@@ -6,6 +6,8 @@
 
 **Estado:** aprobado el 7 de noviembre de 2026. Propuesto y revisado ese mismo día; la revisión añade la sección 8 (seguridad del contenido de los agentes), construye la fase 1 ahora en lugar del PR U7 (`togi inbox`) y resuelve la pregunta 1 sobre el navegador de los gates.
 
+**Enmienda del 9 de noviembre de 2026:** la barra lateral pasa de una lista plana de tareas a una **columna de proyectos** (alternativa B de la página «Fase 1» del lienzo). Cambian el §2 y la fila «Lista de tareas» del §3; el resto del ADR no cambia.
+
 El principio 3 hace del daemon el núcleo y de la CLI, la web UI y la app de escritorio sus clientes. Este ADR define la app de escritorio: qué muestra, cómo se conecta al daemon y qué no puede hacer. El diseño de referencia son las siete pantallas del [lienzo de la app de escritorio](https://claude.ai/artifact/QCo31vuqqDekePy6dNWcmM) y la identidad visual, el [manual de marca](../marca/manual-de-marca.md).
 
 Las referencias de uso son Conductor, Paseo, T3 Code y Herdr. De ellas se toman patrones comunes del género (lista de trabajos con su estado de atención, paneles divididos, diff, terminal, explorador de ficheros y uso intensivo del teclado), nunca su maquetación exacta ni su identidad visual.
@@ -29,14 +31,14 @@ Debe cumplir:
 
 ### 2. Dos densidades
 
-- **Banco de taller**, para trabajar: lista lateral de tareas agrupadas por quién tiene que actuar, la tarea seleccionada con pestañas y paneles divisibles (⌘D, ⌘⇧D, como máximo dos), barra de estado y paleta de comandos (⌘K) con los mismos verbos que la CLI.
+- **Banco de taller**, para trabajar: columna lateral de proyectos (un proyecto es un repo con tareas), cada uno con sus tareas agrupadas por quién tiene que actuar; la columna se pliega a un riel con la inicial de cada proyecto y su ◆ (⌘\). Tres vistas: «Pendiente de ti» (lo que espera tu decisión en todos los proyectos), el resumen de un proyecto y el cuaderno de una tarea. La tarea seleccionada con pestañas y paneles divisibles (⌘D, ⌘⇧D, como máximo dos), barra de estado y paleta de comandos (⌘K) con los mismos verbos que la CLI.
 - **Cuaderno**, para decidir: una tarea en `plan_review` o `review` se abre en la vista de lectura de la web, con un único botón principal.
 
 ### 3. Vistas
 
 | Vista | Qué muestra | Pantalla |
 | --- | --- | --- |
-| Lista de tareas | Te esperan, en marcha y el resto, con glifo, id, título y nota de estado | todas |
+| Columna de proyectos | Los proyectos (repos con tareas) y, en cada uno, sus tareas: te esperan, en marcha y el resto, con glifo, id, título y nota de estado. Los contadores son parciales si la lista llega truncada | todas |
 | Trayectoria | Las acciones de la sesión activa en orden: leer, razonar, editar, ejecutar y las denegadas por los hooks | 1 |
 | Plan | La versión aprobada y el historial con los motivos de cada cambio | 2 (cuaderno) |
 | Diff | El cambio frente a la base, con los ficheros marcados dentro o fuera del plan | 3 |
