@@ -34,7 +34,7 @@ test("la selección y el foco se ven con los tokens, no con colores propios", ()
   assert.match(css, /\.col-task:focus-visible[^{]*\{[^}]*outline: 2px solid var\(--ink\)/);
 });
 
-test("App monta la columna solo con la lista cargada y filtra lo que muestra por la vista", () => {
-  assert.match(app, /projects !== null && \(\s*<ProjectColumn/);
+test("App monta siempre la columna (sin lista solo enseña la marca y el estado) y filtra lo que muestra por la vista", () => {
+  assert.match(app, /<ProjectColumn\s+data=\{projects\}/);
   assert.match(app, /tasksFor\(view, list\.tasks\)/);
 });

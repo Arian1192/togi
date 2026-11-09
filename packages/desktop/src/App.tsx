@@ -119,23 +119,26 @@ export function App() {
   );
   return (
     <div className="workbench">
-      {projects !== null && (
-        <ProjectColumn
-          data={projects}
-          view={view}
-          closed={closed}
-          onView={setView}
-          onToggle={(repo) => setClosed((prev) => toggled(prev, repo))}
-        />
-      )}
+      {/* Siempre montada: si el daemon deja de responder no hay lista, pero el estado se sigue viendo. */}
+      <ProjectColumn
+        data={projects}
+        view={view}
+        closed={closed}
+        onView={setView}
+        onToggle={(repo) => setClosed((prev) => toggled(prev, repo))}
+        head={
+          <div className="logo">
+            <Monogram />
+            <span>togi</span>
+          </div>
+        }
+        foot={<p role="status">{text}</p>}
+      />
       <main className="shell">
-        <div className="logo">
-          <Monogram />
-          <span>togi</span>
-        </div>
-        <p role="status">{text}</p>
-        {list?.status === "ok" && (
+        {list?.status === "ok" ? (
           <TaskList tasks={tasksFor(view, list.tasks)} truncated={list.truncated} />
+        ) : (
+          <p className="muted">Sin lista de tareas.</p>
         )}
       </main>
     </div>

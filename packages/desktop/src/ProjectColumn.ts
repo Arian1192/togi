@@ -8,7 +8,12 @@ import type { View } from "./viewState.ts";
 // Sin JSX a propósito: los tests de la app corren con `node --test`, que no transforma .tsx.
 
 interface Props {
-  data: Projects;
+  /** `null`: no hay lista (el daemon no responde); la columna solo muestra la cabecera y el pie. */
+  data: Projects | null;
+  /** Arriba: la marca. */
+  head?: ReactNode;
+  /** Abajo: el estado del daemon. */
+  foot?: ReactNode;
   view: View;
   closed: ReadonlySet<string>;
   onView: (view: View) => void;
@@ -37,7 +42,7 @@ function counts(project: Project, partial: boolean): ReactNode {
   );
 }
 
-function projectBlock(project: Project, props: Props): ReactNode {
+function projectBlock(project: Project, props: Props & { data: Projects }): ReactNode {
   const { view, closed, onView, onToggle, data } = props;
   const open = !closed.has(project.repo);
   const selected = view.kind === "project" && view.repo === project.repo;
@@ -115,25 +120,33 @@ function projectBlock(project: Project, props: Props): ReactNode {
 }
 
 export function ProjectColumn(props: Props): ReactNode {
-  const { data, view, onView } = props;
+  const { data, view, onView, head, foot } = props;
   return createElement(
     "nav",
     { className: "project-col", "aria-label": "Proyectos" },
+    head && createElement("div", { key: "head", className: "col-head" }, head),
+    // Sin lista (el daemon no responde) no hay datos de tareas, pero sí cabecera y pie.
     createElement(
-      "button",
-      {
-        type: "button",
-        className: "col-pending",
-        "aria-current": on(view.kind === "pending"),
-        onClick: () => onView({ kind: "pending" }),
-      },
-      createElement("span", null, "Pendiente de ti"),
-      createElement("span", { className: "col-counts tone-human" }, [
-        createElement(StateGlyph, { key: "g", state: "plan_review" }),
-        data.pending.length,
-        data.partial && createElement("span", { key: "p", className: "col-partial" }, "+"),
-      ]),
+      "div",
+      { key: "scroll", className: "col-scroll" },
+      data &&
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "col-pending",
+            "aria-current": on(view.kind === "pending"),
+            onClick: () => onView({ kind: "pending" }),
+          },
+          createElement("span", null, "Pendiente de ti"),
+          createElement("span", { className: "col-counts tone-human" }, [
+            createElement(StateGlyph, { key: "g", state: "plan_review" }),
+            data.pending.length,
+            data.partial && createElement("span", { key: "p", className: "col-partial" }, "+"),
+          ]),
+        ),
+      data?.projects.map((project) => projectBlock(project, { ...props, data })),
     ),
-    data.projects.map((project) => projectBlock(project, props)),
+    foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
   );
 }
