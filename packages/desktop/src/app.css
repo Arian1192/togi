@@ -503,6 +503,23 @@ body {
   font-weight: 600;
 }
 
+/* El centro con una tarea elegida: el aviso del último intento y, debajo, el cuaderno. */
+.task-notebook {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-self: stretch;
+}
+
+.notebook-notice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
 .col-tasks {
   margin: 0;
   padding: 0 0 0 var(--space-4);

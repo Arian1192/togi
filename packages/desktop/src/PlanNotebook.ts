@@ -39,7 +39,7 @@ export interface PlanData {
 }
 
 const KANJI = ["一", "二", "三", "四"] as const;
-const RISK_LABEL: Record<string, string> = {
+export const RISK_LABEL: Record<string, string> = {
   low: "riesgo bajo",
   medium: "riesgo medio",
   high: "riesgo alto",
