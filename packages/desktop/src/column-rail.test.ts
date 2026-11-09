@@ -37,10 +37,9 @@ const TASKS = [
 
 interface Calls {
   views: View[];
-  collapse: number;
 }
 const column = (collapsed: boolean, view: View = PENDING) => {
-  const calls: Calls = { views: [], collapse: 0 };
+  const calls: Calls = { views: [] };
   const props = {
     data: buildProjects(TASKS, false),
     view,
@@ -48,9 +47,6 @@ const column = (collapsed: boolean, view: View = PENDING) => {
     onView: (v: View) => calls.views.push(v),
     onToggle: () => {},
     collapsed,
-    onCollapse: () => {
-      calls.collapse += 1;
-    },
     head: createElement("b", null, "MARCA"),
     foot: createElement("p", null, "DAEMON"),
   };
@@ -66,14 +62,12 @@ function find(node: ReactNode, test: (el: El) => boolean): El[] {
   return [...(test(el) ? [el] : []), ...find(el.props.children as ReactNode, test)];
 }
 
-test("desplegada lleva el asa para plegar con su atajo, y plegada, para desplegar", () => {
+test("plegada lleva su clase, y el control de plegar ya no va en la columna sino en la barra de título", () => {
   const open = column(false).html;
-  assert.match(open, /aria-label="Plegar la columna"/);
-  assert.match(open, /⌘\\/);
   assert.match(open, /<nav class="project-col"/);
   const closed = column(true).html;
   assert.match(closed, /<nav class="project-col is-collapsed"/);
-  assert.match(closed, /aria-label="Desplegar la columna"/);
+  assert.doesNotMatch(open + closed, /la columna"/);
 });
 
 test("plegada es la misma columna: el contenido no cambia, solo lo recorta el CSS", () => {
@@ -123,9 +117,7 @@ test("plegada conserva lo seleccionado y los botones avisan de lo que se pulsa",
     (found.props.onClick as () => void)();
   };
   click((b) => b.props.title === "togi · 1 esperan");
-  click((b) => b.props["aria-label"] === "Desplegar la columna");
   assert.deepEqual(calls.views, [{ kind: "project", repo: "o/togi" }]);
-  assert.equal(calls.collapse, 1);
 });
 
 test("⌘\\ es el atajo y nada más lo dispara", () => {
@@ -151,7 +143,7 @@ test("plegada mide 56 px y los botones siguen a 32 px como el resto", () => {
   assert.match(css, /\.col-pending,[^{]*\.col-name[^{]*\{[^}]*min-height: 32px/);
 });
 
-test("App pliega con el asa y con ⌘\\, y despliega sola si no hay lista para que el estado se vea", () => {
+test("App pliega con el botón de la barra de título y con ⌘\\, y despliega sola si no hay lista para que el estado se vea", () => {
   assert.match(app, /isToggleShortcut/);
   assert.match(app, /addEventListener\("keydown"/);
   assert.match(app, /removeEventListener\("keydown"/);

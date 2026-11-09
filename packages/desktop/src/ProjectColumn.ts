@@ -1,5 +1,5 @@
 import { stateColor } from "@togi/core";
-import { createElement, Fragment, type ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 import { closedLabel } from "./ProjectSummary.ts";
 import { openTasks, type Project, type Projects } from "./projects.ts";
 import { StateGlyph } from "./StateGlyph.ts";
@@ -26,11 +26,7 @@ interface Props {
   onToggle: (repo: string) => void;
   /** Plegada a un riel de 56 px con la inicial de cada proyecto. */
   collapsed?: boolean;
-  /** Pliega o despliega la columna; sin él no hay asa. */
-  onCollapse?: () => void;
 }
-
-const SHORTCUT = "⌘\\";
 
 const on = (selected: boolean) => (selected ? "true" : undefined);
 
@@ -165,51 +161,11 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
   );
 }
 
-// Iconos de Lucide (https://lucide.dev, licencia ISC): chevron-left y chevron-right, con el trazo de
-// 1,5 px y las esquinas rectas de los glifos de la marca.
-const CHEVRON = { left: "m15 18-6-6 6-6", right: "m9 18 6-6-6-6" } as const;
-
-/**
- * El control que pliega o despliega la columna: una pestaña fina sobre la línea que la separa del
- * centro, con un `<` para plegar y un `>` para desplegar. Va fuera de la columna (que recorta su
- * contenido) y pegada a su borde, así que acompaña la transición del ancho.
- */
-function collapseHandle(collapsed: boolean, onCollapse: (() => void) | undefined): ReactNode {
-  if (onCollapse === undefined) return null;
-  const label = collapsed ? "Desplegar la columna" : "Plegar la columna";
-  return createElement(
-    "div",
-    { key: "handle", className: "col-handle" },
-    createElement(
-      "button",
-      {
-        type: "button",
-        className: "col-handle-btn",
-        "aria-label": label,
-        "aria-expanded": !collapsed,
-        title: `${label} (${SHORTCUT})`,
-        onClick: onCollapse,
-      },
-      createElement(
-        "svg",
-        { viewBox: "0 0 24 24", width: 12, height: 12, fill: "none", "aria-hidden": true },
-        createElement("path", {
-          d: collapsed ? CHEVRON.right : CHEVRON.left,
-          stroke: "currentColor",
-          strokeWidth: 1.5,
-          strokeLinecap: "butt",
-          strokeLinejoin: "miter",
-        }),
-      ),
-    ),
-  );
-}
-
 export function ProjectColumn(props: Props): ReactNode {
   const { data, view, onView, head, foot } = props;
   // Sin lista no hay nada que plegar: la columna se queda como está para que se vea el estado.
   const collapsed = props.collapsed === true && data !== null;
-  const nav = createElement(
+  return createElement(
     "nav",
     {
       className: collapsed ? "project-col is-collapsed" : "project-col",
@@ -247,5 +203,4 @@ export function ProjectColumn(props: Props): ReactNode {
     ),
     foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
   );
-  return createElement(Fragment, null, nav, collapseHandle(collapsed, props.onCollapse));
 }

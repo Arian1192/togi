@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "El webview solo puede pedir el estado del daemon, la lista de tareas, el detalle de una tarea y su plan, decidir sobre el plan (la confirmación la pide Rust con un diálogo nativo), arrancar el reenvío de eventos y escucharlos.",
+  "description": "El webview solo puede pedir el estado del daemon, la lista de tareas, el detalle de una tarea y su plan, decidir sobre el plan (la confirmación la pide Rust con un diálogo nativo), arrancar el reenvío de eventos y escucharlos, y arrastrar la ventana desde su barra de título.",
   "windows": ["main"],
   "permissions": [
     "allow-get-daemon-status",
@@ -13,6 +13,7 @@
     "allow-reject-plan",
     "allow-read-trajectory",
     "core:event:allow-listen",
-    "core:event:allow-unlisten"
+    "core:event:allow-unlisten",
+    "core:window:allow-start-dragging"
   ]
 }

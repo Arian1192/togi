@@ -34,7 +34,7 @@ test("el webview carga solo el bundle propio: sin URL remota ni servidor de desa
   for (const w of config.app.windows) assert.equal(w.url, undefined);
 });
 
-test("las capacidades solo permiten los comandos concretos del daemon y escuchar eventos de Tauri", () => {
+test("las capacidades solo permiten los comandos concretos del daemon, escuchar eventos de Tauri y arrastrar la ventana", () => {
   const files = readdirSync(join(TAURI, "capabilities"));
   assert.deepEqual(files, ["default.json"]);
   const capability = JSON.parse(read(TAURI, "capabilities", "default.json")) as {
@@ -52,6 +52,7 @@ test("las capacidades solo permiten los comandos concretos del daemon y escuchar
     "allow-read-trajectory",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:window:allow-start-dragging",
   ]);
 });
 
@@ -59,9 +60,13 @@ test("ni tauri-plugin-dialog ni tauri-plugin-fs dan ningún permiso al webview: 
   const capability = JSON.parse(read(TAURI, "capabilities", "default.json")) as {
     permissions: string[];
   };
-  // Los únicos permisos con «:» son los de eventos del núcleo; los de plugins serían «dialog:…» o «fs:…».
+  // Los únicos permisos con «:» son los de eventos del núcleo y el de arrastrar la ventana desde la
+  // barra de título; los de plugins serían «dialog:…» o «fs:…».
   assert.deepEqual(
-    capability.permissions.filter((p) => p.includes(":") && !p.startsWith("core:event:")),
+    capability.permissions.filter(
+      (p) =>
+        p.includes(":") && !p.startsWith("core:event:") && p !== "core:window:allow-start-dragging",
+    ),
     [],
   );
   assert.deepEqual(

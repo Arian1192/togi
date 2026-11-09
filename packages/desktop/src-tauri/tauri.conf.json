@@ -4,7 +4,17 @@
   "identifier": "io.github.arian1192.togi",
   "build": { "frontendDist": "../dist" },
   "app": {
-    "windows": [{ "label": "main", "title": "togi", "width": 960, "height": 640 }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "togi",
+        "width": 960,
+        "height": 640,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 14, "y": 21 }
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src ipc:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     }
