@@ -252,3 +252,114 @@ body {
   color: var(--ink-muted);
   cursor: not-allowed;
 }
+
+/* Banco de taller (ADR-010 §2): la columna de proyectos, de 288 px, y el resto a su derecha. */
+.workbench {
+  display: flex;
+  min-height: 100vh;
+}
+
+.workbench > .shell {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-col {
+  flex: none;
+  box-sizing: border-box;
+  width: 288px;
+  padding: var(--space-3) var(--space-2);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  font: 400 13px / 20px var(--font-sans);
+}
+
+/* Filas de 32 px (manual de marca): todo lo que se pulsa en la columna es un botón. */
+.col-pending,
+.col-name,
+.col-task,
+.col-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.col-pending,
+.col-name,
+.col-task {
+  flex: 1;
+  min-width: 0;
+}
+
+.col-pending,
+.col-name {
+  justify-content: space-between;
+}
+
+.col-pending[aria-current="true"],
+.col-name[aria-current="true"],
+.col-task[aria-current="true"] {
+  background: var(--border);
+}
+
+.col-pending:focus-visible,
+.col-name:focus-visible,
+.col-task:focus-visible,
+.col-toggle:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.col-project {
+  margin-top: var(--space-3);
+}
+
+.col-row {
+  display: flex;
+  align-items: center;
+}
+
+.col-counts {
+  display: inline-flex;
+  gap: var(--space-2);
+  font: 400 12px / 20px var(--font-mono);
+}
+
+.col-counts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.col-partial {
+  color: var(--ink-muted);
+}
+
+.col-tasks {
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  list-style: none;
+}
+
+.col-task .ident {
+  flex: none;
+  color: var(--ink-muted);
+  font: 400 12px / 20px var(--font-mono);
+}
+
+.col-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
