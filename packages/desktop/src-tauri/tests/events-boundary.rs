@@ -58,12 +58,13 @@ fn fake_daemon(home: &Path, status: &str, sse: String, chunk: usize) -> JoinHand
         .unwrap();
         let (mut events, _) = listener.accept().unwrap();
         let second = request(&mut events);
-        write!(
+        // El cliente puede cortar antes de leer las cabeceras (un rechazo): en macOS escribir en un
+        // socket ya cerrado da «Socket is not connected». No es un fallo del test.
+        let _ = write!(
             events,
             "HTTP/1.1 {status}\r\ntransfer-encoding: chunked\r\nx-echo: Bearer {SENTINEL}\r\n\r\n"
-        )
-        .unwrap();
-        // El cliente puede cortar antes de que acabe el cuerpo (un error de contrato): no es un fallo.
+        );
+        // Igual con el cuerpo: el cliente puede cortar antes de que acabe (un error de contrato).
         let _ = (|| -> std::io::Result<()> {
             for part in sse.as_bytes().chunks(chunk) {
                 write!(events, "{:x}\r\n", part.len())?;
