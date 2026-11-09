@@ -1,5 +1,5 @@
 import { stateColor } from "@togi/core";
-import { createElement, type ReactNode, useEffect, useState } from "react";
+import { createElement, Fragment, type ReactNode, useEffect, useState } from "react";
 import { closedLabel } from "./ProjectSummary.ts";
 import { openTasks, type Project, type Projects } from "./projects.ts";
 import { StateGlyph } from "./StateGlyph.ts";
@@ -136,30 +136,42 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
   );
 }
 
-/** El botón de la cabecera que pliega o despliega la columna. */
-function collapseButton({ collapsed, onCollapse }: Props): ReactNode {
+// Iconos de Lucide (https://lucide.dev, licencia ISC): chevron-left y chevron-right, con el trazo de
+// 1,5 px y las esquinas rectas de los glifos de la marca.
+const CHEVRON = { left: "m15 18-6-6 6-6", right: "m9 18 6-6-6-6" } as const;
+
+/**
+ * El control que pliega o despliega la columna: una pestaña fina sobre la línea que la separa del
+ * centro, con un `<` para plegar y un `>` para desplegar. Va fuera de la columna (que recorta su
+ * contenido) y pegada a su borde, así que acompaña la transición del ancho.
+ */
+function collapseHandle({ collapsed, onCollapse }: Props): ReactNode {
   if (onCollapse === undefined) return null;
   const label = collapsed ? "Desplegar la columna" : "Plegar la columna";
   return createElement(
-    "button",
-    {
-      key: "collapse",
-      type: "button",
-      className: "col-collapse",
-      "aria-label": label,
-      "aria-expanded": !collapsed,
-      title: `${label} (${SHORTCUT})`,
-      onClick: onCollapse,
-    },
+    "div",
+    { key: "handle", className: "col-handle" },
     createElement(
-      "svg",
-      { viewBox: "0 0 16 16", width: "1em", height: "1em", "aria-hidden": true },
-      createElement("path", {
-        d: "M2.75 3.25h10.5v9.5H2.75zM6.25 3.25v9.5",
-        fill: "none",
-        stroke: "currentColor",
-        strokeWidth: 1.5,
-      }),
+      "button",
+      {
+        type: "button",
+        className: "col-handle-btn",
+        "aria-label": label,
+        "aria-expanded": !collapsed,
+        title: `${label} (${SHORTCUT})`,
+        onClick: onCollapse,
+      },
+      createElement(
+        "svg",
+        { viewBox: "0 0 24 24", width: 12, height: 12, fill: "none", "aria-hidden": true },
+        createElement("path", {
+          d: collapsed ? CHEVRON.right : CHEVRON.left,
+          stroke: "currentColor",
+          strokeWidth: 1.5,
+          strokeLinecap: "butt",
+          strokeLinejoin: "miter",
+        }),
+      ),
     ),
   );
 }
@@ -261,11 +273,10 @@ export function ProjectColumn(props: Props): ReactNode {
   // Sin `settled` el contenido plegado aparece a la vez que el ancho (sin transición de contenido).
   const { className, showRail } = railState(target, props.settled ?? true);
   const rolled = showRail;
-  return createElement(
+  const nav = createElement(
     "nav",
     { className, "aria-label": "Proyectos" },
-    (head || props.onCollapse) &&
-      createElement("div", { key: "head", className: "col-head" }, head, collapseButton(props)),
+    head && createElement("div", { key: "head", className: "col-head" }, head),
     rolled &&
       data !== null &&
       createElement("div", { key: "rail", className: "col-scroll" }, rail({ ...props, data })),
@@ -295,4 +306,5 @@ export function ProjectColumn(props: Props): ReactNode {
     // El estado del daemon no cabe en 56 px: con el riel no se pinta (App despliega sola si cae).
     !rolled && foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
   );
+  return createElement(Fragment, null, nav, collapseHandle(props));
 }
