@@ -1,6 +1,7 @@
 //! Los eventos del daemon hacia la interfaz (ADR-010 §1). Lee `GET /v1/events` (SSE) por el socket y
-//! reenvía al webview, como eventos de Tauri, solo un resumen: de qué tarea y de qué tipo. El token
-//! y el contenido de los eventos se quedan aquí.
+//! reenvía al webview, como eventos de Tauri, solo un resumen: de qué tarea y de qué tipo. Para la
+//! mesa en vivo reenvía además su cabecera (hora y quién: humano, rol del agente o pieza de togi). El
+//! token, el contenido de los eventos y los identificadores de usuario y sesión se quedan aquí.
 
 use crate::daemon::{connection, get, home};
 use serde::Serialize;
@@ -35,6 +36,79 @@ pub enum Forwarded {
     Closed {
         reason: &'static str,
     },
+}
+
+/// Nombre del evento de Tauri con la cabecera de cada evento, para la mesa en vivo (ADR-010 §3).
+pub const HEADER_EVENT: &str = "daemon-event-header";
+
+/// Quién emitió un evento, sin identificadores: ni el usuario ni la sesión salen de aquí.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Who {
+    Human,
+    /// `role` es el rol del agente (`planner`, `builder`…).
+    Agent {
+        role: String,
+    },
+    /// `component` es la pieza de togi (`gates`, `merger`…).
+    System {
+        component: String,
+    },
+}
+
+/// La cabecera de un evento de tarea: cuándo, quién y qué, nunca su contenido.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Header {
+    pub seq: u64,
+    pub at: String,
+    pub number: u64,
+    pub name: String,
+    pub actor: Who,
+}
+
+/// Una palabra corta del vocabulario cerrado del daemon: minúsculas, `.`, `_`, `-` o `:`.
+fn word(value: Option<&serde_json::Value>, max: usize, token: &str) -> Option<String> {
+    value
+        .and_then(|v| v.as_str())
+        .filter(|s| {
+            !s.is_empty()
+                && s.len() <= max
+                && !s.contains(token)
+                && s.chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "._-:".contains(c))
+        })
+        .map(str::to_owned)
+}
+
+/// La cabecera de un evento ya reenviado; `None` si le falta la hora o un actor reconocible.
+fn header(summary: &Forwarded, json: &serde_json::Value, token: &str) -> Option<Header> {
+    let Forwarded::Task { seq, number, name } = summary else {
+        return None;
+    };
+    let at = json.get("at").and_then(|a| a.as_str()).filter(|a| {
+        !a.is_empty()
+            && a.len() <= 40
+            && a.chars()
+                .all(|c| c.is_ascii_digit() || "-:.TZ+".contains(c))
+    })?;
+    let actor = json.get("actor")?;
+    let actor = match actor.get("kind").and_then(|k| k.as_str())? {
+        "human" => Who::Human,
+        "agent" => Who::Agent {
+            role: word(actor.get("role"), 32, token)?,
+        },
+        "system" => Who::System {
+            component: word(actor.get("component"), 40, token)?,
+        },
+        _ => return None,
+    };
+    Some(Header {
+        seq: *seq,
+        at: at.to_owned(),
+        number: *number,
+        name: name.clone(),
+        actor,
+    })
 }
 
 /// Cuerpo con `Transfer-Encoding: chunked`, que es como el daemon manda el SSE.
@@ -93,7 +167,11 @@ fn line<R: BufRead>(reader: &mut R, buf: &mut Vec<u8>) -> Result<bool, &'static 
 }
 
 /// Resumen de un mensaje SSE completo. `None` si no es de una tarea; error si está fuera de contrato.
-fn forward(name: &str, data: &str, token: &str) -> Result<Option<Forwarded>, &'static str> {
+fn forward(
+    name: &str,
+    data: &str,
+    token: &str,
+) -> Result<Option<(Forwarded, serde_json::Value)>, &'static str> {
     if name == "error" {
         return Err("integrity_error");
     }
@@ -118,11 +196,14 @@ fn forward(name: &str, data: &str, token: &str) -> Result<Option<Forwarded>, &'s
                 .all(|c| c.is_ascii_lowercase() || "._".contains(c))
     });
     match (seq, number, kind) {
-        (Some(seq), Some(number), Some(kind)) => Ok(Some(Forwarded::Task {
-            seq,
-            number,
-            name: kind.to_owned(),
-        })),
+        (Some(seq), Some(number), Some(kind)) => {
+            let summary = Forwarded::Task {
+                seq,
+                number,
+                name: kind.to_owned(),
+            };
+            Ok(Some((summary, json)))
+        }
         _ => Err("bad_response"),
     }
 }
@@ -130,10 +211,24 @@ fn forward(name: &str, data: &str, token: &str) -> Result<Option<Forwarded>, &'s
 /// Abre el stream del daemon de `home` desde su último evento y entrega cada resumen a `emit`.
 /// Vuelve con el motivo cerrado de por qué terminó.
 pub fn stream_at(home: &Path, emit: &mut dyn FnMut(Forwarded)) -> &'static str {
-    run(home, emit).err().unwrap_or("closed")
+    run(home, emit, &mut |_| {}).err().unwrap_or("closed")
 }
 
-fn run(home: &Path, emit: &mut dyn FnMut(Forwarded)) -> Result<(), &'static str> {
+/// Como `stream_at`, y además entrega a `emit_header` la cabecera de cada evento de tarea que la
+/// tenga completa (hora y actor reconocible), justo después de su resumen.
+pub fn stream_with_headers_at(
+    home: &Path,
+    emit: &mut dyn FnMut(Forwarded),
+    emit_header: &mut dyn FnMut(Header),
+) -> &'static str {
+    run(home, emit, emit_header).err().unwrap_or("closed")
+}
+
+fn run(
+    home: &Path,
+    emit: &mut dyn FnMut(Forwarded),
+    emit_header: &mut dyn FnMut(Header),
+) -> Result<(), &'static str> {
     let (token, socket) = connection(home)?;
     let last = match get(&socket, &token, "/v1/health", 64 * 1024)? {
         (200, body) => serde_json::from_slice::<serde_json::Value>(&body)
@@ -191,8 +286,12 @@ fn run(home: &Path, emit: &mut dyn FnMut(Forwarded)) -> Result<(), &'static str>
         let text = String::from_utf8_lossy(&buf);
         let text = text.trim_end_matches(['\r', '\n']);
         if text.is_empty() {
-            if let Some(event) = forward(&name, &data, &token)? {
-                emit(event);
+            if let Some((summary, json)) = forward(&name, &data, &token)? {
+                let head = header(&summary, &json, &token);
+                emit(summary);
+                if let Some(head) = head {
+                    emit_header(head);
+                }
             }
             name.clear();
             data.clear();
@@ -218,9 +317,15 @@ pub fn watch_events(app: tauri::AppHandle) {
     }
     std::thread::spawn(move || loop {
         let reason = match home() {
-            Some(home) => stream_at(&home, &mut |event| {
-                let _ = app.emit(EVENT, &event);
-            }),
+            Some(home) => stream_with_headers_at(
+                &home,
+                &mut |event| {
+                    let _ = app.emit(EVENT, &event);
+                },
+                &mut |head| {
+                    let _ = app.emit(HEADER_EVENT, &head);
+                },
+            ),
             None => "no_home",
         };
         let _ = app.emit(EVENT, &Forwarded::Closed { reason });
