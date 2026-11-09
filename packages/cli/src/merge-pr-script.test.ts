@@ -29,6 +29,7 @@ const PENDING = GREEN.replace('"rust","state":"SUCCESS"', '"rust","state":"PENDI
 // gh falso: responde a view/checks/api, registra cada llamada y simula el merge empujando el head a main.
 // El head vive en $FAKE_STATE/head; update-branch lo cambia a $FAKE_STATE/newhead si existe.
 // Las primeras $FAKE_PENDING_CALLS consultas de checks devuelven $FAKE_PENDING.
+// Las primeras $FAKE_NOCHECKS_CALLS fallan como el gh real cuando el head aún no tiene jobs.
 // Con --delete-branch borra la rama remota y falla al borrar la local, sugiriendo «git worktree remove».
 const FAKE_GH = `#!/usr/bin/env bash
 echo "$*" >> "$FAKE_GH_LOG"
@@ -41,6 +42,7 @@ case "$1 $2" in
     esac ;;
   "pr checks")
     n=$(( $(cat "$FAKE_STATE/n" 2>/dev/null || echo 0) + 1 )); echo $n > "$FAKE_STATE/n"
+    if (( n <= \${FAKE_NOCHECKS_CALLS:-0} )); then echo "no checks reported on the '$FAKE_BRANCH' branch" >&2; exit 1; fi
     if (( n <= \${FAKE_PENDING_CALLS:-0} )); then echo "$FAKE_PENDING"; else echo "$FAKE_CHECKS"; fi ;;
   "pr update-branch") if [[ -f "$FAKE_STATE/newhead" ]]; then cp "$FAKE_STATE/newhead" "$FAKE_STATE/head"; fi ;;
   "pr merge")
@@ -246,6 +248,53 @@ test("PR por detrás de main: update-branch, espera a la CI del nuevo head y mer
       readFileSync(join(s.root, "newhead"), "utf8"),
     );
     assert.equal(s.git(s.repo, "branch", "--list", BRANCH), "");
+  });
+});
+
+test("PR por detrás de main cuyos jobs tardan en aparecer tras update-branch: espera, sigue y mergea", () => {
+  withRepo((s) => {
+    s.goBehind();
+    const r = s.runWith(["7"], { FAKE_NOCHECKS_CALLS: "2" });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    assert.ok(checkCalls(s.calls()).length >= 3);
+    assert.match(s.calls(), /pr merge 7 --rebase/);
+  });
+});
+
+test("--auto con jobs que tardan en aparecer tras update-branch: espera y activa el merge automático", () => {
+  withRepo((s) => {
+    s.goBehind();
+    const r = s.runWith(["--auto", "7"], { FAKE_NOCHECKS_CALLS: "2", FAKE_CHECKS: PENDING });
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const c = s.calls();
+    assert.ok(checkCalls(c).length >= 3);
+    assert.ok(c.indexOf("pr update-branch 7 --rebase") < c.indexOf("pr merge 7 --auto --rebase"));
+  });
+});
+
+test("los jobs del head nuevo no aparecen antes de agotar la espera: sale con 1 sin mergear ni activar nada", () => {
+  for (const [args, verb] of [
+    [["7"], "No se mergea"],
+    [["--auto", "7"], "No se activa el merge automático"],
+  ] as const) {
+    withRepo((s) => {
+      s.goBehind();
+      const r = s.runWith([...args], { FAKE_NOCHECKS_CALLS: "99" });
+      assert.equal(r.status, 1);
+      assert.match(r.stdout, /no han aparecido los jobs del nuevo head del PR #7/);
+      assert.match(r.stdout, new RegExp(verb));
+      assert.doesNotMatch(s.calls(), /pr merge/);
+    });
+  }
+});
+
+test("tras update-branch con jobs a la primera: una sola consulta de espera antes de leerlos", () => {
+  withRepo((s) => {
+    s.goBehind();
+    const r = s.run();
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    // Una de wait_for_jobs y una de read_checks, que ya los encuentra en verde.
+    assert.equal(checkCalls(s.calls()).length, 2);
   });
 });
 

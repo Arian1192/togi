@@ -4,6 +4,8 @@
 # Uso: tools/merge-pr.sh [--auto] <número del PR>
 #   --auto  activa el merge automático de GitHub (gh pr merge --auto) y termina sin esperar a la CI;
 #           solo si los jobs obligatorios de la protección de main coinciden con REQUIRED.
+# Tras update-branch espera primero a que el head nuevo tenga jobs (hasta entonces gh dice «no checks
+# reported» y sale con 1), en los dos modos.
 # Esperas: MERGE_PR_POLL_SECONDS (20) entre consultas y MERGE_PR_MAX_POLLS (90) consultas como máximo.
 set -euo pipefail
 
@@ -47,6 +49,18 @@ read_checks() {
       ;;
     esac
   done
+}
+
+# Espera a que el PR tenga algún job. Tolera el fallo de gh: sale con 1 mientras no hay ninguno.
+wait_for_jobs() {
+  local out i
+  for ((i = 0; i < MAX_POLLS; i++)); do
+    out=$(gh pr checks "$pr" --json name,state 2>/dev/null) || out=""
+    if [[ -n "$out" ]] && (($(jq length <<<"$out") > 0)); then return; fi
+    sleep "$POLL"
+  done
+  echo "✗ Tras update-branch no han aparecido los jobs del nuevo head del PR #${pr}. $1"
+  exit 1
 }
 
 not_green() {
@@ -102,6 +116,7 @@ if ! is_up_to_date; then
     exit 1
   fi
   updated=1
+  if ((auto)); then wait_for_jobs "No se activa el merge automático."; else wait_for_jobs "No se mergea."; fi
 fi
 
 if ((auto)); then
