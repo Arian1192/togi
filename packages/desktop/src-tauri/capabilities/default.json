@@ -11,6 +11,7 @@
     "allow-approve-plan",
     "allow-request-plan-changes",
     "allow-reject-plan",
+    "allow-read-trajectory",
     "core:event:allow-listen",
     "core:event:allow-unlisten"
   ]

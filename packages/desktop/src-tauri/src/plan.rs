@@ -75,7 +75,7 @@ fn failed(reason: &'static str) -> Decision {
 }
 
 /// Motivo cerrado para un código HTTP que no es el esperado.
-fn closed_reason(code: u16) -> &'static str {
+pub(crate) fn closed_reason(code: u16) -> &'static str {
     match code {
         401 => "unauthorized",
         404 => "not_found",

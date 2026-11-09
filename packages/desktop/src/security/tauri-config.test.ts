@@ -49,6 +49,7 @@ test("las capacidades solo permiten los comandos concretos del daemon y escuchar
     "allow-approve-plan",
     "allow-request-plan-changes",
     "allow-reject-plan",
+    "allow-read-trajectory",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
   ]);
@@ -77,7 +78,7 @@ test("ni tauri-plugin-dialog ni tauri-plugin-fs dan ningún permiso al webview: 
 test("los comandos están declarados en build.rs y son los únicos registrados en el invoke handler", () => {
   assert.match(
     read(TAURI, "build.rs"),
-    /\.commands\(&\[\s*"get_daemon_status",\s*"list_tasks",\s*"read_task",\s*"watch_events",\s*"read_plan",\s*"approve_plan",\s*"request_plan_changes",\s*"reject_plan",?\s*\]\)/,
+    /\.commands\(&\[\s*"get_daemon_status",\s*"list_tasks",\s*"read_task",\s*"watch_events",\s*"read_plan",\s*"approve_plan",\s*"request_plan_changes",\s*"reject_plan",\s*"read_trajectory",?\s*\]\)/,
   );
   const handler = /generate_handler!\[([^\]]*)\]/.exec(read(TAURI, "src", "lib.rs"))?.[1];
   assert.deepEqual(
@@ -94,6 +95,7 @@ test("los comandos están declarados en build.rs y son los únicos registrados e
       "plan::approve_plan",
       "plan::request_plan_changes",
       "plan::reject_plan",
+      "trajectory::read_trajectory",
     ],
   );
 });
