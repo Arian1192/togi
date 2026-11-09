@@ -422,6 +422,7 @@ body {
 
 .col-counts {
   display: inline-flex;
+  align-items: center;
   gap: var(--space-2);
   font: 400 12px / 20px var(--font-mono);
 }
@@ -434,6 +435,36 @@ body {
 
 .col-partial {
   color: var(--ink-muted);
+}
+
+/* Un proyecto sin tareas abiertas: dice cuántas hay cerradas, en gris. */
+.col-empty {
+  margin: 0;
+  padding: 0 var(--space-2) 0 var(--space-6);
+  color: var(--ink-muted);
+}
+
+/* Resumen de un proyecto (centro): título en la serif de la marca, el repo en mono. */
+.view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  align-self: stretch;
+}
+
+.view-title {
+  margin: 0;
+  font: 600 30px / 38px var(--font-display);
+}
+
+.view-meta {
+  margin: calc(var(--space-4) * -1) 0 0;
+  color: var(--ink-muted);
+}
+
+.kanji {
+  font-family: var(--font-display);
+  font-weight: 600;
 }
 
 .col-tasks {

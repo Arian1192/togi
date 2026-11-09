@@ -56,6 +56,28 @@ export function openTasks(project: Project): TaskRow[] {
     .sort((a, b) => rank(a) - rank(b) || a.number - b.number);
 }
 
+export interface Summary {
+  waiting: TaskRow[];
+  active: TaskRow[];
+  drafts: TaskRow[];
+  /** Cuántas hay cerradas: no se listan, son un contador. */
+  closed: number;
+}
+
+/** El resumen de un proyecto: sus tareas por tramo (como la columna) y el número de cerradas. */
+export function summaryOf(project: Project): Summary {
+  const tasks = openTasks(project);
+  const closed = project.tasks.filter(
+    (task) => Object.hasOwn(STATE_BRAND, task.state) && attentionGroup(task.state) === "closed",
+  );
+  return {
+    waiting: tasks.filter(isWaiting),
+    active: tasks.filter((t) => !isWaiting(t) && attentionGroup(t.state) === "active"),
+    drafts: tasks.filter((t) => t.state === "draft"),
+    closed: closed.length,
+  };
+}
+
 /** Agrupa las tareas por repo. Primero los proyectos con algo que te espera; después, por nombre. */
 export function buildProjects(tasks: TaskRow[], truncated: boolean): Projects {
   const byRepo = new Map<string, TaskRow[]>();

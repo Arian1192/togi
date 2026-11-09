@@ -1,5 +1,6 @@
 import { stateColor } from "@togi/core";
 import { createElement, type ReactNode } from "react";
+import { closedLabel } from "./ProjectSummary.ts";
 import { openTasks, type Project, type Projects } from "./projects.ts";
 import { StateGlyph } from "./StateGlyph.ts";
 import type { View } from "./viewState.ts";
@@ -90,6 +91,14 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
         counts(project, data.partial),
       ),
     ),
+    open &&
+      openTasks(project).length === 0 &&
+      project.counts.closed > 0 &&
+      createElement(
+        "p",
+        { className: "col-empty" },
+        closedLabel(project.counts.closed, data.partial),
+      ),
     open &&
       createElement(
         "ul",

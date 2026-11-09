@@ -72,13 +72,18 @@ function Row({ task }: { task: TaskRow }): ReactNode {
   );
 }
 
-function Group({ group, tasks }: { group: AttentionGroup; tasks: TaskRow[] }): ReactNode {
-  const heading = `${GROUP_LABEL[group]} · ${tasks.length}`;
-  const rows = createElement(
+/** Las filas de una lista de tareas, con el aspecto de la lista del centro. */
+export function TaskRows({ tasks }: { tasks: TaskRow[] }): ReactNode {
+  return createElement(
     "ul",
     { className: "task-rows" },
     tasks.map((task) => createElement(Row, { key: task.number, task })),
   );
+}
+
+function Group({ group, tasks }: { group: AttentionGroup; tasks: TaskRow[] }): ReactNode {
+  const heading = `${GROUP_LABEL[group]} · ${tasks.length}`;
+  const rows = createElement(TaskRows, { tasks });
   // Las cerradas van plegadas, como `togi status` las oculta; el recuento se ve igualmente.
   if (group === "closed") {
     return createElement(
