@@ -7,7 +7,8 @@
       "!pnpm-lock.yaml",
       "!packages/desktop/dist",
       "!packages/desktop/src-tauri/target",
-      "!packages/desktop/src-tauri/gen"
+      "!packages/desktop/src-tauri/gen",
+      "!!**/.claude"
     ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
