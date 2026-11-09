@@ -10,6 +10,10 @@ import { buildProjects } from "./projects.ts";
 import type { TaskRow } from "./TaskList.ts";
 import { isToggleShortcut, PENDING, type View } from "./viewState.ts";
 
+// La columna plegada es la MISMA columna (un solo DOM, como el Sidebar de shadcn): el contenido no
+// cambia entre un estado y otro, solo el CSS lo recorta, lo desvanece o lo coloca. Por eso la
+// transición es continua. Aquí se vigila el contenido y el cableado; las medidas, en column-transition.
+
 const SRC = import.meta.dirname;
 const css = readFileSync(join(SRC, "app.css"), "utf8");
 const app = readFileSync(join(SRC, "App.tsx"), "utf8");
@@ -62,58 +66,66 @@ function find(node: ReactNode, test: (el: El) => boolean): El[] {
   return [...(test(el) ? [el] : []), ...find(el.props.children as ReactNode, test)];
 }
 
-test("desplegada, la cabecera lleva un botón para plegar con su atajo", () => {
-  const { html } = column(false);
+test("desplegada lleva el asa para plegar con su atajo, y plegada, para desplegar", () => {
+  const open = column(false).html;
+  assert.match(open, /aria-label="Plegar la columna"/);
+  assert.match(open, /⌘\\/);
+  assert.match(open, /<nav class="project-col"/);
+  const closed = column(true).html;
+  assert.match(closed, /<nav class="project-col is-collapsed"/);
+  assert.match(closed, /aria-label="Desplegar la columna"/);
+});
+
+test("plegada es la misma columna: el contenido no cambia, solo lo recorta el CSS", () => {
+  const open = column(false).html;
+  const closed = column(true).html;
+  for (const text of [
+    "MARCA",
+    "DAEMON",
+    "Pendiente de ti",
+    "togi",
+    "promos",
+    "tarea 1",
+    "tarea 3",
+  ]) {
+    assert.ok(open.includes(text), `desplegada: falta ${text}`);
+    assert.ok(closed.includes(text), `plegada: falta ${text}`);
+  }
+  const buttons = (html: string) => (html.match(/<button/g) ?? []).length;
+  assert.equal(buttons(open), buttons(closed));
+});
+
+test("cada proyecto lleva su inicial como icono, decorativo, y el nombre sigue siendo el accesible", () => {
+  const { html } = column(true);
+  for (const initial of ["T", "P"]) {
+    assert.match(html, new RegExp(`class="col-initial"[^>]*aria-hidden="true">${initial}<`));
+  }
+  assert.match(html, /title="togi · 1 esperan"/);
+  assert.match(html, /<span class="col-label">togi<\/span>/);
+});
+
+test("«Pendiente de ti» lleva su ◆ como icono, decorativo, y su etiqueta sigue ahí", () => {
+  const { html } = column(true);
+  assert.match(html, /<span class="col-label">Pendiente de ti<\/span>/);
   assert.match(
     html,
-    /aria-label="Plegar la columna"[^>]*aria-expanded="true"|aria-expanded="true"[^>]*aria-label="Plegar la columna"/,
+    /class="col-initial tone-human"[^>]*aria-hidden="true"><svg[^>]*class="glyph"/,
   );
-  assert.match(html, /⌘\\/);
-  assert.doesNotMatch(html, /is-rail/);
 });
 
-test("plegada, es un riel: sin tareas ni nombres largos, con la inicial de cada proyecto", () => {
-  const { html } = column(true);
-  assert.match(html, /project-col is-rail/);
-  assert.doesNotMatch(html, /tarea 1|Pendiente de ti</);
-  for (const initial of ["t", "p"]) {
-    assert.match(html, new RegExp(`class="rail-initial"[^>]*>${initial}<`, "i"));
-  }
-  assert.match(html, /aria-label="Desplegar la columna"/);
-});
-
-test("en el riel cada proyecto sigue siendo un botón con su nombre completo para un lector de pantalla", () => {
-  const { html } = column(true);
-  assert.match(html, /aria-label="togi"/);
-  assert.match(html, /aria-label="promos"/);
-});
-
-test("en el riel solo el proyecto con algo que te espera lleva el ◆", () => {
-  const { html } = column(true);
-  const togi = html.slice(html.indexOf('aria-label="togi"'), html.indexOf('aria-label="promos"'));
-  assert.match(togi, /tone-human/);
-  const promos = html.slice(html.indexOf('aria-label="promos"'));
-  assert.doesNotMatch(promos.slice(0, promos.indexOf("</button>")), /tone-human/);
-});
-
-test("el riel conserva lo seleccionado y los botones avisan de lo que se pulsa", () => {
+test("plegada conserva lo seleccionado y los botones avisan de lo que se pulsa", () => {
   const { props, calls, html } = column(true, { kind: "project", repo: "o/promos" });
   assert.equal((html.match(/aria-current="true"/g) ?? []).length, 1);
   const buttons = find(ProjectColumn(props), (el) => el.type === "button");
-  const click = (label: string) => {
-    const found = buttons.find((b) => b.props["aria-label"] === label);
-    assert.ok(found, label);
+  const click = (match: (b: El) => boolean) => {
+    const found = buttons.find(match);
+    assert.ok(found);
     (found.props.onClick as () => void)();
   };
-  click("togi");
-  click("Desplegar la columna");
+  click((b) => b.props.title === "togi · 1 esperan");
+  click((b) => b.props["aria-label"] === "Desplegar la columna");
   assert.deepEqual(calls.views, [{ kind: "project", repo: "o/togi" }]);
   assert.equal(calls.collapse, 1);
-});
-
-test("plegada no enseña el pie (el estado del daemon), que no cabe en 56 px", () => {
-  assert.doesNotMatch(column(true).html, /DAEMON/);
-  assert.match(column(false).html, /DAEMON/);
 });
 
 test("⌘\\ es el atajo y nada más lo dispara", () => {
@@ -134,12 +146,12 @@ test("⌘\\ es el atajo y nada más lo dispara", () => {
   assert.equal(key({ key: "k" }), false);
 });
 
-test("el riel mide 56 px y lleva los botones a 32 px como el resto", () => {
-  assert.match(css, /\.project-col\.is-rail \{[^}]*width: 56px/);
-  assert.match(css, /\.rail-project[^{]*\{[^}]*min-height: 32px/);
+test("plegada mide 56 px y los botones siguen a 32 px como el resto", () => {
+  assert.match(css, /\.project-col\.is-collapsed \{[^}]*width: 56px/);
+  assert.match(css, /\.col-pending,[^{]*\.col-name[^{]*\{[^}]*min-height: 32px/);
 });
 
-test("App pliega con el botón y con ⌘\\, y despliega sola si no hay lista para que el estado se vea", () => {
+test("App pliega con el asa y con ⌘\\, y despliega sola si no hay lista para que el estado se vea", () => {
   assert.match(app, /isToggleShortcut/);
   assert.match(app, /addEventListener\("keydown"/);
   assert.match(app, /removeEventListener\("keydown"/);

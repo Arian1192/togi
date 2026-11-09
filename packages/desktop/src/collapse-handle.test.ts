@@ -5,7 +5,7 @@ import { test } from "node:test";
 import type { TaskState } from "@togi/core";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ProjectColumn, TRANSITION_MS } from "./ProjectColumn.ts";
+import { ProjectColumn } from "./ProjectColumn.ts";
 import { buildProjects } from "./projects.ts";
 import type { TaskRow } from "./TaskList.ts";
 import { PENDING } from "./viewState.ts";
@@ -121,24 +121,6 @@ test("el foco y el hover se ven con los tokens", () => {
   assert.match(css, /\.col-handle-btn:focus-visible[^{]*\{[^}]*outline: 2px solid var\(--ink\)/);
 });
 
-test("el contenido nuevo aparece con un fundido en vez de golpe (era el «pop»)", () => {
-  assert.match(css, /@keyframes col-fade-in \{[^}]*from \{[^}]*opacity: 0/);
-  const content = css.slice(css.indexOf(".project-col > .col-scroll"));
-  assert.match(content, /animation: col-fade-in [0-9]+ms ease-out backwards/);
-  assert.match(content, /\.project-col > \.col-foot/);
-});
-
-test("el contenido desplegado se desvanece rápido al plegar, antes de que cambie", () => {
-  const out = rule(
-    ".project-col.is-rail:not(.is-rolled) > .col-scroll,\n.project-col.is-rail:not(.is-rolled) > .col-foot",
-  );
-  assert.match(out, /opacity: 0/);
-  const ms = Number(/opacity ([0-9]+)ms/.exec(out)?.[1]);
-  assert.ok(ms > 0 && ms < TRANSITION_MS, `${ms}ms debe ser menor que ${TRANSITION_MS}ms`);
-});
-
-test("con «reducir movimiento» no hay fundidos", () => {
-  const media = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
-  assert.match(media, /\.project-col > \.col-scroll[^{]*\{[^}]*animation: none/);
-  assert.match(media, /transition: none/);
+test("el contenido ya no cambia a mitad de la animación, así que no hay fundidos para disimularlo", () => {
+  assert.doesNotMatch(css, /@keyframes col-fade-in|animation: col-fade-in/);
 });

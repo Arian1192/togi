@@ -1,5 +1,5 @@
 import { stateColor } from "@togi/core";
-import { createElement, Fragment, type ReactNode, useEffect, useState } from "react";
+import { createElement, Fragment, type ReactNode } from "react";
 import { closedLabel } from "./ProjectSummary.ts";
 import { openTasks, type Project, type Projects } from "./projects.ts";
 import { StateGlyph } from "./StateGlyph.ts";
@@ -7,6 +7,11 @@ import type { View } from "./viewState.ts";
 
 // La columna de proyectos (ADR-010 §2): «Pendiente de ti», y cada proyecto con sus tareas.
 // Sin JSX a propósito: los tests de la app corren con `node --test`, que no transforma .tsx.
+//
+// Plegada es la MISMA columna, como el Sidebar de shadcn: el contenido nunca cambia, solo el CSS lo
+// recorta, lo desvanece o lo coloca (app.css, «Columna lateral: transiciones»). Cada botón lleva su
+// etiqueta y su icono (la inicial del proyecto, el ◆ de «Pendiente de ti»); el icono solo se ve
+// plegada. Cambiar de contenido a mitad de la animación es lo que hacía que «saltara».
 
 interface Props {
   /** `null`: no hay lista (el daemon no responde); la columna solo muestra la cabecera y el pie. */
@@ -19,17 +24,23 @@ interface Props {
   closed: ReadonlySet<string>;
   onView: (view: View) => void;
   onToggle: (repo: string) => void;
-  /** Plegada a un riel con la inicial de cada proyecto. */
+  /** Plegada a un riel de 56 px con la inicial de cada proyecto. */
   collapsed?: boolean;
-  /** Pliega o despliega la columna; sin él no hay botón. */
+  /** Pliega o despliega la columna; sin él no hay asa. */
   onCollapse?: () => void;
-  /** Lleva ya plegada el tiempo de la transición (`useSettled`); sin él, se supone que sí. */
-  settled?: boolean;
 }
 
 const SHORTCUT = "⌘\\";
 
 const on = (selected: boolean) => (selected ? "true" : undefined);
+
+/** Una insignia sobre la esquina del icono, como una notificación. Decorativa: el botón ya lo dice. */
+const badge = (...content: ReactNode[]) =>
+  createElement(
+    "span",
+    { key: "badge", className: "rail-badge tone-human", "aria-hidden": true },
+    createElement("span", { className: "rail-badge-body" }, ...content),
+  );
 
 /** Lo que te espera y lo que está en curso, con el glifo de su estado; «+» si la lista está truncada. */
 function counts(project: Project, partial: boolean): ReactNode {
@@ -55,6 +66,7 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
   const { view, closed, onView, onToggle, data } = props;
   const open = !closed.has(project.repo);
   const selected = view.kind === "project" && view.repo === project.repo;
+  const { waiting } = project.counts;
   return createElement(
     "div",
     { key: project.repo, className: "col-project" },
@@ -86,48 +98,65 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
         {
           type: "button",
           className: "col-name",
+          title: waiting > 0 ? `${project.name} · ${waiting} esperan` : project.name,
           "aria-current": on(selected),
           onClick: () => onView({ kind: "project", repo: project.repo }),
         },
-        createElement("span", null, project.name),
+        createElement("span", { className: "col-label" }, project.name),
         counts(project, data.partial),
+        createElement(
+          "span",
+          { className: "col-initial", "aria-hidden": true },
+          project.name.charAt(0).toUpperCase(),
+        ),
+        waiting > 0 &&
+          badge(createElement(StateGlyph, { key: "g", state: "plan_review" }), waiting),
       ),
     ),
     open &&
-      openTasks(project).length === 0 &&
-      project.counts.closed > 0 &&
+      // Se pliegan en vertical (grid 1fr → 0fr): no se pueden recortar en horizontal, y así las
+      // filas de debajo suben sin saltar.
       createElement(
-        "p",
-        { className: "col-empty" },
-        closedLabel(project.counts.closed, data.partial),
-      ),
-    open &&
-      createElement(
-        "ul",
-        { className: "col-tasks" },
-        openTasks(project).map((task) =>
-          createElement(
-            "li",
-            { key: task.number },
+        "div",
+        { className: "col-tasks-wrap" },
+        createElement(
+          "div",
+          { className: "col-tasks-inner" },
+          openTasks(project).length === 0 &&
+            project.counts.closed > 0 &&
             createElement(
-              "button",
-              {
-                type: "button",
-                className: "col-task",
-                "aria-current": on(view.kind === "task" && view.number === task.number),
-                onClick: () => onView({ kind: "task", number: task.number }),
-              },
-              // El color del estado (manual de marca), como en la lista del centro.
+              "p",
+              { className: "col-empty" },
+              closedLabel(project.counts.closed, data.partial),
+            ),
+          createElement(
+            "ul",
+            { className: "col-tasks" },
+            openTasks(project).map((task) =>
               createElement(
-                "span",
-                { className: `tone-${stateColor(task.state)}` },
-                createElement(StateGlyph, { state: task.state }),
-              ),
-              createElement("code", { className: "ident" }, `#${task.number}`),
-              createElement(
-                "span",
-                { className: "col-title" },
-                task.titleErased || task.title === null ? "[borrado]" : task.title,
+                "li",
+                { key: task.number },
+                createElement(
+                  "button",
+                  {
+                    type: "button",
+                    className: "col-task",
+                    "aria-current": on(view.kind === "task" && view.number === task.number),
+                    onClick: () => onView({ kind: "task", number: task.number }),
+                  },
+                  // El color del estado (manual de marca), como en la lista del centro.
+                  createElement(
+                    "span",
+                    { className: `tone-${stateColor(task.state)}` },
+                    createElement(StateGlyph, { state: task.state }),
+                  ),
+                  createElement("code", { className: "ident" }, `#${task.number}`),
+                  createElement(
+                    "span",
+                    { className: "col-title" },
+                    task.titleErased || task.title === null ? "[borrado]" : task.title,
+                  ),
+                ),
               ),
             ),
           ),
@@ -145,7 +174,7 @@ const CHEVRON = { left: "m15 18-6-6 6-6", right: "m9 18 6-6-6-6" } as const;
  * centro, con un `<` para plegar y un `>` para desplegar. Va fuera de la columna (que recorta su
  * contenido) y pegada a su borde, así que acompaña la transición del ancho.
  */
-function collapseHandle({ collapsed, onCollapse }: Props): ReactNode {
+function collapseHandle(collapsed: boolean, onCollapse: (() => void) | undefined): ReactNode {
   if (onCollapse === undefined) return null;
   const label = collapsed ? "Desplegar la columna" : "Plegar la columna";
   return createElement(
@@ -176,135 +205,47 @@ function collapseHandle({ collapsed, onCollapse }: Props): ReactNode {
   );
 }
 
-/** La columna plegada: «Pendiente de ti» y la inicial de cada proyecto, con su ◆ si algo te espera. */
-function rail(props: Props & { data: Projects }): ReactNode {
-  const { data, view, onView } = props;
-  // Una insignia sobre la esquina de la letra, como una notificación: así la inicial queda sola y
-  // centrada y todas se alinean. Decorativa: el nombre accesible del botón no cambia.
-  const badge = (...content: ReactNode[]) =>
-    createElement(
-      "span",
-      { key: "badge", className: "rail-badge tone-human", "aria-hidden": true },
-      createElement("span", { className: "rail-badge-body" }, ...content),
-    );
-  const diamond = createElement(
-    "span",
-    { key: "d", className: "tone-human" },
-    createElement(StateGlyph, { state: "plan_review" }),
-  );
-  return [
-    createElement(
-      "button",
-      {
-        key: "pending",
-        type: "button",
-        className: "rail-project",
-        "aria-label": `Pendiente de ti, ${data.pending.length}`,
-        title: "Pendiente de ti",
-        "aria-current": on(view.kind === "pending"),
-        onClick: () => onView({ kind: "pending" }),
-      },
-      diamond,
-      badge(data.pending.length),
-    ),
-    ...data.projects.map((project) =>
-      createElement(
-        "button",
-        {
-          key: project.repo,
-          type: "button",
-          className: "rail-project",
-          "aria-label": project.name,
-          title:
-            project.counts.waiting > 0
-              ? `${project.name} · ${project.counts.waiting} esperan`
-              : project.name,
-          "aria-current": on(view.kind === "project" && view.repo === project.repo),
-          onClick: () => onView({ kind: "project", repo: project.repo }),
-        },
-        createElement("span", { className: "rail-initial" }, project.name.charAt(0).toUpperCase()),
-        project.counts.waiting > 0 &&
-          badge(createElement(StateGlyph, { state: "plan_review" }), project.counts.waiting),
-      ),
-    ),
-  ];
-}
-
-/** La duración de la transición del ancho; app.css usa los mismos 240ms. */
-export const TRANSITION_MS = 240;
-
-/**
- * Qué se pinta al plegar o desplegar. El ancho (`is-rail`) cambia en cuanto cambia `collapsed` y lo
- * anima el CSS; el contenido plegado (`is-rolled`, `showRail`) llega al final de la transición al
- * plegar y desaparece de inmediato al desplegar, así nada se deforma mientras el ancho cambia.
- */
-export function railState(collapsed: boolean, settled: boolean) {
-  return {
-    className: ["project-col", collapsed && "is-rail", collapsed && settled && "is-rolled"]
-      .filter(Boolean)
-      .join(" "),
-    showRail: collapsed && settled,
-  };
-}
-
-/**
- * `true` cuando la columna lleva ya plegada el tiempo de la transición. Lo calcula `App` y lo pasa
- * como `settled`: así `ProjectColumn` sigue siendo una función pura, que los tests recorren sin React.
- */
-export function useSettled(collapsed: boolean): boolean {
-  const [settled, setSettled] = useState(collapsed);
-  useEffect(() => {
-    if (!collapsed) {
-      setSettled(false);
-      return;
-    }
-    const reduced =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    const timer = setTimeout(() => setSettled(true), reduced ? 0 : TRANSITION_MS);
-    return () => clearTimeout(timer);
-  }, [collapsed]);
-  return settled;
-}
-
 export function ProjectColumn(props: Props): ReactNode {
   const { data, view, onView, head, foot } = props;
-  const target = props.collapsed === true && data !== null;
-  // Sin `settled` el contenido plegado aparece a la vez que el ancho (sin transición de contenido).
-  const { className, showRail } = railState(target, props.settled ?? true);
-  const rolled = showRail;
+  // Sin lista no hay nada que plegar: la columna se queda como está para que se vea el estado.
+  const collapsed = props.collapsed === true && data !== null;
   const nav = createElement(
     "nav",
-    { className, "aria-label": "Proyectos" },
+    {
+      className: collapsed ? "project-col is-collapsed" : "project-col",
+      "aria-label": "Proyectos",
+    },
     head && createElement("div", { key: "head", className: "col-head" }, head),
-    rolled &&
-      data !== null &&
-      createElement("div", { key: "rail", className: "col-scroll" }, rail({ ...props, data })),
-    !rolled &&
-      // Sin lista (el daemon no responde) no hay datos de tareas, pero sí cabecera y pie.
-      createElement(
-        "div",
-        { key: "scroll", className: "col-scroll" },
-        data &&
+    // Sin lista (el daemon no responde) no hay datos de tareas, pero sí cabecera y pie.
+    createElement(
+      "div",
+      { key: "scroll", className: "col-scroll" },
+      data &&
+        createElement(
+          "button",
+          {
+            type: "button",
+            className: "col-pending",
+            title: "Pendiente de ti",
+            "aria-current": on(view.kind === "pending"),
+            onClick: () => onView({ kind: "pending" }),
+          },
+          createElement("span", { className: "col-label" }, "Pendiente de ti"),
+          createElement("span", { className: "col-counts tone-human" }, [
+            createElement(StateGlyph, { key: "g", state: "plan_review" }),
+            data.pending.length,
+            data.partial && createElement("span", { key: "p", className: "col-partial" }, "+"),
+          ]),
           createElement(
-            "button",
-            {
-              type: "button",
-              className: "col-pending",
-              "aria-current": on(view.kind === "pending"),
-              onClick: () => onView({ kind: "pending" }),
-            },
-            createElement("span", null, "Pendiente de ti"),
-            createElement("span", { className: "col-counts tone-human" }, [
-              createElement(StateGlyph, { key: "g", state: "plan_review" }),
-              data.pending.length,
-              data.partial && createElement("span", { key: "p", className: "col-partial" }, "+"),
-            ]),
+            "span",
+            { className: "col-initial tone-human", "aria-hidden": true },
+            createElement(StateGlyph, { state: "plan_review" }),
           ),
-        data?.projects.map((project) => projectBlock(project, { ...props, data })),
-      ),
-    // El estado del daemon no cabe en 56 px: con el riel no se pinta (App despliega sola si cae).
-    !rolled && foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
+          badge(data.pending.length),
+        ),
+      data?.projects.map((project) => projectBlock(project, { ...props, data })),
+    ),
+    foot && createElement("div", { key: "foot", className: "col-foot" }, foot),
   );
-  return createElement(Fragment, null, nav, collapseHandle(props));
+  return createElement(Fragment, null, nav, collapseHandle(collapsed, props.onCollapse));
 }
