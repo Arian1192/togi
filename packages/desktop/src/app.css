@@ -304,21 +304,6 @@ body {
   gap: var(--space-2);
 }
 
-.col-collapse {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  min-height: 32px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ink-muted);
-  cursor: pointer;
-}
-
-.col-collapse:focus-visible,
 .rail-project:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: -2px;
@@ -544,6 +529,13 @@ body {
   white-space: nowrap;
 }
 
+/* El contenido que llega aparece con un fundido (keyframes más abajo). `backwards` y no `both`: al
+   acabar manda la regla que lo desvanece al plegar. */
+.project-col > .col-scroll,
+.project-col > .col-foot {
+  animation: col-fade-in 160ms ease-out backwards;
+}
+
 /* Plegada: un riel de 56 px con «Pendiente de ti» y la inicial de cada proyecto. */
 /* El ancho (y el relleno) se animan con ease-in-out; el contenido cambia al final al plegar y de
    inmediato al desplegar. TRANSITION_MS (ProjectColumn.ts) debe valer lo mismo que estos 240ms. */
@@ -583,8 +575,72 @@ body {
   min-width: 272px;
 }
 
+/* El asa que pliega y despliega: sin ancho, pegada al borde de la columna (es hermana suya en el
+   flex, así que sigue su transición) y con una pestaña fina que cabalga sobre la línea. */
+.col-handle {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: none;
+  align-self: flex-start;
+  width: 0;
+  height: 100vh;
+}
+
+.col-handle-btn {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.col-handle-btn:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.col-handle-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* El contenido nuevo aparece con un fundido en vez de golpe: al plegar llega el riel y al desplegar
+   la columna completa. `backwards` y no `both`: al acabar manda la regla de abajo, que lo desvanece. */
+@keyframes col-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Al plegar, el contenido desplegado se desvanece rápido (menos que la transición del ancho) y, al
+   acabar esta, cambia por el riel, que ya aparece con su fundido. */
+.project-col.is-rail:not(.is-rolled) > .col-scroll,
+.project-col.is-rail:not(.is-rolled) > .col-foot {
+  opacity: 0;
+  transition: opacity 120ms ease-in;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .project-col {
+    transition: none;
+  }
+
+  .project-col > .col-scroll,
+  .project-col > .col-foot {
+    animation: none;
     transition: none;
   }
 }
