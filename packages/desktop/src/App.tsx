@@ -1,7 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ProjectColumn } from "./ProjectColumn.ts";
+import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
+import { PENDING, tasksFor, toggled, type View } from "./viewState.ts";
 
 type DaemonStatus =
   | { state: "running"; version: string }
@@ -36,6 +39,8 @@ type DaemonEvent = { kind: "open" } | { kind: "task" } | { kind: "closed" };
 export function App() {
   const [status, setStatus] = useState<DaemonStatus | null>(null);
   const [list, setList] = useState<TaskResult | null>(null);
+  const [view, setView] = useState<View>(PENDING);
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let live = true;
@@ -108,14 +113,31 @@ export function App() {
     ) : (
       `daemon sin respuesta: ${REASONS[status.reason] ?? "respuesta no válida"}`
     );
+  const projects = useMemo(
+    () => (list?.status === "ok" ? buildProjects(list.tasks, list.truncated) : null),
+    [list],
+  );
   return (
-    <main className="shell">
-      <div className="logo">
-        <Monogram />
-        <span>togi</span>
-      </div>
-      <p role="status">{text}</p>
-      {list?.status === "ok" && <TaskList tasks={list.tasks} truncated={list.truncated} />}
-    </main>
+    <div className="workbench">
+      {projects !== null && (
+        <ProjectColumn
+          data={projects}
+          view={view}
+          closed={closed}
+          onView={setView}
+          onToggle={(repo) => setClosed((prev) => toggled(prev, repo))}
+        />
+      )}
+      <main className="shell">
+        <div className="logo">
+          <Monogram />
+          <span>togi</span>
+        </div>
+        <p role="status">{text}</p>
+        {list?.status === "ok" && (
+          <TaskList tasks={tasksFor(view, list.tasks)} truncated={list.truncated} />
+        )}
+      </main>
+    </div>
   );
 }
