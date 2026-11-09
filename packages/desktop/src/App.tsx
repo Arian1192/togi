@@ -5,6 +5,7 @@ import { ProjectColumn, useSettled } from "./ProjectColumn.ts";
 import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
+import { TaskNotebookPane } from "./TaskNotebookPane.tsx";
 import { isToggleShortcut, PENDING, tasksFor, toggled, type View } from "./viewState.ts";
 
 type DaemonStatus =
@@ -133,6 +134,11 @@ export function App() {
   // El ancho de la columna se anima; su contenido plegado llega al final de la transición.
   const settled = useSettled(collapsed && projects !== null);
   // El resumen del proyecto elegido; si ya no existe (la lista se recargó), la lista vacía de siempre.
+  // La tarea elegida: su cuaderno. Si ya no está en la lista, la lista vacía de siempre.
+  const opened =
+    view.kind === "task" && list?.status === "ok"
+      ? list.tasks.find((t) => t.number === view.number)
+      : undefined;
   const shown =
     view.kind === "project" ? projects?.projects.find((p) => p.repo === view.repo) : undefined;
   return (
@@ -159,6 +165,13 @@ export function App() {
         {list?.status === "ok" ? (
           shown !== undefined ? (
             <ProjectSummary project={shown} partial={list.truncated} />
+          ) : opened !== undefined ? (
+            <TaskNotebookPane
+              key={opened.number}
+              number={opened.number}
+              state={opened.state}
+              version={opened.version}
+            />
           ) : (
             <TaskList tasks={tasksFor(view, list.tasks)} truncated={list.truncated} />
           )
