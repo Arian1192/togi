@@ -8,6 +8,8 @@
 
 **Enmienda del 9 de noviembre de 2026:** la barra lateral pasa de una lista plana de tareas a una **columna de proyectos** (alternativa B de la página «Fase 1» del lienzo). Cambian el §2 y la fila «Lista de tareas» del §3; el resto del ADR no cambia.
 
+**Enmienda del 10 de noviembre de 2026:** la **mesa en vivo** pasa de la fase 3 a la fase 1. togi es una factoría visual con togi como intermediario, y la mesa es la forma de ver cómo fluye la información y en qué estado está cada agente mientras se construyen el constructor, los gates y el revisor. Nace con lo que ya existe (tú, togi y las sesiones del planificador) y cada rol nuevo aparece en ella cuando existe en el backend. Para verlo antes que el agente real se usan los agentes falsos de los tests sobre el daemon real, en una demo local, nunca en la app distribuida ni con datos inventados en el webview. Cambian el §3 (la mesa), la tabla de la API y la de fases; el resto del ADR no cambia. El diseño de la pantalla 5 del lienzo es la referencia, no una especificación cerrada.
+
 El principio 3 hace del daemon el núcleo y de la CLI, la web UI y la app de escritorio sus clientes. Este ADR define la app de escritorio: qué muestra, cómo se conecta al daemon y qué no puede hacer. El diseño de referencia son las siete pantallas del [lienzo de la app de escritorio](https://claude.ai/artifact/QCo31vuqqDekePy6dNWcmM) y la identidad visual, el [manual de marca](../marca/manual-de-marca.md).
 
 Las referencias de uso son Conductor, Paseo, T3 Code y Herdr. De ellas se toman patrones comunes del género (lista de trabajos con su estado de atención, paneles divididos, diff, terminal, explorador de ficheros y uso intensivo del teclado), nunca su maquetación exacta ni su identidad visual.
@@ -49,6 +51,8 @@ Debe cumplir:
 | Terminales (⌘T) | Las terminales del usuario y la salida de las sesiones de agente | 4 |
 
 La mesa se dibuja con lo que ya registra el log: cada evento tiene un actor y un stream, y todo evento pasa por togi (ADR-009). Una arista es siempre actor ↔ togi, así que no hace falta añadir un campo de destinatario al esquema de eventos. La vista de secuencia queda como alternativa dentro de la mesa.
+
+La mesa es viva: se mueve sola, sin recargar. Los mensajes recorren su arista al ocurrir, los nodos cambian de estado (ciclo, progreso de un gate), las sesiones aparecen al empezar y se apagan al terminar, y una acción denegada destaca en su arista. Para eso el lado Rust reenvía, de cada evento del log y de la trayectoria, solo su cabecera (`seq`, `at`, actor, tipo y stream), nunca su contenido; el contenido se lee aparte, con un comando concreto, cuando se elige el evento. La mesa también muestra lo que togi entrega a cada agente, no solo lo que los agentes le mandan: así se ve que ningún agente recibe el razonamiento de otro (política de entradas por rol, que fijará el ADR-011, en preparación).
 
 En la interfaz, los roles se muestran con los nombres del ADR-009. En el código se usan los identificadores del ADR-004.
 
@@ -119,9 +123,9 @@ La fase 1 se construye ahora, en lugar del PR U7 de `docs/plan-rebanada-2.md` (`
 
 | Fase | Qué entra | Requiere |
 | --- | --- | --- |
-| 1 | Shell, lista de tareas, plan, cuaderno del gate 1 y trayectoria | `GET /v1/tasks`, `GET /v1/events`, la API de planes (PR 4), la escritura de la trayectoria (PR 12) y la ruta de lectura de la trayectoria |
+| 1 | Shell, lista de tareas, plan, cuaderno del gate 1, trayectoria y mesa en vivo (enmienda del 10 de noviembre) | `GET /v1/tasks`, `GET /v1/events`, la API de planes (PR 4), la escritura de la trayectoria (PR 12), la ruta de lectura de la trayectoria, la cabecera de cada evento reenviada por Rust y `GET /sessions?state=active` |
 | 2 | Diff, log, cuaderno del gate 2 y terminales | Rebanada 4 |
-| 3 | Ficheros y mesa en vivo | Endpoints de ficheros y sesiones |
+| 3 | Ficheros | Endpoints de ficheros |
 | 4 | Navegador | Gate visual y el aislamiento con loopback interno (sección 6) |
 
 Riesgos:
