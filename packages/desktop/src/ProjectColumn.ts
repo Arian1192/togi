@@ -1,5 +1,6 @@
+import { stateColor } from "@togi/core";
 import { createElement, type ReactNode } from "react";
-import type { Project, Projects } from "./projects.ts";
+import { openTasks, type Project, type Projects } from "./projects.ts";
 import { StateGlyph } from "./StateGlyph.ts";
 import type { View } from "./viewState.ts";
 
@@ -82,7 +83,7 @@ function projectBlock(project: Project, props: Props): ReactNode {
       createElement(
         "ul",
         { className: "col-tasks" },
-        project.tasks.map((task) =>
+        openTasks(project).map((task) =>
           createElement(
             "li",
             { key: task.number },
@@ -94,7 +95,12 @@ function projectBlock(project: Project, props: Props): ReactNode {
                 "aria-current": on(view.kind === "task" && view.number === task.number),
                 onClick: () => onView({ kind: "task", number: task.number }),
               },
-              createElement(StateGlyph, { state: task.state }),
+              // El color del estado (manual de marca), como en la lista del centro.
+              createElement(
+                "span",
+                { className: `tone-${stateColor(task.state)}` },
+                createElement(StateGlyph, { state: task.state }),
+              ),
               createElement("code", { className: "ident" }, `#${task.number}`),
               createElement(
                 "span",

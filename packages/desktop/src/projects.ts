@@ -42,6 +42,20 @@ function count(tasks: TaskRow[]): ProjectCounts {
   return counts;
 }
 
+/**
+ * Las tareas de un proyecto que lista la columna: sin las cerradas (son un contador) ni las de un
+ * estado que esta versión no conoce; primero lo que te espera, después lo en curso y al final los
+ * borradores, y dentro de cada tramo por número.
+ */
+export function openTasks(project: Project): TaskRow[] {
+  const rank = (task: TaskRow): number => (isWaiting(task) ? 0 : task.state === "draft" ? 2 : 1);
+  return project.tasks
+    .filter(
+      (task) => Object.hasOwn(STATE_BRAND, task.state) && attentionGroup(task.state) !== "closed",
+    )
+    .sort((a, b) => rank(a) - rank(b) || a.number - b.number);
+}
+
 /** Agrupa las tareas por repo. Primero los proyectos con algo que te espera; después, por nombre. */
 export function buildProjects(tasks: TaskRow[], truncated: boolean): Projects {
   const byRepo = new Map<string, TaskRow[]>();
