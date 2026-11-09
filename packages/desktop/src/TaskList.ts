@@ -18,6 +18,8 @@ export interface TaskRow {
   title: string | null;
   titleErased: boolean;
   state: TaskState;
+  repo: string;
+  baseBranch: string;
   hasCriteria: boolean;
   updatedAt: string;
   version: number;
@@ -114,7 +116,7 @@ export function TaskList({
       ? createElement(
           "p",
           { className: "muted" },
-          "Se muestran las 200 más recientes: puede haber más.",
+          "Se muestran las 200 más antiguas: puede haber más.",
         )
       : null,
   );
