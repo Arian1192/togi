@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, parse, relative, resolve, sep } from "node:path";
@@ -24,12 +25,34 @@ const DENIED_OUTSIDE_HOME = ["/Users", "/Volumes", "/private/tmp"];
 
 /**
  * La carpeta temporal del usuario. En /var/folders/xx/yyyy el `T/` va junto a `C/` (cachés de otras
- * aplicaciones) y `0/`, así que se deniega el padre entero.
+ * aplicaciones) y `0/`, así que se deniega el padre entero. Sin `path`, en macOS se pregunta al
+ * sistema y no solo a TMPDIR: el trabajador corre sin él y entonces tmpdir() dice /tmp. Si TMPDIR
+ * apunta a otro sitio, se deniega también.
  */
-export function userTmpDirs(path: string = tmpdir()): string[] {
+export function userTmpDirs(path?: string): string[] {
+  if (path !== undefined) return parentOfT(path);
+  const fromSystem = process.platform === "darwin" ? parentOfT(darwinUserTempDir()) : [];
+  return [...new Set([...fromSystem, ...parentOfT(tmpdir())])];
+}
+
+function parentOfT(path: string): string[] {
   const tmp = realpathSync(path);
   const parent = dirname(tmp);
   return basename(tmp) === "T" && parent.startsWith("/private/var/folders/") ? [parent] : [tmp];
+}
+
+/** La temporal que macOS asigna al usuario, sin depender del entorno; si no se sabe, no hay sandbox. */
+function darwinUserTempDir(): string {
+  try {
+    const dir = execFileSync("/usr/bin/getconf", ["DARWIN_USER_TEMP_DIR"], {
+      encoding: "utf8",
+      env: {},
+    }).trim();
+    if (!isAbsolute(dir)) throw new Error(dir);
+    return dir;
+  } catch {
+    throw new SandboxSpecError("no se pudo saber la carpeta temporal del usuario");
+  }
 }
 
 /**
