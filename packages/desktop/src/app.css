@@ -475,6 +475,57 @@ body {
   font-weight: 600;
 }
 
+/* La trayectoria de la sesión (ADR-010 §3): una fila por evento, el número y el tipo en mono, y el
+   texto del agente en una sola columna que se parte donde haga falta (puede ser una ruta larga). */
+.trajectory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-self: stretch;
+}
+
+.trajectory .btn {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+}
+
+.trajectory h2 {
+  margin: 0;
+  font: 600 22px / 28px var(--font-display);
+}
+
+.trajectory-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+}
+
+.trajectory-row {
+  display: grid;
+  grid-template-columns: 56px 120px minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: baseline;
+  min-height: 32px;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.trajectory-seq,
+.trajectory-kind {
+  font: 400 12.5px / 20px var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.trajectory-kind.tone-human {
+  color: var(--human);
+}
+
+.trajectory-text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 /* El centro con una tarea elegida: el aviso del último intento y, debajo, el cuaderno. */
 .task-notebook {
   display: flex;
