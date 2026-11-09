@@ -13,7 +13,8 @@ const MAX_TITLE: usize = 120;
 /// El mayor entero que JavaScript representa sin perder precisión.
 const MAX_SAFE: u64 = (1 << 53) - 1;
 
-/// Una fila de la lista. El resto de campos del daemon (repo, rama, riesgo…) no llegan al webview.
+/// Una fila de la lista. El repo agrupa las tareas en proyectos (ADR-010 §2); el resto de campos del
+/// daemon (riesgo, descripción…) no llegan al webview.
 #[derive(Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskSummary {
@@ -21,6 +22,8 @@ pub struct TaskSummary {
     pub title: Option<String>,
     pub title_erased: bool,
     pub state: String,
+    pub repo: String,
+    pub base_branch: String,
     pub has_criteria: bool,
     pub updated_at: String,
     pub version: u64,
@@ -95,15 +98,37 @@ fn summary(row: &Value, token: &str) -> Option<TaskSummary> {
     if !valid || leaks {
         return None;
     }
+    let safe = |name: &str| text(name).filter(|s| s.len() <= 200 && !s.contains(token));
     Some(TaskSummary {
         number,
         title,
         title_erased: row.get("titleErased")?.as_bool()?,
         state: state.to_owned(),
+        repo: safe("repo").filter(|r| valid_repo(r))?.to_owned(),
+        base_branch: safe("baseBranch").filter(|b| valid_line(b))?.to_owned(),
         has_criteria: row.get("hasCriteria")?.as_bool()?,
         updated_at: updated_at.to_owned(),
         version: int("version")?,
     })
+}
+
+/// Un repo `owner/name`: dos partes y solo letras, cifras y `_.-`.
+fn valid_repo(repo: &str) -> bool {
+    let mut parts = repo.split('/');
+    let (Some(owner), Some(name), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    let ok = |s: &str| {
+        !s.is_empty()
+            && s.chars()
+                .all(|c| c.is_ascii_alphanumeric() || "_.-".contains(c))
+    };
+    ok(owner) && ok(name)
+}
+
+/// No vacío y en una línea.
+fn valid_line(s: &str) -> bool {
+    !s.is_empty() && !s.chars().any(char::is_control)
 }
 
 /// El título en una sola línea, sin caracteres de control y recortado a `MAX_TITLE` caracteres.
