@@ -292,6 +292,58 @@ body {
   font-size: 20px;
 }
 
+.col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.col-collapse {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.col-collapse:focus-visible,
+.rail-project:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.rail-project {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.rail-project[aria-current="true"] {
+  background: var(--border);
+}
+
+.rail-initial {
+  font: 600 13px / 20px var(--font-display);
+}
+
 .col-scroll {
   flex: 1;
   min-height: 0;
@@ -406,4 +458,29 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Plegada: un riel de 56 px con «Pendiente de ti» y la inicial de cada proyecto. */
+.project-col.is-rail {
+  width: 56px;
+  align-items: center;
+  padding-inline: var(--space-1);
+}
+
+.is-rail .col-head {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-inline: 0;
+}
+
+.is-rail .col-head .logo span {
+  display: none;
+}
+
+.is-rail .col-scroll {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
 }

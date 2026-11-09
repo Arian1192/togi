@@ -23,6 +23,17 @@ export function tasksFor(view: View, tasks: TaskRow[]): TaskRow[] {
   }
 }
 
+/** ⌘\ pliega y despliega la columna. Cualquier otro modificador, o tecla, no lo dispara. */
+export function isToggleShortcut(e: {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}): boolean {
+  return e.key === "\\" && e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey;
+}
+
 /** El conjunto de proyectos plegados con `repo` cambiado de estado; no modifica el anterior. */
 export function toggled(closed: ReadonlySet<string>, repo: string): Set<string> {
   const next = new Set(closed);
