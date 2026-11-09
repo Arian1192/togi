@@ -1,4 +1,4 @@
-import { attentionGroup } from "@togi/core";
+import { buildProjects } from "./projects.ts";
 import type { TaskRow } from "./TaskList.ts";
 
 // Qué muestra la app y qué proyectos están plegados. Sin DOM: App lo guarda y la columna lo pinta.
@@ -14,7 +14,8 @@ export const PENDING: View = { kind: "pending" };
 export function tasksFor(view: View, tasks: TaskRow[]): TaskRow[] {
   switch (view.kind) {
     case "pending":
-      return tasks.filter((t) => attentionGroup(t.state) === "pending");
+      // El grupo pending con lo que te espera primero, igual que en la columna.
+      return buildProjects(tasks, false).pending;
     case "project":
       return tasks.filter((t) => t.repo === view.repo);
     case "task":
