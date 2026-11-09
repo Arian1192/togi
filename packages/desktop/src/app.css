@@ -268,6 +268,8 @@ body {
   flex: none;
   box-sizing: border-box;
   width: 288px;
+  /* No queda atada al ancho de su contenido: se encoge mientras el contenido se recorta. */
+  min-width: 0;
   /* Ocupa el alto de la ventana y se desplaza sola: el centro no la arrastra. */
   position: sticky;
   top: 0;
@@ -277,6 +279,9 @@ body {
   display: flex;
   flex-direction: column;
   padding: var(--space-3) var(--space-2);
+  transition:
+    width 240ms cubic-bezier(0.65, 0, 0.35, 1),
+    padding-inline 240ms cubic-bezier(0.65, 0, 0.35, 1);
   background: var(--surface);
   border-right: 1px solid var(--border);
   font: 400 13px / 20px var(--font-sans);
@@ -320,6 +325,7 @@ body {
 }
 
 .rail-project {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -342,6 +348,36 @@ body {
 
 .rail-initial {
   font: 600 13px / 20px var(--font-display);
+}
+
+/* La insignia: pegada a la esquina de la letra, como una notificación. El fondo es el color del
+   estado (human) y el contenido va en el del fondo de la app para que contraste en los dos temas. */
+.rail-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: currentColor;
+  font: 500 10px / 14px var(--font-mono);
+}
+
+.rail-badge-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--bg);
+}
+
+.rail-badge .glyph {
+  width: 8px;
+  height: 8px;
 }
 
 .col-scroll {
@@ -492,26 +528,46 @@ body {
 }
 
 /* Plegada: un riel de 56 px con «Pendiente de ti» y la inicial de cada proyecto. */
+/* El ancho (y el relleno) se animan con ease-in-out; el contenido cambia al final al plegar y de
+   inmediato al desplegar. TRANSITION_MS (ProjectColumn.ts) debe valer lo mismo que estos 240ms. */
 .project-col.is-rail {
   width: 56px;
-  align-items: center;
   padding-inline: var(--space-1);
 }
 
-.is-rail .col-head {
+/* El estilo del riel va con el contenido plegado (is-rolled), no con el ancho que está en curso. */
+.project-col.is-rolled {
+  align-items: center;
+}
+
+.is-rolled .col-head {
   flex-direction: column;
   justify-content: flex-start;
   padding-inline: 0;
 }
 
-.is-rail .col-head .logo span {
+.is-rolled .col-head .logo span {
   display: none;
 }
 
-.is-rail .col-scroll {
+.is-rolled .col-scroll {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
   width: 100%;
+}
+
+/* Desplegada, el contenido tiene su ancho fijo: mientras el ancho cambia se recorta como un cajón en
+   vez de deformarse. */
+.project-col:not(.is-rolled) > .col-head,
+.project-col:not(.is-rolled) > .col-scroll,
+.project-col:not(.is-rolled) > .col-foot {
+  min-width: 272px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-col {
+    transition: none;
+  }
 }
