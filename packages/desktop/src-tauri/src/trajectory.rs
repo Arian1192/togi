@@ -72,15 +72,20 @@ pub fn trajectory_for(home: &Path, number: u64, after: u64, mark: Option<&str>) 
     let get = |path: &str| match request(&socket, &token, "GET", path, &[], None, MAX_BODY) {
         Ok(Reply {
             code: 200, body, ..
-        }) => serde_json::from_slice::<Value>(&body).map_err(|_| "bad_response"),
+        }) => serde_json::from_slice::<Value>(&body).map_err(|_| "invalid_json"),
         Ok(reply) => Err(closed_reason(reply.code)),
         Err(reason) => Err(reason),
     };
+    // El JSON roto no es un motivo de la API: sale como cualquier otra respuesta fuera de contrato.
+    let closed = |reason| match reason {
+        "invalid_json" => "bad_response",
+        other => other,
+    };
     let listed = match get(&format!("/v1/tasks/{number}/sessions")) {
         Ok(json) => json,
-        Err(reason) => return unreachable(reason),
+        Err(reason) => return unreachable(closed(reason)),
     };
-    let (session, started) = match pick_session(&listed, &token) {
+    let (session, started, active) = match pick_session(&listed, &token) {
         Ok(Some(picked)) => picked,
         Ok(None) => return TrajectoryRead::NoSession,
         Err(reason) => return unreachable(reason),
@@ -88,19 +93,49 @@ pub fn trajectory_for(home: &Path, number: u64, after: u64, mark: Option<&str>) 
     if mark.is_some_and(|m| m != started) {
         return TrajectoryRead::SessionChanged;
     }
-    let path =
-        format!("/v1/tasks/{number}/sessions/{session}/trajectory?after={after}&limit={PAGE}");
-    match get(&path) {
+    let page = |limit| {
+        format!("/v1/tasks/{number}/sessions/{session}/trajectory?after={after}&limit={limit}")
+    };
+    // Una página mayor que el cuerpo máximo se reintenta con un solo evento; si ni ese cabe, una
+    // fila marcadora lo salta. Sin esto el cursor no avanza y la sesión queda ilegible para siempre.
+    let json = match get(&page(PAGE)) {
+        Err("bad_response") => match get(&page(1)) {
+            Err("bad_response") => return oversized(after, active, started),
+            other => other,
+        },
+        other => other,
+    };
+    match json {
         Ok(json) => {
             parse(&json, &token, after, started).unwrap_or_else(|| unreachable("bad_response"))
         }
-        Err(reason) => unreachable(reason),
+        Err(reason) => unreachable(closed(reason)),
+    }
+}
+
+/// El evento siguiente a `after` no cabe en el cuerpo máximo: una fila sin texto y el cursor un paso
+/// más allá. El estado de la sesión es el de la lista; la página real no se pudo leer.
+fn oversized(after: u64, active: bool, mark: String) -> TrajectoryRead {
+    let seq = after + 1;
+    TrajectoryRead::Ok {
+        events: vec![Row {
+            seq,
+            at: String::new(),
+            kind: "oversized",
+            text: String::new(),
+            truncated: false,
+            erased: false,
+        }],
+        next_after: seq,
+        has_more: true,
+        session_state: if active { "active" } else { "ended" },
+        session_mark: mark,
     }
 }
 
 /// La sesión activa o, si no hay, la de `startedAt` más reciente. Un id que no sea `ses_` más
 /// caracteres seguros invalida la lista: va a la ruta de la petición.
-fn pick_session(json: &Value, token: &str) -> Result<Option<(String, String)>, &'static str> {
+fn pick_session(json: &Value, token: &str) -> Result<Option<(String, String, bool)>, &'static str> {
     let list = json
         .get("sessions")
         .and_then(Value::as_array)
@@ -129,7 +164,7 @@ fn pick_session(json: &Value, token: &str) -> Result<Option<(String, String)>, &
             best = Some(key);
         }
     }
-    Ok(best.map(|(_, started, id)| (id.to_owned(), started.to_owned())))
+    Ok(best.map(|(active, started, id)| (id.to_owned(), started.to_owned(), active)))
 }
 
 /// Caracteres de formato que no se ven y permiten que un texto se lea de otra forma (bidi, anchura
