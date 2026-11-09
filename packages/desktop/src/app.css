@@ -323,9 +323,12 @@ body {
    estado (human) y el contenido va en el del fondo de la app para que contraste en los dos temas.
    También solo se ve plegada (desplegada, los contadores van en línea). */
 .rail-badge {
+  /* Cuelga de la esquina de arriba a la derecha del icono, que va centrado en el botón, y crece
+     hacia fuera: así no tapa la inicial por ancha que sea. Pegada a la esquina del botón tapaba la
+     «T» y tocaba el borde de la columna. */
   position: absolute;
-  top: 0;
-  right: 0;
+  left: calc(50% + 3px);
+  bottom: calc(50% + 2px);
   opacity: 0;
   pointer-events: none;
   display: inline-flex;
@@ -341,15 +344,7 @@ body {
 }
 
 .rail-badge-body {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
   color: var(--bg);
-}
-
-.rail-badge .glyph {
-  width: 8px;
-  height: 8px;
 }
 
 .col-scroll {

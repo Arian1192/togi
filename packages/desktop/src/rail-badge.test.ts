@@ -58,12 +58,12 @@ const button = (html: string, title: string): string => {
   return html.slice(start, html.indexOf("</button>", start));
 };
 
-test("lo que te espera es una insignia con el ◆ y el número, sobre la esquina del icono", () => {
+test("lo que te espera es una insignia con solo el número: el color ya dice que te espera", () => {
   for (const collapsed of [false, true]) {
     const togi = button(render(collapsed), "togi · 2 esperan");
     assert.match(
       togi,
-      /class="rail-badge tone-human"[^>]*aria-hidden="true"><span class="rail-badge-body"><svg[^>]*class="glyph"[^>]*>.*<\/svg>2<\/span>/,
+      /class="rail-badge tone-human"[^>]*aria-hidden="true"><span class="rail-badge-body">2<\/span>/,
     );
   }
 });
@@ -94,11 +94,12 @@ test("el icono ocupa todo el botón y va centrado, así que todas las iniciales 
   assert.match(declarations(".col-pending"), /position: relative/);
 });
 
-test("la insignia va pegada a la esquina, sobre el icono, con el color del estado", () => {
+test("la insignia cuelga de la esquina del icono (el centro del botón) y crece hacia fuera, sin taparlo", () => {
   const badge = declarations(".rail-badge");
   assert.match(badge, /position: absolute/);
-  assert.match(badge, /top: 0/);
-  assert.match(badge, /right: 0/);
+  assert.match(badge, /left: calc\(50% \+ 3px\)/);
+  assert.match(badge, /bottom: calc\(50% \+ 2px\)/);
+  assert.doesNotMatch(badge, /right: 0/);
   assert.match(badge, /background: currentColor/);
   assert.match(declarations(".rail-badge-body"), /color: var\(--bg\)/);
 });
