@@ -105,8 +105,7 @@ function projectBlock(project: Project, props: Props & { data: Projects }): Reac
           { className: "col-initial", "aria-hidden": true },
           project.name.charAt(0).toUpperCase(),
         ),
-        waiting > 0 &&
-          badge(createElement(StateGlyph, { key: "g", state: "plan_review" }), waiting),
+        waiting > 0 && badge(waiting),
       ),
     ),
     open &&
