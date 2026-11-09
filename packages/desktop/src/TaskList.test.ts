@@ -10,6 +10,8 @@ const row = (number: number, state: string, extra: Partial<TaskRow> = {}): TaskR
   title: `tarea ${number}`,
   titleErased: false,
   state: state as TaskState,
+  repo: "arian1192/togi",
+  baseBranch: "main",
   hasCriteria: true,
   updatedAt: "2026-11-07T10:00:00Z",
   version: 1,

@@ -7,6 +7,8 @@ const row = (number: number, version: number, state: TaskRow["state"] = "draft")
   title: `tarea ${number}`,
   titleErased: false,
   state,
+  repo: "arian1192/togi",
+  baseBranch: "main",
   hasCriteria: true,
   updatedAt: "2026-11-07T10:00:00Z",
   version,
