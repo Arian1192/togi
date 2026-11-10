@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from "react";
-import { type MesaState, type Pulse, ROLE_LABEL, type Seat } from "./mesa.ts";
+import { MAX_SEATS, type MesaState, type Pulse, ROLE_LABEL, type Seat } from "./mesa.ts";
 
 // La mesa en vivo (ADR-010 §3): togi en el centro, tú arriba y una plaza por rol y tarea alrededor.
 // Cada arista va de alguien a togi: los agentes no se hablan entre sí. El último mensaje de cada
@@ -64,16 +64,23 @@ const lastPulse = (pulses: Pulse[], seat: string | null) =>
   pulses.filter((p) => p.seat === seat).at(-1);
 
 export function MesaView({ state, waiting }: { state: MesaState; waiting: number }): ReactNode {
-  const seats = state.seats;
-  const points = new Map<string, Point>(seats.map((s, i) => [s.key, seatPoint(i, seats.length)]));
+  // Si no caben todas, las que sobran se agrupan en un último nodo «+N más», con su arista.
+  const overflow = state.seats.length > MAX_SEATS;
+  const seats = overflow ? state.seats.slice(0, MAX_SEATS - 1) : state.seats;
+  const hidden = overflow ? state.seats.slice(MAX_SEATS - 1) : [];
+  const slots = seats.length + (overflow ? 1 : 0);
+  const points = new Map<string, Point>(seats.map((s, i) => [s.key, seatPoint(i, slots)]));
+  const more = seatPoint(slots - 1, slots);
+  for (const s of hidden) points.set(s.key, more);
   const pulses: ReactNode[] = [];
   const mine = lastPulse(state.pulses, null);
   if (mine) pulses.push(pulseLine(mine, YOU));
-  for (const s of seats) {
+  for (const s of state.seats) {
     const p = lastPulse(state.pulses, s.key);
     const at = points.get(s.key);
     if (p && at) pulses.push(pulseLine(p, at));
   }
+  const active = state.seats.filter((s) => s.active).length;
   const seatNode = (s: Seat) =>
     node(
       points.get(s.key) ?? TOGI,
@@ -88,13 +95,22 @@ export function MesaView({ state, waiting }: { state: MesaState; waiting: number
       className: "mesa",
       viewBox: `0 0 ${W} ${H}`,
       role: "img",
-      "aria-label": `Mesa en vivo: ${seats.filter((s) => s.active).length} sesiones activas`,
+      "aria-label": `Mesa en vivo: ${active} sesiones activas`,
     },
     edge(YOU, "edge-you"),
     seats.map((s) => edge(points.get(s.key) ?? TOGI, `edge-${s.key}`)),
+    overflow && edge(more, "edge-more"),
     pulses,
     node(YOU, waiting > 0 ? "is-you is-waiting" : "is-you", "tú", `◆ ${waiting} te esperan`, "you"),
     seats.map(seatNode),
+    overflow &&
+      node(
+        more,
+        "is-more",
+        `+${hidden.length} más`,
+        `${hidden.filter((s) => s.active).length} en curso`,
+        "more",
+      ),
     node(TOGI, "is-togi", "togi", `log · seq ${state.lastSeq}`, "togi"),
   );
 }
