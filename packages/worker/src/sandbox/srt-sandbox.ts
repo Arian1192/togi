@@ -75,7 +75,9 @@ export class SrtSandbox implements Sandbox {
     }
     await this.#manager.initialize(config);
     try {
-      const wrapped = await this.#manager.wrapWithSandboxArgv(argv.map(quote).join(" "));
+      const wrapped = await withTmpdir(spec.writeDir, () =>
+        this.#manager.wrapWithSandboxArgv(argv.map(quote).join(" ")),
+      );
       const env: Record<string, string> = {};
       // El valor real de una credencial enmascarada no entra en el entorno del hijo: srt lo lee del
       // entorno de este proceso y pone el marcador en el comando envuelto.
@@ -91,6 +93,23 @@ export class SrtSandbox implements Sandbox {
     } finally {
       await this.#manager.reset();
     }
+  }
+}
+
+/**
+ * srt pone en el comando envuelto `TMPDIR` con el valor de `CLAUDE_CODE_TMPDIR` de este proceso (o
+ * `/tmp/claude`), por encima del entorno que recibe el hijo. Sin esto, el `TMPDIR` de la
+ * especificación no llega, y las herramientas caen a una carpeta temporal denegada. Las ejecuciones
+ * van en serie (`queue`), así que cambiar el entorno del proceso mientras se envuelve es seguro.
+ */
+export async function withTmpdir<T>(dir: string, wrap: () => Promise<T>): Promise<T> {
+  const before = process.env.CLAUDE_CODE_TMPDIR;
+  process.env.CLAUDE_CODE_TMPDIR = dir;
+  try {
+    return await wrap();
+  } finally {
+    if (before === undefined) delete process.env.CLAUDE_CODE_TMPDIR;
+    else process.env.CLAUDE_CODE_TMPDIR = before;
   }
 }
 
