@@ -8,8 +8,11 @@
       {
         "label": "main",
         "title": "togi",
-        "width": 960,
-        "height": 640,
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "center": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": { "x": 14, "y": 21 }
