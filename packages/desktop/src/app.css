@@ -751,6 +751,104 @@ body {
   fill: var(--human);
 }
 
+/* El mapa sobre React Flow: su hueco, su retícula, sus aristas, sus etiquetas y sus botones. */
+.mesa-map {
+  flex: 1;
+  /* React Flow necesita una altura: sin ella no pinta nada. */
+  min-height: 420px;
+  --xy-background-color: var(--bg);
+  /* Un poco más claro que el borde, para que la retícula se vea sin competir con las aristas. */
+  --xy-background-pattern-color: color-mix(in srgb, var(--border) 65%, var(--ink-muted));
+}
+
+.mesa-map .mesa-edge {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1.5;
+}
+
+.mesa-map .is-you > .mesa-edge {
+  stroke: var(--human);
+}
+
+.mesa-map .is-active > .mesa-edge,
+.mesa-map .is-more > .mesa-edge {
+  stroke: var(--agent);
+}
+
+.mesa-map .is-done > .mesa-edge {
+  stroke-dasharray: 4 4;
+}
+
+/* Mientras la sesión sigue, un punto recorre la arista sin parar: un trazo de largo 0 y punta redonda. */
+@keyframes mesa-flow {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.mesa-dot {
+  fill: none;
+  stroke: var(--agent);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 0 1;
+  animation: mesa-flow 2.4s linear infinite;
+}
+
+.mesa-map .is-you > .mesa-dot {
+  stroke: var(--human);
+  animation-duration: 2.8s;
+}
+
+/* La etiqueta de cada arista: el último mensaje que pasó por ella. */
+.mesa-chip {
+  position: absolute;
+  padding: 2px 8px;
+  white-space: nowrap;
+  font: 400 11.5px / 16px var(--font-mono);
+  color: var(--ink-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.mesa-chip.is-you {
+  color: var(--human);
+}
+
+.mesa-chip.is-active,
+.mesa-chip.is-more {
+  color: var(--agent);
+}
+
+.mesa-caption {
+  margin-bottom: var(--space-2);
+  /* Deja sitio a los botones de la izquierda; en una ventana estrecha, parte la línea. */
+  max-width: calc(100% - 160px);
+  text-align: center;
+  font: 400 12.5px / 20px var(--font-sans);
+  color: var(--ink-muted);
+}
+
+.mesa-map .react-flow__controls {
+  gap: 2px;
+}
+
+.mesa-map .react-flow__controls-button {
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.mesa-map .react-flow__controls-button:hover {
+  color: var(--ink);
+}
+
 /* Los nodos del mapa sobre React Flow (MesaMap.ts), con las medidas de la pantalla 5 del diseño. */
 .mesa-seat {
   display: flex;
@@ -885,6 +983,7 @@ body {
 }
 
 .mesa-pulse {
+  fill: none;
   stroke: var(--agent);
   stroke-width: 3;
   stroke-linecap: round;
@@ -916,6 +1015,12 @@ body {
     animation: none;
     stroke-dasharray: none;
     opacity: 0.6;
+  }
+
+  /* El punto se queda quieto, al final de su arista. */
+  .mesa-dot {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }
 
