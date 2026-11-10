@@ -1,13 +1,21 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
+import { MesaPane } from "./MesaPane.tsx";
 import { ProjectColumn } from "./ProjectColumn.ts";
 import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
 import { mergeRows, TaskList, type TaskRow } from "./TaskList.ts";
 import { TaskNotebookPane } from "./TaskNotebookPane.tsx";
 import { TitleBar } from "./TitleBar.ts";
-import { isToggleShortcut, PENDING, tasksFor, toggled, type View } from "./viewState.ts";
+import {
+  isToggleShortcut,
+  PENDING,
+  tasksFor,
+  toggled,
+  type View,
+  viewShortcut,
+} from "./viewState.ts";
 
 type DaemonStatus =
   | { state: "running"; version: string }
@@ -59,9 +67,16 @@ export function App() {
     };
   }, []);
 
-  // ⌘\ pliega y despliega la columna. Un atajo del webview: no pasa por Tauri.
+  // ⌘\ pliega y despliega la columna; ⌘1 y ⌘2 cambian entre las tareas y la mesa en vivo. Atajos del
+  // webview: no pasan por Tauri.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const next = viewShortcut(e);
+      if (next !== null) {
+        e.preventDefault();
+        setView(next);
+        return;
+      }
       if (!isToggleShortcut(e)) return;
       e.preventDefault();
       setCollapsed((prev) => !prev);
@@ -159,6 +174,8 @@ export function App() {
         collapsed={collapsed && projects !== null}
         onCollapse={() => setCollapsed((prev) => !prev)}
         fullscreen={fullscreen}
+        mesa={view.kind === "mesa"}
+        onMesa={(open) => setView(open ? { kind: "mesa" } : PENDING)}
       />
       {/* Siempre montada: si el daemon deja de responder no hay lista, pero el estado se sigue viendo. */}
       <ProjectColumn
@@ -178,7 +195,12 @@ export function App() {
       />
       <main className="shell">
         {list?.status === "ok" ? (
-          shown !== undefined ? (
+          view.kind === "mesa" ? (
+            <MesaPane
+              planning={list.tasks.filter((t) => t.state === "planning").map((t) => t.number)}
+              waiting={projects?.pending.length ?? 0}
+            />
+          ) : shown !== undefined ? (
             <ProjectSummary project={shown} partial={list.truncated} />
           ) : opened !== undefined ? (
             <TaskNotebookPane
