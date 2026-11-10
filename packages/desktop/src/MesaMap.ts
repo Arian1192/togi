@@ -5,11 +5,10 @@ import {
   type NodeChange,
   Panel,
   ReactFlow,
-  useNodesInitialized,
   useReactFlow,
   type Viewport,
 } from "@xyflow/react";
-import { createElement, type ReactNode, useEffect, useMemo, useState } from "react";
+import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { MesaFlowEdge } from "./MesaFlowEdge.ts";
 import { MesaFlowNode } from "./MesaFlowNode.ts";
 import type { MesaState } from "./mesa.ts";
@@ -23,17 +22,30 @@ import { mesaMemory } from "./mesaMemory.ts";
 const FIT = { padding: 0.08, maxZoom: 1 };
 type Size = { width: number; height: number };
 
+/**
+ * Si toca encuadrar: con todos los nodos medidos y salvo que sean los mismos que había al volver a la
+ * mesa (`restored`), que se quedan con el encuadre que dejaste.
+ */
+export const shouldRefit = (ids: string, measured: boolean, restored: string | null): boolean =>
+  measured && ids !== restored;
+
 /** Cuando entra o sale alguien de la mesa, la vuelve a encuadrar; si solo cambian los textos, no. */
-function Refit({ ids }: { ids: string }): null {
+function Refit({ ids, measured }: { ids: string; measured: boolean }): null {
   const { fitView } = useReactFlow();
-  const ready = useNodesInitialized();
+  // Al volver a la mesa con los mismos nodos, se queda el encuadre que dejaste: solo esa primera vez.
+  const restored = useRef(mesaMemory.viewport !== null && ids === mesaMemory.ids ? ids : null);
   useEffect(() => {
-    if (!ready) return;
-    // Al volver a la mesa con los mismos nodos, se queda el encuadre que dejaste.
-    const same = ids === mesaMemory.ids && mesaMemory.viewport !== null;
     mesaMemory.ids = ids;
-    if (!same) void fitView({ ...FIT, duration: 300 });
-  }, [ids, ready, fitView]);
+  }, [ids]);
+  // Encuadra cuando cambia quién está, en cuanto todos los nodos están medidos y un fotograma
+  // después, con las medidas ya en React Flow. Si se le pide antes, lo deja en cola y, con una plaza
+  // nueva, la cola no siempre se vacía: la plaza se quedaba fuera del mapa.
+  useEffect(() => {
+    if (!shouldRefit(ids, measured, restored.current)) return;
+    restored.current = null;
+    const frame = requestAnimationFrame(() => void fitView({ ...FIT, duration: 300 }));
+    return () => cancelAnimationFrame(frame);
+  }, [ids, measured, fitView]);
   return null;
 }
 
@@ -137,7 +149,10 @@ export function MesaMap({ state, waiting, titles, selected, onSelect }: Props): 
         proOptions: { hideAttribution: true },
       },
       createElement(Background, { variant: BackgroundVariant.Dots, gap: 22, size: 1.5 }),
-      createElement(Refit, { ids: flow.nodes.map((n) => n.id).join(" ") }),
+      createElement(Refit, {
+        ids: flow.nodes.map((n) => n.id).join(" "),
+        measured: flow.nodes.every((n) => sizes.has(n.id)),
+      }),
       // El botón de encuadrar usa el mismo encuadre que al abrir la mesa.
       createElement(Controls, {
         showInteractive: false,
