@@ -751,6 +751,127 @@ body {
   fill: var(--human);
 }
 
+/* Los nodos del mapa sobre React Flow (MesaMap.ts), con las medidas de la pantalla 5 del diseño. */
+.mesa-seat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.mesa-label {
+  height: 24px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 400 11.5px / 20px var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.mesa-map .mesa-node {
+  position: relative;
+  flex: 1;
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: grab;
+}
+
+/* El asidero marca dónde se engancha la arista; no se ve ni se puede usar. */
+.mesa-map .mesa-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mesa-map .mesa-node.is-you {
+  gap: 0;
+  padding: 10px 14px;
+}
+
+.mesa-map .mesa-node.is-togi {
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  color: var(--bg);
+  background: var(--ink);
+  border: 0;
+}
+
+.mesa-map .mesa-node.is-active {
+  border-color: var(--agent);
+}
+
+.mesa-map .mesa-node.is-more {
+  border-color: var(--agent);
+}
+
+.mesa-map .mesa-node.is-done {
+  background: transparent;
+  border-style: dashed;
+}
+
+.mesa-map .mesa-node.is-waiting {
+  border-color: var(--human);
+}
+
+.mesa-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.mesa-map .mesa-node .mesa-title {
+  color: var(--ink);
+  font: 500 13px / 20px var(--font-sans);
+}
+
+.mesa-map .is-done .mesa-title {
+  color: var(--ink-muted);
+}
+
+.mesa-map .is-togi .mesa-title {
+  color: var(--bg);
+  font: 600 17px / 1 var(--font-display);
+}
+
+.mesa-meta {
+  font: 400 11.5px / 16px var(--font-mono);
+  color: var(--ink-muted);
+}
+
+.mesa-map .mesa-node .mesa-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-muted);
+  font: 400 12px / 20px var(--font-mono);
+}
+
+.mesa-map .is-active .mesa-note,
+.mesa-map .is-more .mesa-note {
+  color: var(--agent);
+}
+
+.mesa-map .is-waiting .mesa-note {
+  color: var(--human);
+}
+
+.mesa-map .is-togi .mesa-note {
+  color: var(--bg);
+  opacity: 0.6;
+  font-size: 10.5px;
+  line-height: 14px;
+}
+
 /* Un mensaje recorre su arista una vez, en su sentido; uno nuevo (otra `key`) vuelve a empezar. */
 @keyframes mesa-travel {
   from {
