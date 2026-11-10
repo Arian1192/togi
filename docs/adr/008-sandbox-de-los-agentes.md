@@ -6,7 +6,7 @@
 
 **Estado:** aprobado el 4 de noviembre de 2026.
 
-**Enmienda del 10 de noviembre de 2026 (ADR-011):** en la rebanada 3 el builder y los gates usan `srt`, siempre que antes pasen dentro de él la instalación, el typecheck, el lint y los tests de `promos`. Además de la copia de solo lectura, cada tarea tiene una copia escribible (el árbol de su clon, sin el directorio de git). La instalación de dependencias, que es una ejecución aparte sin agente, es la única que tiene red, y solo hacia los dominios exactos del registro del perfil. microsandbox se evalúa con el gate del navegador.
+**Enmienda del 10 de noviembre de 2026 (ADR-011):** en la rebanada 3 el builder y los gates usan `srt`, siempre que antes pasen dentro de él la instalación, el typecheck, el lint y los tests de `promos`. Además de la copia de solo lectura, cada tarea tiene una copia escribible (el árbol de su clon, sin el directorio de git). La instalación de dependencias, que es una ejecución aparte sin agente, es la única que tiene red, y solo hacia los dominios exactos del registro del perfil. También es la única que puede escribir en un sitio de `/tmp`, el bloqueo de pnpm (`/private/tmp/pnpm-store-operation-locks-<uid>`). `allowLocalBinding` queda prohibido: en la prueba de `promos` dejó llegar a todo lo que escucha en el loopback del Mac. microsandbox se evalúa con el gate del navegador.
 
 El ADR-005 fijó una condición antes de la rebanada 2: ningún agente se lanza sin sandbox. Un agente que lee un repo puede encontrar instrucciones maliciosas en él, y lo que puede hacer en ese caso lo decide su aislamiento. Lo que el sandbox debe impedir, de más a menos grave:
 
