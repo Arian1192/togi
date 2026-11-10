@@ -194,7 +194,7 @@ togi 0.1.0 · daemon activo · 4 tareas
 
 La app de escritorio (Tauri 2) es un cliente más del daemon y usa la misma marca con otra densidad. Tiene dos modos: **banco de taller** para trabajar y **cuaderno** para decidir.
 
-- **Banco de taller:** columna lateral de proyectos (de 288 px; plegada, un riel de 56 px con la inicial de cada proyecto y su ◆), con las tareas de cada proyecto agrupadas por quién tiene que actuar; la tarea seleccionada en el centro con pestañas (trayectoria, diff, ficheros, navegador, plan, log), paneles divisibles con ⌘D y paleta de comandos con ⌘K. Dos vistas globales completan la app: la mesa en vivo (⌘M) y las terminales (⌘T). Es la única superficie de togi con barra lateral.
+- **Banco de taller:** columna lateral de proyectos (de 288 px; plegada, un riel de 56 px con la inicial de cada proyecto y su ◆), con las tareas de cada proyecto agrupadas por quién tiene que actuar; la tarea seleccionada en el centro con pestañas (trayectoria, diff, ficheros, navegador, plan, log), paneles divisibles con ⌘D y paleta de comandos con ⌘K. Dos vistas globales completan la app: la mesa en vivo (⌘2; las tareas, ⌘1) y las terminales (⌘T). Es la única superficie de togi con barra lateral.
 - **Cuaderno:** al abrir una tarea en `plan_review` o `review`, la zona central pasa a la vista de lectura de la web: título en Shippori Mincho, recorrido de estados, secciones 一 二 三 y un único botón principal.
 - **Densidad:** texto de interfaz a 13 / 20 px, mono a 12,5 / 20 px y filas de 32 px con puntero.
 - **Sin red:** las fuentes van empaquetadas en la app, nunca cargadas de Google Fonts.

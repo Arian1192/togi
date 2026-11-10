@@ -6,7 +6,8 @@ import type { TaskRow } from "./TaskList.ts";
 export type View =
   | { kind: "pending" }
   | { kind: "project"; repo: string }
-  | { kind: "task"; number: number };
+  | { kind: "task"; number: number }
+  | { kind: "mesa" };
 
 export const PENDING: View = { kind: "pending" };
 
@@ -20,7 +21,23 @@ export function tasksFor(view: View, tasks: TaskRow[]): TaskRow[] {
       return tasks.filter((t) => t.repo === view.repo);
     case "task":
       return tasks.filter((t) => t.number === view.number);
+    case "mesa":
+      return [];
   }
+}
+
+/** ⌘1 lleva a las tareas («Pendiente de ti») y ⌘2 a la mesa en vivo (ADR-010 §3); nada más. */
+export function viewShortcut(e: {
+  key: string;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}): View | null {
+  if (!e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return null;
+  if (e.key === "1") return PENDING;
+  if (e.key === "2") return { kind: "mesa" };
+  return null;
 }
 
 /** ⌘\ pliega y despliega la columna. Cualquier otro modificador, o tecla, no lo dispara. */

@@ -9,14 +9,32 @@ interface Props {
   onCollapse: () => void;
   /** A pantalla completa macOS oculta los semáforos: la barra deja de reservarles sitio. */
   fullscreen: boolean;
+  /** Si está la mesa en vivo en pantalla; con `onMesa`, la barra lleva «Tareas ⌘1» y «Mesa ⌘2». */
+  mesa?: boolean;
+  onMesa?: (open: boolean) => void;
 }
+
+const navButton = (label: string, key: string, pressed: boolean, onClick: () => void) =>
+  createElement(
+    "button",
+    {
+      key,
+      type: "button",
+      className: "titlebar-nav",
+      "aria-pressed": pressed,
+      title: `${label} (⌘${key})`,
+      onClick,
+    },
+    label,
+    createElement("kbd", null, `⌘${key}`),
+  );
 
 const SHORTCUT = "⌘\\";
 
 // Icono de Lucide (https://lucide.dev, licencia ISC): panel-left, con el trazo de 1,5 px de la marca.
 const PANEL_LEFT = { rect: { x: 3, y: 3, width: 18, height: 18, rx: 2 }, line: "M9 3v18" } as const;
 
-export function TitleBar({ collapsed, onCollapse, fullscreen }: Props): ReactNode {
+export function TitleBar({ collapsed, onCollapse, fullscreen, mesa, onMesa }: Props): ReactNode {
   const label = collapsed ? "Desplegar la columna" : "Plegar la columna";
   return createElement(
     "header",
@@ -43,5 +61,12 @@ export function TitleBar({ collapsed, onCollapse, fullscreen }: Props): ReactNod
         createElement("path", { d: PANEL_LEFT.line, stroke: "currentColor", strokeWidth: 1.5 }),
       ),
     ),
+    onMesa &&
+      createElement(
+        "nav",
+        { className: "titlebar-views", "aria-label": "Vistas" },
+        navButton("Tareas", "1", mesa !== true, () => onMesa(false)),
+        navButton("Mesa en vivo", "2", mesa === true, () => onMesa(true)),
+      ),
   );
 }
