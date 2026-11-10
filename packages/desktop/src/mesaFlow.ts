@@ -1,4 +1,4 @@
-import { type Node, Position } from "@xyflow/react";
+import { type Edge, type Node, Position } from "@xyflow/react";
 import { MAX_SEATS, type MesaState, type Pulse, ROLE_LABEL, type Seat } from "./mesa.ts";
 
 // La mesa en vivo como grafo de React Flow (ADR-010 §3, pantalla 5 del diseño): togi en el centro, tú
@@ -159,4 +159,87 @@ export function placeNodes(
   const togi: MesaNodeData = { tone: "is-togi", title: "togi", note: `log · seq ${state.lastSeq}` };
   put("togi", SIZE.togi, TOGI, togi, TOGI_HANDLES);
   return nodes;
+}
+
+/** Lo que lleva cada arista; va siempre de una plaza (o de ti) a togi. */
+export type MesaEdgeData = {
+  tone: Tone;
+  /** El último mensaje: recorre la arista una vez, en su sentido. */
+  pulse: Pulse | null;
+  /** Mientras la sesión sigue, un punto recorre la arista sin parar, en este sentido. */
+  flow: Pulse["toward"] | null;
+  /** La etiqueta de la arista: el último mensaje que pasó por ella. */
+  chip: string | null;
+};
+export type MesaEdge = Edge<MesaEdgeData, "mesa">;
+
+const facing = (side: "left" | "right") => (side === "right" ? "left" : "right");
+
+function edge(
+  id: string,
+  [sourceHandle, targetHandle]: [string, string],
+  tone: Tone,
+  pulse: Pulse | undefined,
+  flow: Pulse["toward"] | null,
+  chip: string | null,
+): MesaEdge {
+  return {
+    id: `edge-${id}`,
+    source: id,
+    sourceHandle,
+    target: "togi",
+    targetHandle,
+    type: "mesa",
+    selectable: false,
+    focusable: false,
+    ariaLabel: "Canal con togi",
+    data: { tone, pulse: pulse ?? null, flow, chip },
+  };
+}
+
+/**
+ * Las aristas de la mesa: todas van a togi, ninguna de un agente a otro. Cada una sale por el lado de
+ * la tarjeta que mira a togi y entra por el lado de togi que la mira.
+ */
+export function linkEdges(state: MesaState, waiting: number): MesaEdge[] {
+  const { seats, hidden, slots } = visibleSeats(state);
+  const mine = lastPulse(state, [null]);
+  const mineAt = state.log?.find((e) => e.seq === mine?.seq);
+  const chip = mineAt ? `#${mineAt.number} ${mineAt.name}` : null;
+  // Si algo te espera, un punto viaja sin parar de togi hacia ti.
+  const edges = [edge("you", ["bottom", "top"], "is-you", mine, waiting > 0 ? "seat" : null, chip)];
+  const seat = (id: string, index: number, tone: Tone, keys: string[], live: boolean) => {
+    const p = lastPulse(state, keys);
+    const side = seatSide(index);
+    const flow = live ? (p?.toward ?? "seat") : null;
+    edges.push(edge(id, [side, facing(side)], tone, p, flow, p?.name ?? null));
+  };
+  seats.forEach((s, i) => {
+    seat(s.key, i, s.active ? "is-active" : "is-done", [s.key], s.active);
+  });
+  if (hidden.length > 0) {
+    const keys = hidden.map((s) => s.key);
+    seat(
+      "more",
+      slots - 1,
+      "is-more",
+      keys,
+      hidden.some((s) => s.active),
+    );
+  }
+  return edges;
+}
+
+/** La mesa entera para React Flow: sus nodos, sus aristas y cuántas sesiones siguen activas. */
+export function layout(
+  state: MesaState,
+  waiting: number,
+  moved?: ReadonlyMap<string, Point>,
+  titles?: ReadonlyMap<number, string>,
+): { nodes: MesaNode[]; edges: MesaEdge[]; active: number } {
+  return {
+    nodes: placeNodes(state, waiting, moved, titles),
+    edges: linkEdges(state, waiting),
+    active: state.seats.filter((s) => s.active).length,
+  };
 }
