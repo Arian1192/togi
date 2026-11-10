@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MesaView, seatPoint } from "./MesaView.ts";
+import { MesaView } from "./MesaView.ts";
 import {
   applyHeader,
   EMPTY,
@@ -12,6 +12,7 @@ import {
   type MesaState,
   type Who,
 } from "./mesa.ts";
+import { seatPoint } from "./mesaFlow.ts";
 
 // La mesa en vivo v1 (ADR-010 §3): el modelo a partir de las cabeceras y su mapa. El cableado con
 // `daemon-event-header` llega en la parte siguiente.
@@ -113,14 +114,20 @@ test("el mapa: togi, tú con lo que te espera, cada plaza con el nombre del ADR-
     h(4, 9, "session.ended", togi("planner")),
   );
   const out = renderToStaticMarkup(createElement(MesaView, { state: s, waiting: 2 }));
-  assert.match(out, /<svg[^>]*aria-label="Mesa en vivo: 1 sesiones activas"/);
+  assert.match(out, /class="mesa-map" aria-label="Mesa en vivo: 1 sesiones activas"/);
   assert.match(out, />togi</);
   assert.match(out, />log · seq 4</);
   assert.match(out, /mesa-node is-you is-waiting/);
-  assert.match(out, />◆ 2 te esperan</);
+  assert.match(out, /mesa-note"><svg[^>]*class="glyph"[\s\S]*?<\/svg>2 te esperan</);
   assert.equal((out.match(/>Planificador</g) ?? []).length, 2);
-  assert.match(out, />#7 · en curso</);
-  assert.match(out, /mesa-node is-done[\s\S]*?>#9 · terminado</);
+  assert.match(
+    out,
+    /mesa-label">#7<\/span><div class="mesa-node is-active"[\s\S]*?<\/svg>plan\.proposed</,
+  );
+  assert.match(
+    out,
+    /mesa-label">#9<\/span><div class="mesa-node is-done"[\s\S]*?<\/svg>terminado</,
+  );
   assert.equal((out.match(/class="mesa-edge"/g) ?? []).length, 3, "tú y las dos plazas");
 });
 
@@ -130,10 +137,10 @@ test("el último mensaje de cada arista la recorre, en el sentido en que va", ()
     h(2, 7, "plan.proposed", agent("planner")),
   );
   const out = renderToStaticMarkup(createElement(MesaView, { state: s, waiting: 0 }));
-  const pulses = out.match(/<line[^>]*class="mesa-pulse[^"]*"[^>]*>/g) ?? [];
+  const pulses = out.match(/<path[^>]*class="mesa-pulse[^"]*"[^>]*>/g) ?? [];
   assert.equal(pulses.length, 1, "solo el último de la plaza");
   assert.match(pulses[0] ?? "", /class="mesa-pulse to-togi"/);
   assert.match(pulses[0] ?? "", /pathLength="1"/);
-  assert.match(pulses[0] ?? "", /x2="400" y2="260"/, "termina en togi");
+  assert.match(pulses[0] ?? "", /d="M[\d.]+,[\d.]+ C[\d., ]+ 392,330"/, "termina en togi");
   assert.match(pulses[0] ?? "", /data-event="plan.proposed"/);
 });
