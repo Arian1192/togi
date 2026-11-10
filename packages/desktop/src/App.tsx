@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
 import { MesaPane } from "./MesaPane.tsx";
+import { MesaTasksContext } from "./mesaContext.ts";
 import { ProjectColumn } from "./ProjectColumn.ts";
 import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
@@ -208,11 +209,19 @@ export function App() {
       <main className={view.kind === "mesa" ? "shell is-mesa" : "shell"}>
         {list?.status === "ok" ? (
           view.kind === "mesa" ? (
-            <MesaPane
-              planning={list.tasks.filter((t) => t.state === "planning").map((t) => t.number)}
-              waiting={projects?.pending.length ?? 0}
-              titles={titles}
-            />
+            // El lateral de la mesa tiene una tarjeta por tarea; «Abrir cuaderno →» sale de la mesa.
+            <MesaTasksContext.Provider
+              value={{
+                tasks: list.tasks,
+                onOpen: (number) => setView({ kind: "task", number }),
+              }}
+            >
+              <MesaPane
+                planning={list.tasks.filter((t) => t.state === "planning").map((t) => t.number)}
+                waiting={projects?.pending.length ?? 0}
+                titles={titles}
+              />
+            </MesaTasksContext.Provider>
           ) : shown !== undefined ? (
             <ProjectSummary project={shown} partial={list.truncated} />
           ) : opened !== undefined ? (
