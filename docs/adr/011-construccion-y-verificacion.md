@@ -44,6 +44,24 @@ En esta rebanada el agente ejecuta código del repo (tests, lint), y los gates t
 
 **Condicionada a una prueba previa**, que es el primer paso de la construcción: ejecutar la instalación, el typecheck, el lint y los tests reales de `promos` dentro de `srt` con esas reglas. Si los tests de la API necesitan abrir un puerto local o llegar a una base de datos, `srt` no los deja, y habrá que decidir entre permitir el loopback solo a los gates, una base de datos en memoria o microsandbox. Si la prueba falla, este punto vuelve a Arian antes de seguir.
 
+**Resultado de la prueba (10 de noviembre de 2026), aprobado por Arian.** Clon de `promos` (rama `dev`) con el directorio de git aparte y las reglas del ADR-008:
+
+| Paso | Dentro de `srt` |
+| --- | --- |
+| Typecheck | Pasa (6 s). |
+| Tests | 2680 de 2688 pasan. Fallan los 8 de `apps/api/src/server.test.ts`, que arrancan el servidor HTTP de verdad: `listen` da `EPERM`. Los de la API usan PGlite en el proceso, sin Postgres. |
+| Instalación | Falla: pnpm 12 escribe su bloqueo siempre en `/private/tmp/pnpm-store-operation-locks-<uid>`, sin hacer caso a `TMPDIR`, y `/tmp` está denegado. Descargar fuera sin scripts y ejecutarlos dentro (`pnpm rebuild`) choca con el mismo bloqueo. |
+
+Dos hallazgos más:
+
+- **togi no hacía llegar `TMPDIR` al sandbox.** srt lo sustituye por el `CLAUDE_CODE_TMPDIR` de quien lo lanza (o `/tmp/claude`). Se arregla en el worker y afecta también al planificador.
+- **`allowLocalBinding` de srt no sirve.** Además de dejar escuchar, deja conectarse a todo lo que escucha en el loopback del Mac: en la prueba llegó al Postgres de desarrollo de `promos` (5432) y a otros servicios. Queda prohibido, como `allowAll` en microsandbox.
+
+Con eso, dos excepciones acotadas:
+
+1. **La instalación**, que es una ejecución sin agente, puede escribir **solo** en `/private/tmp/pnpm-store-operation-locks-<uid>`. El builder y los gates siguen sin `/tmp`. Lo peor que puede hacer un script de instalación ahí es estropear los bloqueos de pnpm del usuario, y se arregla repitiendo la instalación.
+2. **Los tests que necesitan abrir un puerto** salen del gate `test` de togi con un campo del perfil (`testExclude`); en `promos`, `apps/api/src/server.test.ts`. La CI del repo los sigue ejecutando antes del merge. Vuelven al gate cuando llegue microsandbox, que tiene su propio loopback dentro de la VM.
+
 ### 3. La copia de trabajo: un clon de togi, con git fuera del árbol
 El ADR-004 dice `Workspace.kind: "worktree"`, pero el ADR-008 descarta `git worktree` porque el checkout ejecutaría los hooks del repo en el daemon, fuera del sandbox.
 
@@ -78,6 +96,7 @@ interface RepoProfile {
   protectedPaths: string[];   // configuración de gates, .github/, credenciales: el builder nunca los toca
   docs: string[];             // globs de documentación, para medir el diff
   registry: string[];         // dominios exactos para instalar
+  testExclude: string[];      // tests que el sandbox no puede ejecutar (abren puertos); los corre la CI del repo
 }
 ```
 
@@ -85,7 +104,19 @@ interface RepoProfile {
 
 **`protectedPaths` lleva siempre unos mínimos que el perfil no puede quitar**, porque son lo que el agente usaría para trucar la verificación: `package.json` de cualquier carpeta, los lockfiles, la configuración de las herramientas de los gates (`tsconfig*.json`, la de lint y la del runner de tests), `.github/` y cualquier fichero que se parezca a una credencial (`.env*`, `*.pem`, `*.key`). Sin eso, el builder podría cambiar `"test"` por `exit 0`. El perfil solo añade rutas.
 
-**Necesito de Arian** los globs reales de `promos`: tests, configuración de lint y de tests, y credenciales.
+**Perfil de `promos`, primera versión** (sacado del repo y aprobado por Arian el 10 de noviembre):
+
+| Campo | Valor |
+| --- | --- |
+| `install` | `pnpm install --frozen-lockfile` |
+| `checks` | `typecheck`: `pnpm typecheck`; `lint`: ninguno (`promos` no tiene); `test`: `pnpm test` |
+| `testFiles` | `apps/**/*.test.{ts,tsx}`, `apps/web/e2e/**` |
+| `protectedPaths`, además de los mínimos | `apps/*/src/test/**`, `apps/api/drizzle/**`, `**/vitest.config.ts`, `**/playwright.config.ts`, `apps/api/drizzle.config.ts`, `bruno/**/.env*`, `package-lock.json` |
+| `docs` | `docs/**`, `**/*.md` |
+| `registry` | `registry.npmjs.org` |
+| `testExclude` | `apps/api/src/server.test.ts` |
+
+Los e2e de Playwright no entran en los gates de esta rebanada: necesitan navegador, que va con microsandbox (ADR-010). Los `.env` con credenciales de `promos` no están en git, así que no llegan al clon.
 
 ### 6. El Bash del builder: comandos exactos
 **Recomendación:** la herramienta `Bash` del builder solo acepta los comandos de `checks` del perfil, tal cual o con rutas del repo como argumentos (`pnpm test apps/api/src/promos`). El hook rechaza cualquier otra cosa, y también cualquier metacarácter de shell (`;`, `&&`, `|`, `$(`, redirecciones), para que un comando permitido no sirva de puerta a otro.
@@ -133,7 +164,7 @@ Todo debe fallar o no llegar a la verificación.
 Aprobado, enmienda los ADR siguientes, que lo dicen en su estado:
 
 - **ADR-004:** `Workspace.kind` pasa de `"worktree"` a `"clone"`, con el directorio de git separado del árbol.
-- **ADR-008 §1:** además de la copia de solo lectura, una copia escribible por tarea (el árbol del clon), y el directorio desechable deja de ser el único escribible para el builder. La red admite, solo en la instalación, los dominios exactos del registro del perfil.
+- **ADR-008 §1:** además de la copia de solo lectura, una copia escribible por tarea (el árbol del clon), y el directorio desechable deja de ser el único escribible para el builder. La red admite, solo en la instalación, los dominios exactos del registro del perfil, y la instalación puede escribir en `/private/tmp/pnpm-store-operation-locks-<uid>` (punto 2). `allowLocalBinding` queda prohibido en `srt`, porque abre todo el loopback del Mac.
 - **ADR-003:** el Bash del builder queda definido por el punto 6, y su bloqueo de ficheros incluye los `protectedPaths` del punto 5.
 - **ADR-001:** la integración de `dev` y la merge queue pasan a la rebanada 4 (decisión 0).
 
