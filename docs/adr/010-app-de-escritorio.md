@@ -8,7 +8,7 @@
 
 **Enmienda del 9 de noviembre de 2026:** la barra lateral pasa de una lista plana de tareas a una **columna de proyectos** (alternativa B de la página «Fase 1» del lienzo). Cambian el §2 y la fila «Lista de tareas» del §3; el resto del ADR no cambia.
 
-**Enmienda del 10 de noviembre de 2026:** la **mesa en vivo** pasa de la fase 3 a la fase 1. togi es una factoría visual con togi como intermediario, y la mesa es la forma de ver cómo fluye la información y en qué estado está cada agente mientras se construyen el constructor, los gates y el revisor. Nace con lo que ya existe (tú, togi y las sesiones del planificador) y cada rol nuevo aparece en ella cuando existe en el backend. Para verlo antes que el agente real se usan los agentes falsos de los tests sobre el daemon real, en una demo local, nunca en la app distribuida ni con datos inventados en el webview. Cambian el §3 (la mesa), la tabla de la API y la de fases; el resto del ADR no cambia. El diseño de la pantalla 5 del lienzo es la referencia, no una especificación cerrada.
+**Enmienda del 10 de noviembre de 2026:** la **mesa en vivo** pasa de la fase 3 a la fase 1. togi es una factoría visual con togi como intermediario, y la mesa es la forma de ver cómo fluye la información y en qué estado está cada agente mientras se construyen el constructor, los gates y el revisor. Nace con lo que ya existe (tú, togi y las sesiones del planificador) y cada rol nuevo aparece en ella cuando existe en el backend. Para verlo antes que el agente real se usan los agentes falsos de los tests sobre el daemon real, en una demo local, nunca en la app distribuida ni con datos inventados en el webview. Cambian el §3 (la mesa), la tabla de la API y la de fases; el resto del ADR no cambia. El diseño de la pantalla 5 del lienzo es la referencia, no una especificación cerrada. El atajo de la mesa pasa de ⌘M a **⌘2**, y las tareas quedan en ⌘1: ⌘M es «Minimizar» en macOS, un atajo estándar que no se reutiliza.
 
 El principio 3 hace del daemon el núcleo y de la CLI, la web UI y la app de escritorio sus clientes. Este ADR define la app de escritorio: qué muestra, cómo se conecta al daemon y qué no puede hacer. El diseño de referencia son las siete pantallas del [lienzo de la app de escritorio](https://claude.ai/artifact/QCo31vuqqDekePy6dNWcmM) y la identidad visual, el [manual de marca](../marca/manual-de-marca.md).
 
@@ -47,7 +47,7 @@ Debe cumplir:
 | Log | Los eventos de la tarea en crudo | — |
 | Ficheros | El árbol de la rama de la tarea con su estado en git y en el plan, y un visor de solo lectura | 6 |
 | Navegador | Lo que renderiza el navegador de los gates, con sus acciones, consola, red y capturas | 7 |
-| Mesa en vivo (⌘M) | El mapa de las sesiones activas alrededor de togi y los mensajes entre ellas y togi | 5 |
+| Mesa en vivo (⌘2) | El mapa de las sesiones activas alrededor de togi y los mensajes entre ellas y togi | 5 |
 | Terminales (⌘T) | Las terminales del usuario y la salida de las sesiones de agente | 4 |
 
 La mesa se dibuja con lo que ya registra el log: cada evento tiene un actor y un stream, y todo evento pasa por togi (ADR-009). Una arista es siempre actor ↔ togi, así que no hace falta añadir un campo de destinatario al esquema de eventos. La vista de secuencia queda como alternativa dentro de la mesa.

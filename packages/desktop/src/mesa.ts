@@ -45,10 +45,21 @@ export interface Pulse {
   name: string;
 }
 
+/** Un evento del registro de la mesa: lo que el panel lista, más reciente primero. */
+export interface LogEntry {
+  seq: number;
+  at: string;
+  number: number;
+  name: string;
+  who: string;
+}
+
 export interface MesaState {
   seats: Seat[];
   pulses: Pulse[];
   lastSeq: number;
+  /** Los últimos MAX_PULSES eventos, también los de roles que no entran en la mesa. */
+  log?: LogEntry[];
 }
 
 export const EMPTY: MesaState = { seats: [], pulses: [], lastSeq: 0 };
@@ -71,14 +82,26 @@ function placeOf(actor: Who): { role: string; toward: Pulse["toward"] } | null {
 export function applyHeader(state: MesaState, h: Header): MesaState {
   if (h.seq <= state.lastSeq) return state;
   const place = placeOf(h.actor);
-  const base = { ...state, lastSeq: h.seq };
+  const entry: LogEntry = {
+    seq: h.seq,
+    at: h.at,
+    number: h.number,
+    name: h.name,
+    who: whoLabel(h.actor),
+  };
+  const log = [...(state.log ?? []), entry].slice(-MAX_PULSES);
+  const base = { ...state, lastSeq: h.seq, log };
   if (place === null) {
     return { ...base, pulses: keep([...state.pulses, pulse(h, null, "togi")]) };
   }
   if (!Object.hasOwn(ROLE_LABEL, place.role)) return base;
-  // Una plaza por sesión: dos agentes del mismo rol en la misma tarea no se pisan.
-  const key = h.session ?? `${place.role}#${h.number}`;
-  const old = state.seats.find((s) => s.key === key);
+  // Una plaza por sesión: dos agentes del mismo rol en la misma tarea no se pisan. Una plaza sembrada
+  // sin etiqueta (`seed`) es esa misma sesión: la primera etiqueta de su rol y tarea la adopta.
+  const plain = `${place.role}#${h.number}`;
+  const key = h.session ?? plain;
+  const adopt =
+    h.session !== undefined && !state.seats.some((s) => s.key === key) ? plain : undefined;
+  const old = state.seats.find((s) => s.key === key || s.key === adopt);
   const active =
     h.name === "session.ended"
       ? false
@@ -86,10 +109,32 @@ export function applyHeader(state: MesaState, h: Header): MesaState {
         ? true
         : (old?.active ?? true);
   const seat: Seat = { key, role: place.role, number: h.number, active, lastSeq: h.seq };
-  const seats = old
-    ? state.seats.map((s) => (s.key === key ? seat : s))
-    : trim([...state.seats, seat]);
-  return { seats, pulses: keep([...state.pulses, pulse(h, key, place.toward)]), lastSeq: h.seq };
+  const seats = old ? state.seats.map((s) => (s === old ? seat : s)) : trim([...state.seats, seat]);
+  return { ...base, seats, pulses: keep([...state.pulses, pulse(h, key, place.toward)]) };
+}
+
+/**
+ * La mesa al abrirla o al reconectar: una plaza de planificador en curso por cada tarea que tiene su
+ * sesión activa ahora mismo. Lo que llegue después se suma; `lastSeq` evita contar dos veces.
+ */
+export function seed(activePlanners: readonly number[], lastSeq = 0): MesaState {
+  const seats = activePlanners.map(
+    (number): Seat => ({
+      key: `planner#${number}`,
+      role: "planner",
+      number,
+      active: true,
+      lastSeq,
+    }),
+  );
+  return { seats, pulses: [], lastSeq };
+}
+
+/** Quién mandó un mensaje, con los nombres de la interfaz: tú, togi o el rol del ADR-009. */
+export function whoLabel(actor: Who): string {
+  if (actor.kind === "human") return "tú";
+  if (actor.kind === "agent") return ROLE_LABEL[actor.role] ?? "agente";
+  return actor.component.startsWith("adapter:") ? "togi" : (ROLE_LABEL[actor.component] ?? "togi");
 }
 
 const pulse = (h: Header, seat: string | null, toward: Pulse["toward"]): Pulse => ({
