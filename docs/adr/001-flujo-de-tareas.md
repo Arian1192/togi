@@ -4,7 +4,7 @@
 
 ## Estado y contexto
 
-**Estado:** propuesto, pendiente de aprobación.
+**Estado:** aprobado el 10 de noviembre de 2026, junto con el ADR-011, que construye `building`, `verifying`, `review` y `failed`. La integración de `dev` cuando avanza y la merge queue pasan a la rebanada 4.
 
 Cada tarea de togi recorre siete estados con dos gates humanos: la aprobación del plan y la revisión del PR. El objetivo es imponer el flujo que siguen los equipos que usan agentes con éxito (Stripe, Spotify, Dropbox, `dotnet/runtime`): tareas pequeñas, plan aprobado antes del código, verificación independiente del agente y PRs revisables.
 

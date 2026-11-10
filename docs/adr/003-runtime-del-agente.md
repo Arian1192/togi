@@ -6,6 +6,8 @@
 
 **Estado:** aprobado el 2 de noviembre de 2026.
 
+**Enmienda del 10 de noviembre de 2026 (ADR-011):** el `Bash` del builder solo acepta los comandos de comprobación del perfil del repo, con rutas como argumentos y sin metacaracteres de shell. Su bloqueo de ficheros incluye las rutas protegidas del perfil, con unos mínimos fijos (manifiestos, lockfiles, configuración de los gates, `.github/` y credenciales). El esfuerzo de razonamiento (`effort`) es un campo del especialista.
+
 togi no construye su propio agente: usa uno existente y lo controla. El runtime elegido debe permitir:
 
 - Lanzarlo de forma programática desde el daemon (ADR-002: TypeScript sobre Node).
