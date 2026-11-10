@@ -15,6 +15,8 @@ export interface Header {
   number: number;
   name: string;
   actor: Who;
+  /** La etiqueta opaca de su sesión de agente (events.rs, `SessionTag`), si la tiene. */
+  session?: string;
 }
 
 /** Los roles con los nombres del ADR-009; un rol que no esté aquí no entra en la mesa. */
@@ -74,7 +76,8 @@ export function applyHeader(state: MesaState, h: Header): MesaState {
     return { ...base, pulses: keep([...state.pulses, pulse(h, null, "togi")]) };
   }
   if (!Object.hasOwn(ROLE_LABEL, place.role)) return base;
-  const key = `${place.role}#${h.number}`;
+  // Una plaza por sesión: dos agentes del mismo rol en la misma tarea no se pisan.
+  const key = h.session ?? `${place.role}#${h.number}`;
   const old = state.seats.find((s) => s.key === key);
   const active =
     h.name === "session.ended"
@@ -98,13 +101,16 @@ const pulse = (h: Header, seat: string | null, toward: Pulse["toward"]): Pulse =
 
 const keep = (pulses: Pulse[]) => pulses.slice(-MAX_PULSES);
 
-/** Como mucho MAX_SEATS plazas: sobran primero las apagadas más antiguas y luego las más antiguas. */
+/**
+ * Por encima de MAX_SEATS sobran las apagadas más antiguas. Una activa nunca sale: si no caben, la
+ * vista agrupa las que sobran en «+N más».
+ */
 function trim(seats: Seat[]): Seat[] {
   const out = [...seats];
   while (out.length > MAX_SEATS) {
     const done = out.filter((s) => !s.active);
-    const pool = done.length > 0 ? done : out;
-    const oldest = pool.reduce((a, b) => (b.lastSeq < a.lastSeq ? b : a));
+    if (done.length === 0) break;
+    const oldest = done.reduce((a, b) => (b.lastSeq < a.lastSeq ? b : a));
     out.splice(out.indexOf(oldest), 1);
   }
   return out;

@@ -66,6 +66,38 @@ pub struct Header {
     pub actor: Who,
 }
 
+/// Nombre del evento de Tauri con la etiqueta de sesión de un evento (ver `SessionTag`).
+pub const SESSION_EVENT: &str = "daemon-event-session";
+
+/// La sesión de agente del evento `seq`, como una etiqueta opaca: un resumen de su id con una clave
+/// aleatoria de este arranque. Distingue sesiones en la mesa; no revela el id ni sirve para pedir nada.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SessionTag {
+    pub seq: u64,
+    pub session: String,
+}
+
+/// La etiqueta de la sesión del evento: del actor si es un agente, o del payload en `session.*`.
+fn session_label(json: &serde_json::Value) -> Option<String> {
+    use std::hash::{BuildHasher, Hasher};
+    static KEY: std::sync::OnceLock<std::collections::hash_map::RandomState> =
+        std::sync::OnceLock::new();
+    let id = json
+        .get("actor")
+        .and_then(|a| a.get("sessionId"))
+        .or_else(|| json.get("payload").and_then(|p| p.get("sessionId")))
+        .and_then(|s| s.as_str())
+        .filter(|s| {
+            s.starts_with("ses_")
+                && s.len() <= 64
+                && s.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "-_".contains(c))
+        })?;
+    let mut hasher = KEY.get_or_init(Default::default).build_hasher();
+    hasher.write(id.as_bytes());
+    Some(format!("s{:016x}", hasher.finish()))
+}
+
 /// Una palabra corta del vocabulario cerrado del daemon: minúsculas, `.`, `_`, `-` o `:`.
 fn word(value: Option<&serde_json::Value>, max: usize, token: &str) -> Option<String> {
     value
@@ -211,7 +243,9 @@ fn forward(
 /// Abre el stream del daemon de `home` desde su último evento y entrega cada resumen a `emit`.
 /// Vuelve con el motivo cerrado de por qué terminó.
 pub fn stream_at(home: &Path, emit: &mut dyn FnMut(Forwarded)) -> &'static str {
-    run(home, emit, &mut |_| {}).err().unwrap_or("closed")
+    run(home, emit, &mut |_| {}, &mut |_| {})
+        .err()
+        .unwrap_or("closed")
 }
 
 /// Como `stream_at`, y además entrega a `emit_header` la cabecera de cada evento de tarea que la
@@ -221,13 +255,29 @@ pub fn stream_with_headers_at(
     emit: &mut dyn FnMut(Forwarded),
     emit_header: &mut dyn FnMut(Header),
 ) -> &'static str {
-    run(home, emit, emit_header).err().unwrap_or("closed")
+    run(home, emit, emit_header, &mut |_| {})
+        .err()
+        .unwrap_or("closed")
+}
+
+/// Como `stream_with_headers_at`, y además, antes de cada cabecera que venga de una sesión de
+/// agente, su etiqueta opaca: así la mesa distingue dos agentes del mismo rol en la misma tarea.
+pub fn stream_with_sessions_at(
+    home: &Path,
+    emit: &mut dyn FnMut(Forwarded),
+    emit_header: &mut dyn FnMut(Header),
+    emit_session: &mut dyn FnMut(SessionTag),
+) -> &'static str {
+    run(home, emit, emit_header, emit_session)
+        .err()
+        .unwrap_or("closed")
 }
 
 fn run(
     home: &Path,
     emit: &mut dyn FnMut(Forwarded),
     emit_header: &mut dyn FnMut(Header),
+    emit_session: &mut dyn FnMut(SessionTag),
 ) -> Result<(), &'static str> {
     let (token, socket) = connection(home)?;
     let last = match get(&socket, &token, "/v1/health", 64 * 1024)? {
@@ -290,6 +340,13 @@ fn run(
                 let head = header(&summary, &json, &token);
                 emit(summary);
                 if let Some(head) = head {
+                    // La etiqueta va antes que su cabecera: la interfaz las junta por `seq`.
+                    if let Some(session) = session_label(&json) {
+                        emit_session(SessionTag {
+                            seq: head.seq,
+                            session,
+                        });
+                    }
                     emit_header(head);
                 }
             }
@@ -317,13 +374,16 @@ pub fn watch_events(app: tauri::AppHandle) {
     }
     std::thread::spawn(move || loop {
         let reason = match home() {
-            Some(home) => stream_with_headers_at(
+            Some(home) => stream_with_sessions_at(
                 &home,
                 &mut |event| {
                     let _ = app.emit(EVENT, &event);
                 },
                 &mut |head| {
                     let _ = app.emit(HEADER_EVENT, &head);
+                },
+                &mut |tag| {
+                    let _ = app.emit(SESSION_EVENT, &tag);
                 },
             ),
             None => "no_home",
