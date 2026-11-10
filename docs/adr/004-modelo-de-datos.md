@@ -6,6 +6,8 @@
 
 **Estado:** aprobado el 2 de noviembre de 2026.
 
+**Enmienda del 10 de noviembre de 2026 (ADR-011):** `Workspace.kind` pasa de `"worktree"` a `"clone"`: un clon propio de togi, con el directorio de git fuera del árbol que ve el sandbox. El ADR-008 ya descartaba `git worktree`.
+
 El ADR-001 fija que todo es un evento (regla 6): el estado de una tarea es una proyección de un log append-only. Este ADR define ese log, las entidades que se derivan de él y cómo se guardan. Debe cumplir:
 
 - Las entidades mínimas del ADR-001: tarea, plan versionado, sesión de agente, workspace, ejecución de gate, decisión humana o delegada y evento.
