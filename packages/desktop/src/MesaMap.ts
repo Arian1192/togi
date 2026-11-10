@@ -55,9 +55,13 @@ interface Props {
   waiting: number;
   /** Los títulos de las tareas, por número: van encima de cada plaza. */
   titles?: ReadonlyMap<number, string>;
+  /** La tarea abierta en el lateral: sus plazas se marcan. */
+  selected?: number | null;
+  /** Pulsar una plaza abre su tarea en el lateral. */
+  onSelect?: (task: number) => void;
 }
 
-export function MesaMap({ state, waiting, titles }: Props): ReactNode {
+export function MesaMap({ state, waiting, titles, selected, onSelect }: Props): ReactNode {
   // Empieza donde la dejaste (mesaMemory.ts) y lo que mueves se recuerda al salir de la mesa.
   const [moved, setMoved] = useState(() => mesaMemory.moved);
   useEffect(() => {
@@ -70,13 +74,20 @@ export function MesaMap({ state, waiting, titles }: Props): ReactNode {
     () => layout(state, waiting, moved, titles),
     [state, waiting, moved, titles],
   );
+  // La tarea de cada plaza, para marcarla y para abrirla en el lateral al pulsarla.
+  const taskOf = useMemo(
+    () => new Map(state.seats.map((s) => [s.key, s.number] as const)),
+    [state],
+  );
   const nodes = useMemo(
     () =>
       flow.nodes.map((n) => {
         const measured = sizes.get(n.id);
-        return measured ? { ...n, measured } : n;
+        const mark =
+          selected != null && taskOf.get(n.id) === selected ? { className: "is-selected" } : {};
+        return { ...n, ...mark, ...(measured ? { measured } : {}) };
       }),
-    [flow, sizes],
+    [flow, sizes, selected, taskOf],
   );
   // Solo se aplica lo que mueves tú y lo que mide React Flow; nada más cambia la mesa.
   const onNodesChange = (changes: NodeChange<MesaNode>[]) => {
@@ -100,6 +111,10 @@ export function MesaMap({ state, waiting, titles }: Props): ReactNode {
         nodeTypes,
         edgeTypes,
         onNodesChange,
+        onNodeClick: (_: unknown, clicked: MesaNode) => {
+          const task = taskOf.get(clicked.id);
+          if (task !== undefined) onSelect?.(task);
+        },
         // Un tamaño fijo solo al pintar sin navegador (los tests); en la app, React Flow mide su hueco
         // y encuadra con él.
         ...(typeof window === "undefined" ? { width: 880, height: 660 } : {}),
