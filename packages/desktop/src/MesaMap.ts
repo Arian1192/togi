@@ -6,6 +6,7 @@ import {
   Panel,
   ReactFlow,
   useReactFlow,
+  useStore,
   type Viewport,
 } from "@xyflow/react";
 import { createElement, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -43,9 +44,19 @@ function Refit({ ids, measured }: { ids: string; measured: boolean }): null {
   useEffect(() => {
     if (!shouldRefit(ids, measured, restored.current)) return;
     restored.current = null;
+    mesaMemory.framed = true;
     const frame = requestAnimationFrame(() => void fitView({ ...FIT, duration: 300 }));
     return () => cancelAnimationFrame(frame);
   }, [ids, measured, fitView]);
+  // Si cambia el tamaño de la ventana y el encuadre lo puso la mesa, vuelve a encuadrar: si no, al
+  // agrandar la ventana la mesa se quedaba en una esquina. Si lo moviste tú, se respeta.
+  const size = useStore((s) => `${Math.round(s.width)}x${Math.round(s.height)}`);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: solo lo dispara el tamaño.
+  useEffect(() => {
+    if (!measured || !mesaMemory.framed || size === "0x0") return;
+    const frame = requestAnimationFrame(() => void fitView(FIT));
+    return () => cancelAnimationFrame(frame);
+  }, [size]);
   return null;
 }
 
@@ -134,8 +145,10 @@ export function MesaMap({ state, waiting, titles, selected, onSelect }: Props): 
         ...(mesaMemory.viewport
           ? { defaultViewport: mesaMemory.viewport }
           : { fitView: true, fitViewOptions: FIT }),
-        onMoveEnd: (_: unknown, viewport: Viewport) => {
+        onMoveEnd: (event: unknown, viewport: Viewport) => {
           mesaMemory.viewport = viewport;
+          // Con evento, lo movió alguien (ratón, rueda); sin él, la mesa, al encuadrar.
+          if (event) mesaMemory.framed = false;
         },
         minZoom: 0.4,
         maxZoom: 2,
