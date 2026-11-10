@@ -23,7 +23,7 @@ test("la mesa usa los tokens de la marca: ningún color escrito a mano", () => {
 });
 
 test("quien te espera destaca con el color human; las plazas en curso, con el de los agentes", () => {
-  assert.match(css, /\.mesa-node\.is-waiting rect \{[^}]*stroke: var\(--human\)/);
-  assert.match(css, /\.mesa-node\.is-active rect \{[^}]*stroke: var\(--agent\)/);
-  assert.match(css, /\.mesa-node\.is-done \{[^}]*opacity: 0\.45/);
+  assert.match(css, /\.mesa-node\.is-waiting \{[^}]*border-color: var\(--human\)/);
+  assert.match(css, /\.mesa-node\.is-active \{[^}]*border-color: var\(--agent\)/);
+  assert.match(css, /\.mesa-node\.is-done \{[^}]*border-style: dashed/);
 });

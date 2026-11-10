@@ -62,7 +62,7 @@ test("el registro lista lo último que pasó por togi, más reciente primero, ta
       ["session.started", "togi · #7 · 09:30:05 · seq 1"],
     ],
   );
-  assert.match(out, /<svg[^>]*class="mesa"/);
+  assert.match(out, /<div class="mesa-map"/);
 });
 
 test("sin nada aún, el registro lo dice", () => {
