@@ -10,7 +10,10 @@ export type Point = { x: number; y: number };
 const TOGI: Point = { x: 440, y: 330 };
 const YOU: Point = { x: 440, y: 72 };
 const COLUMN_X = 289; // del centro de togi al centro de cada columna
+// Entre filas: holgado con pocas plazas, como en el diseño; con tres filas o más, más juntas, para que
+// la mesa llena quepa sin alejarse tanto que no se lea.
 const ROW_GAP = 200;
+const ROW_GAP_CROWDED = 130;
 export const SIZE = {
   togi: { width: 96, height: 96 },
   you: { width: 160, height: 64 },
@@ -26,7 +29,7 @@ export function seatPoint(index: number, count: number): Point {
   const row = Math.floor(index / 2);
   return {
     x: TOGI.x + (index % 2 === 0 ? -COLUMN_X : COLUMN_X),
-    y: TOGI.y + (row - (rows - 1) / 2) * ROW_GAP,
+    y: TOGI.y + (row - (rows - 1) / 2) * (rows > 2 ? ROW_GAP_CROWDED : ROW_GAP),
   };
 }
 

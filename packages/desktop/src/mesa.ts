@@ -58,13 +58,33 @@ export interface MesaState {
   seats: Seat[];
   pulses: Pulse[];
   lastSeq: number;
-  /** Los últimos MAX_PULSES eventos, también los de roles que no entran en la mesa. */
+  /** Lo último de cada tarea (`keepLog`), también lo de roles que no entran en la mesa. */
   log?: LogEntry[];
 }
 
 export const EMPTY: MesaState = { seats: [], pulses: [], lastSeq: 0 };
 export const MAX_SEATS = 8;
 export const MAX_PULSES = 20;
+/** Del registro se guardan los últimos eventos de cada tarea, y hasta un máximo entre todas. */
+export const MAX_TASK_LOG = 20;
+export const MAX_LOG = 200;
+
+/**
+ * Lo que se guarda del registro: los últimos MAX_TASK_LOG eventos de cada tarea y MAX_LOG en total.
+ * Con varias tareas a la vez, una muy activa no se lleva por delante la historia de las demás.
+ */
+export function keepLog(log: readonly LogEntry[]): LogEntry[] {
+  const perTask = new Map<number, number>();
+  const kept: LogEntry[] = [];
+  for (let i = log.length - 1; i >= 0 && kept.length < MAX_LOG; i--) {
+    const e = log[i] as LogEntry;
+    const seen = perTask.get(e.number) ?? 0;
+    if (seen >= MAX_TASK_LOG) continue;
+    perTask.set(e.number, seen + 1);
+    kept.push(e);
+  }
+  return kept.reverse();
+}
 
 /**
  * La plaza de un evento y hacia dónde va. Togi abre y cierra cada sesión como `adapter:<rol>`: eso es
@@ -89,7 +109,7 @@ export function applyHeader(state: MesaState, h: Header): MesaState {
     name: h.name,
     who: whoLabel(h.actor),
   };
-  const log = [...(state.log ?? []), entry].slice(-MAX_PULSES);
+  const log = keepLog([...(state.log ?? []), entry]);
   const base = { ...state, lastSeq: h.seq, log };
   if (place === null) {
     return { ...base, pulses: keep([...state.pulses, pulse(h, null, "togi")]) };

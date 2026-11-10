@@ -11,6 +11,11 @@ export interface MesaMemory {
   viewport: Viewport | null;
   /** Los nodos que había, en orden (`id id id`). */
   ids: string | null;
+  /**
+   * Si el encuadre es el que puso la mesa (y no tú, al desplazar o hacer zoom): entonces, si cambia el
+   * tamaño de la ventana, la mesa vuelve a encuadrar.
+   */
+  framed: boolean;
 }
 
-export const mesaMemory: MesaMemory = { moved: new Map(), viewport: null, ids: null };
+export const mesaMemory: MesaMemory = { moved: new Map(), viewport: null, ids: null, framed: true };
