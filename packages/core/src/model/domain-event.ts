@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { StoredEvent } from "../ports/event-store.ts";
 import { ADMIN_STREAM } from "./admin.ts";
 import { DATA_CLASSES } from "./blob.ts";
+import { GATE_IDS, GATE_STATUSES } from "./building.ts";
 import type { AdminEvent, DomainEvent, SpecialistEvent, TaskEvent } from "./events.ts";
 import { AGENT_ROLES } from "./ids.ts";
 import { FAILURE_REASONS, PLAN_CHANGES, SESSION_OUTCOMES } from "./planning.ts";
@@ -167,6 +168,35 @@ const decisionRecorded = z.discriminatedUnion("verdict", [
   z.strictObject({ ...decisionBase, verdict: z.literal("reject"), reason }),
 ]);
 
+// La rebanada 3 (ADR-011): copia de trabajo, entrega del builder y gates.
+const cycle = z.number().int().positive();
+/** Un commit de git, en hexadecimal: SHA-1 (40) o SHA-256 (64). */
+const headSha = z.string().regex(/^[0-9a-f]{40}([0-9a-f]{24})?$/, "no es un commit de git");
+const workspaceId = z.templateLiteral(["wsp_", z.string()]);
+const gateRunId = z.templateLiteral(["gr_", z.string()]);
+const workspace = z.strictObject({
+  workspaceId,
+  kind: z.literal("clone"),
+  ref: z.string().min(1),
+  branch: z.string().min(1),
+  baseSha: headSha,
+});
+/** El resumen de un gate lo escribe togi: corto y sin caracteres de control. */
+const gateSummary = z
+  .string()
+  .max(200)
+  .refine((s) => !hasControlChar(s), "el resumen no admite caracteres de control");
+const gateRun = z.strictObject({
+  gateRunId,
+  cycle,
+  headSha,
+  gate: z.enum(GATE_IDS),
+  status: z.enum(GATE_STATUSES),
+  summary: gateSummary,
+  evidence: nullableBlob,
+  durationMs: count,
+});
+
 /** zod infiere `x?: T | undefined`; `exactOptionalPropertyTypes` pide añadirlo al tipo de core. */
 type WithUndefined<T> = { [K in keyof T]: T[K] | undefined };
 
@@ -208,6 +238,30 @@ const TASK_PAYLOADS = {
   >,
   "task.completed": z.strictObject({ prNumber: z.number().int().positive() }) satisfies z.ZodType<
     Extract<TaskEvent, { type: "task.completed" }>["payload"]
+  >,
+  "workspace.created": workspace satisfies z.ZodType<
+    Extract<TaskEvent, { type: "workspace.created" }>["payload"]
+  >,
+  "build.submitted": z.strictObject({ cycle, headSha }) satisfies z.ZodType<
+    Extract<TaskEvent, { type: "build.submitted" }>["payload"]
+  >,
+  "gate.completed": gateRun satisfies z.ZodType<
+    Extract<TaskEvent, { type: "gate.completed" }>["payload"]
+  >,
+  "verification.completed": z.strictObject({
+    cycle,
+    headSha,
+    passed: z.boolean(),
+  }) satisfies z.ZodType<Extract<TaskEvent, { type: "verification.completed" }>["payload"]>,
+  "task.failed": z.strictObject({
+    cycle,
+    failedGates: z.array(gateRunId),
+  }) satisfies z.ZodType<Extract<TaskEvent, { type: "task.failed" }>["payload"]>,
+  "failure.classified": z.strictObject({ reason }) satisfies z.ZodType<
+    Extract<TaskEvent, { type: "failure.classified" }>["payload"]
+  >,
+  "workspace.released": z.strictObject({ workspaceId }) satisfies z.ZodType<
+    Extract<TaskEvent, { type: "workspace.released" }>["payload"]
   >,
 };
 const ADMIN_PAYLOADS = {

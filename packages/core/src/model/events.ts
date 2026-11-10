@@ -1,5 +1,6 @@
 import type { BlobRef, DataClass } from "./blob.ts";
-import type { Actor, TaskId } from "./ids.ts";
+import type { GateRun, Workspace } from "./building.ts";
+import type { Actor, GateRunId, TaskId, WorkspaceId } from "./ids.ts";
 import type { Plan, PlanDecision, SessionEnded, SessionStarted } from "./planning.ts";
 import type { Specialist, SpecialistHash } from "./specialist.ts";
 import type { Reason, RiskLevel, TaskSource } from "./task.ts";
@@ -51,7 +52,19 @@ export type TaskEvent =
    * Un humano marca como hecha una tarea construida fuera de togi; building → merged. `prNumber` es una
    * referencia que da el humano: togi no tiene acceso a GitHub y no la verifica.
    */
-  | E<"task.completed", { prNumber: number }>;
+  | E<"task.completed", { prNumber: number }>
+  /** togi prepara la copia de trabajo de la tarea (ADR-011 §3). */
+  | E<"workspace.created", Workspace>
+  /** El builder terminó un ciclo y togi hizo el commit; building → verifying. */
+  | E<"build.submitted", { cycle: number; headSha: string }>
+  | E<"gate.completed", GateRun>
+  /** Fallar con ciclos libres vuelve a building con el siguiente; si no, sigue `task.failed`. */
+  | E<"verification.completed", { cycle: number; headSha: string; passed: boolean }>
+  /** El último ciclo falló: la tarea vuelve al humano (ADR-001). */
+  | E<"task.failed", { cycle: number; failedGates: GateRunId[] }>
+  /** El humano dice por qué falló: la materia prima del aprendizaje (ADR-004). */
+  | E<"failure.classified", { reason: Reason }>
+  | E<"workspace.released", { workspaceId: WorkspaceId }>;
 
 /** Stream `admin`: operaciones de administración que no pertenecen a una tarea. */
 export type AdminEvent = E<
