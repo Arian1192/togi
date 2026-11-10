@@ -13,7 +13,15 @@ type SessionTag = { seq: number; session: string };
  * suma cada cabecera que llega, con la etiqueta de su sesión. Si el daemon se cae, se vacía: no se
  * enseñan datos viejos como si fueran actuales (ADR-010 §1).
  */
-export function MesaPane({ planning, waiting }: { planning: number[]; waiting: number }) {
+export function MesaPane({
+  planning,
+  waiting,
+  titles,
+}: {
+  planning: number[];
+  waiting: number;
+  titles: ReadonlyMap<number, string>;
+}) {
   const [state, setState] = useState<MesaState>(EMPTY);
   const tags = useRef(new Map<number, string>());
   const wanted = useRef(planning);
@@ -55,5 +63,5 @@ export function MesaPane({ planning, waiting }: { planning: number[]; waiting: n
     };
   }, []);
 
-  return <MesaScreen state={state} waiting={waiting} />;
+  return <MesaScreen state={state} waiting={waiting} titles={titles} />;
 }

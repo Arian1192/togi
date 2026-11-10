@@ -160,6 +160,18 @@ export function App() {
     () => (list?.status === "ok" ? buildProjects(list.tasks, list.truncated) : null),
     [list],
   );
+  // Los títulos que la mesa pone encima de cada plaza; uno borrado no se enseña.
+  const titles = useMemo(
+    () =>
+      new Map(
+        list?.status === "ok"
+          ? list.tasks.flatMap((t) =>
+              t.title !== null && !t.titleErased ? [[t.number, t.title] as const] : [],
+            )
+          : [],
+      ),
+    [list],
+  );
   // El resumen del proyecto elegido; si ya no existe (la lista se recargó), la lista vacía de siempre.
   // La tarea elegida: su cuaderno. Si ya no está en la lista, la lista vacía de siempre.
   const opened =
@@ -193,12 +205,13 @@ export function App() {
         }
         foot={<p role="status">{text}</p>}
       />
-      <main className="shell">
+      <main className={view.kind === "mesa" ? "shell is-mesa" : "shell"}>
         {list?.status === "ok" ? (
           view.kind === "mesa" ? (
             <MesaPane
               planning={list.tasks.filter((t) => t.state === "planning").map((t) => t.number)}
               waiting={projects?.pending.length ?? 0}
+              titles={titles}
             />
           ) : shown !== undefined ? (
             <ProjectSummary project={shown} partial={list.truncated} />
