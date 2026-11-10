@@ -1,4 +1,5 @@
 import type { BlobRef } from "../model/blob.ts";
+import { type BuildingView, NO_BUILDING } from "../model/building.ts";
 import type { TaskEvent } from "../model/events.ts";
 import type { SessionId } from "../model/ids.ts";
 import type { FailureReason } from "../model/planning.ts";
@@ -39,9 +40,15 @@ export type TaskView =
       risk: RiskLevel;
       /** Ausente equivale a NO_PLANNING. */
       planning?: PlanningView;
+      /** Ausente equivale a NO_BUILDING: ciclo 1, sin copia de trabajo. */
+      building?: BuildingView;
     };
 
 export const NO_TASK: TaskView = { exists: false };
+
+/** Cambia la parte de construcción de la vista; sin tarea, nada cambia. */
+const withBuilding = (view: TaskView, change: (b: BuildingView) => BuildingView): TaskView =>
+  view.exists ? { ...view, building: change(view.building ?? NO_BUILDING) } : view;
 
 export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
   switch (event.type) {
@@ -94,6 +101,38 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
       } as const;
       return { ...view, state: next[event.payload.verdict] };
     }
+    case "workspace.created":
+      return withBuilding(view, (b) => ({ ...b, workspaceId: event.payload.workspaceId }));
+    case "build.submitted": {
+      // Cada entrega empieza la verificación de cero: los gates de otro commit no cuentan.
+      const { headSha } = event.payload;
+      const next = withBuilding(view, (b) => ({ ...b, headSha, gates: {} }));
+      return next.exists ? { ...next, state: "verifying" } : next;
+    }
+    case "gate.completed": {
+      const { gate, gateRunId, status } = event.payload;
+      return withBuilding(view, (b) => ({
+        ...b,
+        gates: { ...b.gates, [gate]: { gateRunId, status } },
+      }));
+    }
+    case "verification.completed": {
+      if (event.payload.passed) return view.exists ? { ...view, state: "review" } : view;
+      // Falló: vuelve a building con el ciclo siguiente. Si era el último, `task.failed` la cierra.
+      const next = withBuilding(view, (b) => ({
+        ...b,
+        cycle: b.cycle + 1,
+        headSha: null,
+        gates: {},
+      }));
+      return next.exists ? { ...next, state: "building" } : next;
+    }
+    case "task.failed":
+      return view.exists ? { ...view, state: "failed" } : view;
+    case "failure.classified":
+      return withBuilding(view, (b) => ({ ...b, failureClassified: true }));
+    case "workspace.released":
+      return withBuilding(view, (b) => ({ ...b, workspaceReleased: true }));
     default: {
       const unhandled: never = event;
       return unhandled;

@@ -1,6 +1,7 @@
 export * from "./admin.ts";
 export * from "./attention.ts";
 export * from "./blob.ts";
+export * from "./building.ts";
 export * from "./domain-event.ts";
 export type * from "./events.ts";
 export * from "./ids.ts";
