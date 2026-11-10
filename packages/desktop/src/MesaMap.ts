@@ -7,12 +7,14 @@ import {
   ReactFlow,
   useNodesInitialized,
   useReactFlow,
+  type Viewport,
 } from "@xyflow/react";
 import { createElement, type ReactNode, useEffect, useMemo, useState } from "react";
 import { MesaFlowEdge } from "./MesaFlowEdge.ts";
 import { MesaFlowNode } from "./MesaFlowNode.ts";
 import type { MesaState } from "./mesa.ts";
-import { layout, type MesaEdge, type MesaNode, type Point } from "./mesaFlow.ts";
+import { layout, type MesaEdge, type MesaNode } from "./mesaFlow.ts";
+import { mesaMemory } from "./mesaMemory.ts";
 
 // El mapa de la mesa en vivo sobre React Flow (pantalla 5 del diseño): puedes arrastrar cada nodo,
 // desplazar el mapa y acercarlo. Nadie puede unir, seleccionar ni borrar nodos: las aristas las pone
@@ -25,9 +27,12 @@ type Size = { width: number; height: number };
 function Refit({ ids }: { ids: string }): null {
   const { fitView } = useReactFlow();
   const ready = useNodesInitialized();
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `ids` es justo lo que dispara el encuadre.
   useEffect(() => {
-    if (ready) void fitView({ ...FIT, duration: 300 });
+    if (!ready) return;
+    // Al volver a la mesa con los mismos nodos, se queda el encuadre que dejaste.
+    const same = ids === mesaMemory.ids && mesaMemory.viewport !== null;
+    mesaMemory.ids = ids;
+    if (!same) void fitView({ ...FIT, duration: 300 });
   }, [ids, ready, fitView]);
   return null;
 }
@@ -53,7 +58,11 @@ interface Props {
 }
 
 export function MesaMap({ state, waiting, titles }: Props): ReactNode {
-  const [moved, setMoved] = useState<ReadonlyMap<string, Point>>(new Map());
+  // Empieza donde la dejaste (mesaMemory.ts) y lo que mueves se recuerda al salir de la mesa.
+  const [moved, setMoved] = useState(() => mesaMemory.moved);
+  useEffect(() => {
+    mesaMemory.moved = moved;
+  }, [moved]);
   // Lo que React Flow mide de cada nodo vuelve en su `measured`: sin eso no los da por listos y no
   // encuadra (ni al entrar alguien ni con el botón).
   const [sizes, setSizes] = useState<ReadonlyMap<string, Size>>(new Map());
@@ -94,8 +103,13 @@ export function MesaMap({ state, waiting, titles }: Props): ReactNode {
         // Un tamaño fijo solo al pintar sin navegador (los tests); en la app, React Flow mide su hueco
         // y encuadra con él.
         ...(typeof window === "undefined" ? { width: 880, height: 660 } : {}),
-        fitView: true,
-        fitViewOptions: FIT,
+        // Si ya habías estado en la mesa, vuelve con tu encuadre; si no, encuadra.
+        ...(mesaMemory.viewport
+          ? { defaultViewport: mesaMemory.viewport }
+          : { fitView: true, fitViewOptions: FIT }),
+        onMoveEnd: (_: unknown, viewport: Viewport) => {
+          mesaMemory.viewport = viewport;
+        },
         minZoom: 0.4,
         maxZoom: 2,
         nodesConnectable: false,
