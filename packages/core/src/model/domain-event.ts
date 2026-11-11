@@ -3,9 +3,10 @@ import type { StoredEvent } from "../ports/event-store.ts";
 import { ADMIN_STREAM } from "./admin.ts";
 import { DATA_CLASSES } from "./blob.ts";
 import { GATE_IDS, GATE_STATUSES } from "./building.ts";
-import type { AdminEvent, DomainEvent, SpecialistEvent, TaskEvent } from "./events.ts";
+import type { AdminEvent, DomainEvent, RepoEvent, SpecialistEvent, TaskEvent } from "./events.ts";
 import { AGENT_ROLES } from "./ids.ts";
 import { FAILURE_REASONS, PLAN_CHANGES, SESSION_OUTCOMES } from "./planning.ts";
+import { OWNER_REPO, REPO_STREAM_PREFIX, RepoProfileSchema, repoStream } from "./repo-profile.ts";
 import {
   SPECIALIST_STREAM_PREFIX,
   SpecialistSchema,
@@ -14,9 +15,11 @@ import {
 } from "./specialist.ts";
 import { REASON_CATEGORIES, RISK_LEVELS } from "./task.ts";
 
-/** Los eventos del stream de una tarea; el resto (administración, catálogo) no mueven su vista. */
+/** Los eventos del stream de una tarea; el resto (administración, catálogo, repos) no mueven su vista. */
 export const isTaskEvent = (event: DomainEvent): event is TaskEvent =>
-  event.type !== "data.erased" && event.type !== "specialist.version_published";
+  event.type !== "data.erased" &&
+  event.type !== "specialist.version_published" &&
+  event.type !== "repo.profile_set";
 
 /** Evento almacenado que no es un `DomainEvent` válido; `seq` identifica cuál. */
 export class EventParseError extends Error {
@@ -282,10 +285,18 @@ const SPECIALIST_PAYLOADS = {
   }) satisfies z.ZodType<SpecialistEvent["payload"]>,
 };
 
+const REPO_PAYLOADS = {
+  "repo.profile_set": z.strictObject({
+    repo: z.string().regex(OWNER_REPO),
+    profile: RepoProfileSchema,
+  }) satisfies z.ZodType<RepoEvent["payload"]>,
+};
+
 const PAYLOADS: Record<string, z.ZodType> = {
   ...TASK_PAYLOADS,
   ...ADMIN_PAYLOADS,
   ...SPECIALIST_PAYLOADS,
+  ...REPO_PAYLOADS,
 };
 
 /** Todos los tipos de evento que existen (de tareas, administración y catálogo). */
@@ -366,6 +377,16 @@ export function toDomainEvent(stored: StoredEvent): DomainEvent {
       throw new EventParseError(stored.seq, `${stored.type}: el hash no corresponde al contenido`);
     }
   } else if (stored.stream.startsWith(SPECIALIST_STREAM_PREFIX)) {
+    throw new EventParseError(stored.seq, `${stored.type} no pertenece al stream ${stored.stream}`);
+  }
+  // Un perfil solo vive en el stream de su repo, y ese stream solo guarda perfiles.
+  const profileSet = stored.type === "repo.profile_set";
+  const inRepoStream = stored.stream.startsWith(REPO_STREAM_PREFIX);
+  if (
+    profileSet
+      ? stored.stream !== repoStream((payload.data as RepoEvent["payload"]).repo)
+      : inRepoStream
+  ) {
     throw new EventParseError(stored.seq, `${stored.type} no pertenece al stream ${stored.stream}`);
   }
   if (stored.type in ADMIN_PAYLOADS !== (stored.stream === ADMIN_STREAM)) {

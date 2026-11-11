@@ -2,6 +2,7 @@ import type { BlobRef, DataClass } from "./blob.ts";
 import type { GateRun, Workspace } from "./building.ts";
 import type { Actor, GateRunId, TaskId, WorkspaceId } from "./ids.ts";
 import type { Plan, PlanDecision, SessionEnded, SessionStarted } from "./planning.ts";
+import type { RepoProfile } from "./repo-profile.ts";
 import type { Specialist, SpecialistHash } from "./specialist.ts";
 import type { Reason, RiskLevel, TaskSource } from "./task.ts";
 
@@ -79,4 +80,7 @@ export type SpecialistEvent = E<
   { specialist: Specialist; hash: SpecialistHash }
 >;
 
-export type DomainEvent = TaskEvent | AdminEvent | SpecialistEvent;
+/** Stream `repo:<owner/repo>`: cada versión del perfil, completa; la última es la vigente (ADR-011 §5). */
+export type RepoEvent = E<"repo.profile_set", { repo: string; profile: RepoProfile }>;
+
+export type DomainEvent = TaskEvent | AdminEvent | SpecialistEvent | RepoEvent;
