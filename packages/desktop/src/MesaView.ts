@@ -5,6 +5,8 @@ import { MesaMap } from "./MesaMap.ts";
 import type { MesaState } from "./mesa.ts";
 import { MesaTasksContext } from "./mesaContext.ts";
 import { taskCards } from "./mesaTasks.ts";
+import { PanelEdge, usePanel } from "./PanelEdge.ts";
+import type { Panel } from "./panelState.ts";
 import type { TaskRow } from "./TaskList.ts";
 
 // La mesa en vivo (ADR-010 §3, pantalla 5 del diseño): la cabecera, el mapa sobre React Flow
@@ -24,13 +26,15 @@ interface Props {
   tasks?: readonly TaskRow[];
   /** «Abrir cuaderno →»: lleva al cuaderno de la tarea, fuera de la mesa. */
   onOpen?: (task: number) => void;
+  /** El panel al abrir la mesa; si no llega, el que se guardó. Para los tests. */
+  panel?: Panel;
 }
 
 /** Cada cuánto se rehace «hace 12 s». */
 const TICK_MS = 5000;
 
 /** La vista entera: la cabecera, el mapa y lo último que ha pasado por togi. */
-export function MesaScreen({ state, waiting, titles, ...props }: Props): ReactNode {
+export function MesaScreen({ state, waiting, titles, panel: initial, ...props }: Props): ReactNode {
   // Las tareas llegan de la app por contexto (App.tsx); las props mandan, para los tests.
   const given = useContext(MesaTasksContext);
   const tasks = props.tasks ?? given.tasks;
@@ -44,9 +48,14 @@ export function MesaScreen({ state, waiting, titles, ...props }: Props): ReactNo
   const cards = useMemo(() => taskCards(tasks, state), [tasks, state]);
   const log = [...(state.log ?? [])].reverse();
   const toggle = (task: number) => setOpen((prev) => (prev === task ? null : task));
+  const [panel, setPanel] = usePanel(initial);
   return createElement(
     "section",
-    { className: "mesa-screen", "aria-label": "Mesa en vivo" },
+    {
+      className: "mesa-screen",
+      "aria-label": "Mesa en vivo",
+      style: { ["--mesa-panel-width" as string]: `${panel.width}px` },
+    },
     createElement(
       "div",
       { className: "mesa-main" },
@@ -69,9 +78,14 @@ export function MesaScreen({ state, waiting, titles, ...props }: Props): ReactNo
         onSelect: (task: number) => setOpen(task),
       }),
     ),
+    createElement(PanelEdge, { panel, onChange: setPanel }),
     createElement(
       "aside",
-      { className: "mesa-log", "aria-label": "Lo último que ha pasado por togi" },
+      {
+        className: "mesa-log",
+        "aria-label": "Lo último que ha pasado por togi",
+        hidden: !panel.open,
+      },
       createElement("h2", null, "Lo último que ha pasado por togi"),
       tasks.length > 0 &&
         createElement(MesaCards, {
