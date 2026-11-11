@@ -2,12 +2,14 @@ import { type DomainEvent, EventParseError, toDomainEvent } from "@togi/core";
 import type Database from "better-sqlite3";
 import type { SqliteEventStore } from "../store/event-store.ts";
 import { applyToPlanning } from "./planning.ts";
+import { applyToRepoProfiles } from "./repo-profiles.ts";
 import { applyToTasks } from "./tasks.ts";
 
 /** Todas las proyecciones, en la misma transacción que el append. */
 export function applyProjections(db: Database.Database, event: DomainEvent): void {
   applyToTasks(db, event);
   applyToPlanning(db, event);
+  applyToRepoProfiles(db, event);
 }
 
 /**
@@ -20,7 +22,7 @@ export function rebuildProjections(
   batchSize = 500,
 ): void {
   db.transaction(() => {
-    for (const table of ["tasks", "plans", "sessions", "decisions"])
+    for (const table of ["tasks", "plans", "sessions", "decisions", "repo_profiles"])
       db.exec(`DELETE FROM ${table}`);
     for (let next = 1; ; ) {
       const batch = store.readBatchSync(next, batchSize);
@@ -43,6 +45,7 @@ export function rebuildProjections(
           applyToTasks(db, event);
         });
         step("planning", () => applyToPlanning(db, event as DomainEvent));
+        step("repo_profiles", () => applyToRepoProfiles(db, event as DomainEvent));
       }
       const last = batch.at(-1);
       if (last === undefined || batch.length < batchSize) return;
