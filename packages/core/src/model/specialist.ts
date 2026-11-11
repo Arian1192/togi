@@ -10,9 +10,13 @@ import { AGENT_ROLES, type AgentRole } from "./ids.ts";
  */
 export const ROLE_TOOLS = {
   planner: ["Read", "Glob", "Grep"],
-  builder: [],
+  builder: ["Read", "Glob", "Grep", "Edit", "Write", "Bash"],
   reviewer: [],
 } as const satisfies Record<AgentRole, readonly string[]>;
+
+/** Esfuerzo de razonamiento del Agent SDK (ADR-011 §8). Cambiarlo es una versión nueva. */
+export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
+export type Effort = (typeof EFFORTS)[number];
 
 export const SPECIALIST_STREAM_PREFIX = "specialist:";
 export const specialistStream = (id: string) => `${SPECIALIST_STREAM_PREFIX}${id}`;
@@ -25,6 +29,9 @@ export const SpecialistSchema = z
     role: z.enum(AGENT_ROLES),
     runtime: z.string().min(1),
     model: z.string().min(1),
+    // Opcional: sin él, el modelo usa su esfuerzo por defecto y el hash de un especialista ya
+    // publicado no cambia (canonicalize omite las claves ausentes).
+    effort: z.enum(EFFORTS).optional(),
     tools: z.array(z.string()),
     instructions: z.string().min(1),
   })
