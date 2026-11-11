@@ -1,3 +1,4 @@
+pub mod activity;
 pub mod daemon;
 pub mod events;
 pub mod plan;
@@ -29,7 +30,8 @@ pub fn run() {
             plan::approve_plan,
             plan::request_plan_changes,
             plan::reject_plan,
-            trajectory::read_trajectory
+            trajectory::read_trajectory,
+            activity::read_task_activity
         ])
         .run(tauri::generate_context!())
         .expect("la app de togi no pudo arrancar");
