@@ -633,6 +633,11 @@ body {
   outline-offset: 1px;
 }
 
+/* El control del panel derecho de la mesa, en espejo del de la columna: al final de la barra. */
+.titlebar-panel {
+  margin-left: auto;
+}
+
 /* La columna empieza debajo de la barra (el centro, en `.workbench > .shell`). */
 .workbench > .project-col {
   padding-top: calc(var(--titlebar-height) + var(--space-3));
@@ -760,16 +765,12 @@ body {
   transition: none;
 }
 
-/* Su borde se arrastra y su botón lo pliega; plegado, queda un riel para volver a abrirlo. */
+/* Su borde se arrastra; lo pliega el control de la barra de título y, plegado, la mesa llega al
+   borde de la ventana. */
 .mesa-edge {
   position: relative;
   flex: none;
   width: 0;
-}
-
-.mesa-edge.is-closed {
-  width: 20px;
-  border-left: 1px solid var(--border);
 }
 
 .mesa-edge-grip {
@@ -783,26 +784,6 @@ body {
 .mesa-edge-grip:focus-visible {
   outline: none;
   background: linear-gradient(var(--agent), var(--agent)) center / 2px 100% no-repeat;
-}
-
-.mesa-edge-toggle {
-  position: absolute;
-  top: 12px;
-  left: -10px;
-  z-index: 3;
-  width: 20px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--ink-muted);
-  font: 500 13px / 20px var(--font-sans);
-  cursor: pointer;
-}
-
-.mesa-edge.is-closed .mesa-edge-toggle {
-  left: 0;
 }
 
 .mesa-log h2 {

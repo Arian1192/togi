@@ -5,7 +5,7 @@ import { MesaMap } from "./MesaMap.ts";
 import type { MesaState } from "./mesa.ts";
 import { MesaTasksContext } from "./mesaContext.ts";
 import { taskCards } from "./mesaTasks.ts";
-import { PanelEdge, usePanel } from "./PanelEdge.ts";
+import { PanelContext, PanelEdge, usePanel } from "./PanelEdge.ts";
 import type { Panel } from "./panelState.ts";
 import type { TaskRow } from "./TaskList.ts";
 
@@ -48,7 +48,10 @@ export function MesaScreen({ state, waiting, titles, panel: initial, ...props }:
   const cards = useMemo(() => taskCards(tasks, state), [tasks, state]);
   const log = [...(state.log ?? [])].reverse();
   const toggle = (task: number) => setOpen((prev) => (prev === task ? null : task));
-  const [panel, setPanel] = usePanel(initial);
+  // El panel lo lleva la app (su control va en la barra de título); sin proveedor, el de la mesa.
+  const lifted = useContext(PanelContext);
+  const local = usePanel(initial, lifted === null);
+  const [panel, setPanel] = lifted ?? local;
   return createElement(
     "section",
     {
