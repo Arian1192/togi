@@ -10,6 +10,8 @@
 
 **Enmienda del 10 de noviembre de 2026:** la **mesa en vivo** pasa de la fase 3 a la fase 1. togi es una factoría visual con togi como intermediario, y la mesa es la forma de ver cómo fluye la información y en qué estado está cada agente mientras se construyen el constructor, los gates y el revisor. Nace con lo que ya existe (tú, togi y las sesiones del planificador) y cada rol nuevo aparece en ella cuando existe en el backend. Para verlo antes que el agente real se usan los agentes falsos de los tests sobre el daemon real, en una demo local, nunca en la app distribuida ni con datos inventados en el webview. Cambian el §3 (la mesa), la tabla de la API y la de fases; el resto del ADR no cambia. El diseño de la pantalla 5 del lienzo es la referencia, no una especificación cerrada. El atajo de la mesa pasa de ⌘M a **⌘2**, y las tareas quedan en ⌘1: ⌘M es «Minimizar» en macOS, un atajo estándar que no se reutiliza.
 
+**Enmienda del 11 de noviembre de 2026:** el lateral de la mesa pasa a ser un **panel derecho acoplado** con cuatro pestañas (Actividad, Plan, Diff y Gates), y las decisiones se pueden tomar desde el panel que tiene su información. La referencia son las secciones 3 y 4 del documento de pantallas. Cambian el §2 y la tabla del §3, y se añade el apartado «Panel derecho» al §3; el resto del ADR no cambia.
+
 El principio 3 hace del daemon el núcleo y de la CLI, la web UI y la app de escritorio sus clientes. Este ADR define la app de escritorio: qué muestra, cómo se conecta al daemon y qué no puede hacer. El diseño de referencia son las siete pantallas del [lienzo de la app de escritorio](https://claude.ai/artifact/QCo31vuqqDekePy6dNWcmM) y la identidad visual, el [manual de marca](../marca/manual-de-marca.md).
 
 Las referencias de uso son Conductor, Paseo, T3 Code y Herdr. De ellas se toman patrones comunes del género (lista de trabajos con su estado de atención, paneles divididos, diff, terminal, explorador de ficheros y uso intensivo del teclado), nunca su maquetación exacta ni su identidad visual.
@@ -34,7 +36,7 @@ Debe cumplir:
 ### 2. Dos densidades
 
 - **Banco de taller**, para trabajar: columna lateral de proyectos (un proyecto es un repo con tareas), cada uno con sus tareas agrupadas por quién tiene que actuar; la columna se pliega a un riel con la inicial de cada proyecto y su ◆ (⌘\). Tres vistas: «Pendiente de ti» (lo que espera tu decisión en todos los proyectos), el resumen de un proyecto y el cuaderno de una tarea. La tarea seleccionada con pestañas y paneles divisibles (⌘D, ⌘⇧D, como máximo dos), barra de estado y paleta de comandos (⌘K) con los mismos verbos que la CLI.
-- **Cuaderno**, para decidir: una tarea en `plan_review` o `review` se abre en la vista de lectura de la web, con un único botón principal.
+- **Cuaderno**, para decidir: una tarea en `plan_review` o `review` se abre en la vista de lectura de la web, con un único botón principal. Desde la enmienda del 11 de noviembre, la misma decisión se puede tomar en la pestaña Plan o Diff del panel derecho, con el mismo botón único. El cuaderno es esa pestaña a pantalla completa, no otra fuente de datos.
 
 ### 3. Vistas
 
@@ -42,8 +44,10 @@ Debe cumplir:
 | --- | --- | --- |
 | Columna de proyectos | Los proyectos (repos con tareas) y, en cada uno, sus tareas: te esperan, en marcha y el resto, con glifo, id, título y nota de estado. Los contadores son parciales si la lista llega truncada | todas |
 | Trayectoria | Las acciones de la sesión activa en orden: leer, razonar, editar, ejecutar y las denegadas por los hooks | 1 |
-| Plan | La versión aprobada y el historial con los motivos de cada cambio | 2 (cuaderno) |
-| Diff | El cambio frente a la base, con los ficheros marcados dentro o fuera del plan | 3 |
+| Actividad | Los movimientos de las tareas entre tú, togi y los agentes, nunca su contenido | pestaña del panel |
+| Plan | La versión aprobada y el historial con los motivos de cada cambio | 2 (cuaderno) y pestaña del panel |
+| Diff | El cambio frente a la base, con los ficheros marcados dentro o fuera del plan | 3 y pestaña del panel |
+| Gates | Los gates del ciclo con su evidencia; los ciclos anteriores, plegados | pestaña del panel |
 | Log | Los eventos de la tarea en crudo | — |
 | Ficheros | El árbol de la rama de la tarea con su estado en git y en el plan, y un visor de solo lectura | 6 |
 | Navegador | Lo que renderiza el navegador de los gates, con sus acciones, consola, red y capturas | 7 |
@@ -53,6 +57,13 @@ Debe cumplir:
 La mesa se dibuja con lo que ya registra el log: cada evento tiene un actor y un stream, y todo evento pasa por togi (ADR-009). Una arista es siempre actor ↔ togi, así que no hace falta añadir un campo de destinatario al esquema de eventos. La vista de secuencia queda como alternativa dentro de la mesa.
 
 La mesa es viva: se mueve sola, sin recargar. Los mensajes recorren su arista al ocurrir, los nodos cambian de estado (ciclo, progreso de un gate), las sesiones aparecen al empezar y se apagan al terminar, y una acción denegada destaca en su arista. Para eso el lado Rust reenvía, de cada evento del log y de la trayectoria, solo su cabecera (`seq`, `at`, actor, tipo y stream), nunca su contenido; el contenido se lee aparte, con un comando concreto, cuando se elige el evento. La mesa también muestra lo que togi entrega a cada agente, no solo lo que los agentes le mandan: así se ve que ningún agente recibe el razonamiento de otro (política de entradas por rol, que fijará el ADR-011, en preparación).
+
+**Panel derecho** (enmienda del 11 de noviembre):
+
+- **Acoplado, nunca superpuesto.** Ocupa el sitio del lateral de la mesa y la empuja; no es un drawer. Se pliega con ⌘⌥\ (⌘\ sigue plegando la columna de proyectos), se redimensiona y recuerda su estado. El ancho por defecto es el del lateral actual.
+- **Cada dato vive en una sola pestaña**, y cada movimiento de Actividad enlaza a la pestaña que tiene su contenido.
+- **Actividad.** Sin filtro, una tarjeta por tarea con sus pasos, como el lateral actual. Al elegir una tarea, su línea de tiempo: los cambios de estado («togi se la entregó a…») y las aportaciones de agentes y de togi, cada una con su tarjeta. La tarjeta de un agente muestra el especialista, el runtime y el modelo que registra `session.started`, el uso de `session.ended` y el encargo de togi: un resumen determinista de por qué le pasa o le devuelve la tarea, con enlace al prompt completo. El texto que viene del repo o de un agente se marca como no fiable (§8). Las verificaciones de togi dicen que no usan modelo.
+- **Plan, Diff y Gates** muestran lo que dice la tabla. Una pestaña aparece cuando su API existe (principio 1): Diff y Gates llegan con la rebanada que construye sus endpoints.
 
 En la interfaz, los roles se muestran con los nombres del ADR-009. En el código se usan los identificadores del ADR-004.
 
