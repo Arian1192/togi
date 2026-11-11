@@ -10,6 +10,16 @@ export interface SandboxSpec {
   readPaths: readonly string[];
   /** Único directorio escribible; también es el HOME y el directorio temporal del agente. */
   writeDir: string;
+  /**
+   * El árbol del clon de la tarea (ADR-011 §3): también escribible, y el directorio de trabajo. Nunca
+   * su directorio de git, que queda fuera del sandbox.
+   */
+  workTree?: string | undefined;
+  /**
+   * Solo la instalación (ADR-011 §2): deja escribir el bloqueo de pnpm del usuario en /tmp. La ruta la
+   * pone el sandbox, no la especificación.
+   */
+  pnpmLocks?: boolean | undefined;
   /** Nombres exactos de dominio, nunca sufijos ni comodines. */
   allowedDomains: readonly string[];
   /** Variables de entorno que llegan al agente. */

@@ -9,6 +9,8 @@ import { SESSION_OUTCOMES } from "../model/planning.ts";
 const spec = z.strictObject({
   readPaths: z.array(z.string()),
   writeDir: z.string(),
+  workTree: z.string().optional(),
+  pnpmLocks: z.boolean().optional(),
   allowedDomains: z.array(z.string()),
   allowedEnv: z.array(z.string()),
   credentials: z.array(z.strictObject({ name: z.string(), injectDomains: z.array(z.string()) })),

@@ -18,7 +18,16 @@ export interface SrtContext {
   runtimePaths: readonly string[];
   /** Carpetas temporales del usuario que se deniegan; sin él, las de este Mac. Los tests lo fijan. */
   tmpDirs?: readonly string[];
+  /** Usuario del bloqueo de pnpm; sin él, el de este proceso. Los tests lo fijan. */
+  uid?: number;
 }
+
+/**
+ * Donde pnpm escribe siempre su bloqueo, sin hacer caso a TMPDIR (prueba de promos del ADR-011 §2).
+ * Es lo único de /tmp que puede escribir la instalación, y nadie más.
+ */
+export const pnpmLockDir = (uid: number): string =>
+  `/private/tmp/pnpm-store-operation-locks-${uid}`;
 
 /** Fuera de la carpeta personal, el resto del Mac se lee salvo que se deniegue (ADR-008). */
 const DENIED_OUTSIDE_HOME = ["/Users", "/Volumes", "/private/tmp"];
@@ -106,7 +115,8 @@ export function toSrtConfig(spec: SandboxSpec, ctx: SrtContext): SandboxRuntimeC
   if (!Number.isInteger(spec.timeoutMs) || spec.timeoutMs <= 0) {
     throw new SandboxSpecError(`timeoutMs debe ser un entero positivo: ${spec.timeoutMs}`);
   }
-  if (spec.readPaths.length === 0) throw new SandboxSpecError("readPaths está vacío");
+  if (spec.readPaths.length === 0 && spec.workTree === undefined)
+    throw new SandboxSpecError("readPaths está vacío");
 
   const home = real(ctx.home);
   const togiHome = real(ctx.togiHome);
@@ -136,6 +146,26 @@ export function toSrtConfig(spec: SandboxSpec, ctx: SrtContext): SandboxRuntimeC
   const runtimePaths = ctx.runtimePaths.map(runtimePath);
   if (readPaths.some((r) => within(r, writeDir))) {
     throw new SandboxSpecError("writeDir está dentro de readPaths");
+  }
+  const writable = [writeDir];
+  if (spec.workTree !== undefined) {
+    const tree = workspacePath(spec.workTree, "workTree");
+    if (
+      within(tree, writeDir) ||
+      within(writeDir, tree) ||
+      readPaths.some((r) => within(r, tree))
+    ) {
+      throw new SandboxSpecError("workTree se solapa con writeDir o está dentro de readPaths");
+    }
+    writable.push(tree);
+  }
+  if (spec.pnpmLocks) {
+    if (spec.credentials.length > 0) {
+      throw new SandboxSpecError("pnpmLocks es de la instalación, que no lleva credenciales");
+    }
+    const uid = ctx.uid ?? process.getuid?.();
+    if (uid === undefined) throw new SandboxSpecError("pnpmLocks: no se sabe el usuario");
+    writable.push(pnpmLockDir(uid));
   }
 
   for (const d of spec.allowedDomains) {
@@ -171,8 +201,8 @@ export function toSrtConfig(spec: SandboxSpec, ctx: SrtContext): SandboxRuntimeC
     },
     filesystem: {
       denyRead: deniedRead(home, ctx.tmpDirs ?? userTmpDirs()),
-      allowRead: [...new Set([...runtimePaths, ...readPaths, writeDir])],
-      allowWrite: [writeDir],
+      allowRead: [...new Set([...runtimePaths, ...readPaths, ...writable])],
+      allowWrite: writable,
       denyWrite: [],
     },
   };
