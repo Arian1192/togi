@@ -1,5 +1,6 @@
 import type { BlobRef } from "./blob.ts";
-import type { GateRunId, WorkspaceId } from "./ids.ts";
+import type { GateRunId, SessionId, WorkspaceId } from "./ids.ts";
+import type { FailureReason, SessionOutcome } from "./planning.ts";
 
 // La rebanada 3, construir y verificar (ADR-001, ADR-004, ADR-011): la copia de trabajo de la tarea,
 // lo que entrega el builder y lo que dice cada gate. Sin infraestructura: solo los datos de los eventos.
@@ -64,6 +65,13 @@ export interface BuildingView {
   headSha: string | null;
   /** El resultado de cada gate en este ciclo. */
   gates: Partial<Record<GateId, { gateRunId: GateRunId; status: GateStatus }>>;
+  /** La sesión del builder en curso; ausente equivale a ninguna. */
+  activeSession?: SessionId | null;
+  /** Sesiones del builder abiertas en este ciclo; ausente equivale a 0. */
+  attempts?: number;
+  /** Cómo terminó la última sesión del builder de este ciclo, y por qué si fue mal. */
+  lastOutcome?: SessionOutcome;
+  lastFailure?: FailureReason | null;
   workspaceReleased?: boolean;
   failureClassified?: boolean;
 }

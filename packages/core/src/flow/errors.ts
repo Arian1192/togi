@@ -17,6 +17,10 @@ export const DOMAIN_ERROR_CODES = [
   "missing_failure_reason",
   "invalid_specialist",
   "specialist_version_conflict",
+  "invalid_payload",
+  "workspace_already_exists",
+  "workspace_mismatch",
+  "stale_cycle",
 ] as const;
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];
 
