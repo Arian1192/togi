@@ -167,7 +167,7 @@ export async function createTaskClone(request: CloneRequest): Promise<CloneResul
 }
 
 /** Recorre el árbol sin seguir enlaces dando permiso de escritura a cada carpeta, para poder borrarla. */
-async function unlock(path: string): Promise<void> {
+export async function unlock(path: string): Promise<void> {
   await chmod(path, 0o700);
   for (const entry of await readdir(path, { withFileTypes: true })) {
     if (entry.isDirectory()) await unlock(join(path, entry.name));
