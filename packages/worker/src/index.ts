@@ -1,3 +1,4 @@
+export { parseBuilderRun, runBuilder } from "./adapters/claude-agent-sdk/builder-run.ts";
 export { claudeAgentSdkDeclaration } from "./adapters/claude-agent-sdk/declaration.ts";
 export { PLANNER_TOOLS, plannerHook } from "./adapters/claude-agent-sdk/planner-policy.ts";
 export { runPlanner } from "./adapters/claude-agent-sdk/run.ts";
