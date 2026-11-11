@@ -59,6 +59,7 @@ const multiline = (text: string | undefined, fallback: string): string =>
 const repoName = (p: MessageParams) => plain(p.repo, "<owner/repo>");
 const repoPath = (p: MessageParams) => plain(p.path, "<ruta>");
 const listRepos = { label: "Mira los que hay con", command: "togi repo list" };
+const profileHelp = { label: "Mira el uso con", command: "togi repo profile --help" };
 
 const task = (p: MessageParams) => `#${p.n ?? "?"}`;
 /** Línea con el porqué de la última sesión fallida, si se conoce. */
@@ -472,6 +473,32 @@ export const MESSAGES: Record<string, (p: MessageParams) => Message> = {
     next: { label: "Míralo con", command: "togi repo list" },
   }),
   repo_not_found: (p) => ({ text: `${repoName(p)} no está registrado.`, next: listRepos }),
+  repo_profile_not_found: (p) => ({
+    text: `${repoName(p)} no tiene perfil.`,
+    next: { label: "Fíjalo con", command: `togi repo profile ${repoName(p)} --set <fichero.json>` },
+  }),
+  repo_profile_header: (p) => ({ text: `perfil · versión ${p.version ?? "?"}` }),
+  repo_profile_new: (p) => ({ text: `Perfil nuevo de ${repoName(p)}:` }),
+  repo_profile_changes: (p) => ({
+    text: `Cambios en el perfil de ${repoName(p)} (versión ${p.version ?? "?"}):`,
+  }),
+  repo_profile_confirm: (p) => ({ text: `¿Fijar este perfil en ${repoName(p)}? [s/N]` }),
+  repo_profile_unchanged: (p) => ({
+    text: `El perfil de ${repoName(p)} ya es ese. No se ha cambiado nada.`,
+  }),
+  repo_profile_set: (p) => ({
+    text: `Fijado el perfil de ${repoName(p)} · versión ${p.version ?? "?"}`,
+  }),
+  profile_confirmation_required: (p) => ({
+    text: `Fijar el perfil de ${repoName(p)} necesita confirmación y esto no es una terminal.`,
+    next: { label: "Repite con", command: "--yes" },
+  }),
+  profile_file_unreadable: (p) => ({ text: `No se puede leer ${repoPath(p)}.`, next: profileHelp }),
+  profile_invalid_json: (p) => ({ text: `${repoPath(p)} no es JSON válido.`, next: profileHelp }),
+  profile_invalid: (p) => ({
+    text: `El perfil de ${repoPath(p)} no es válido: ${plain(p.detail, "?")}.`,
+    next: profileHelp,
+  }),
   auth_api_key_saved: () => ({ text: "Clave de API guardada · modo api-key" }),
   auth_subscription_saved: () => ({ text: "Token de suscripción guardado · modo subscription" }),
   auth_status_api_key: () => ({ text: "Modo activo: clave de API" }),
