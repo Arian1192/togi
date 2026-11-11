@@ -2,6 +2,7 @@ import { failureReasonProblem, schemaVersionOf } from "../model/domain-event.ts"
 import { isTransientFailure, MAX_AUTO_RETRIES } from "../model/planning.ts";
 import { REASON_CATEGORIES, type TaskState } from "../model/task.ts";
 import type { TaskCommand } from "./commands.ts";
+import { decideBuilding } from "./decide-building.ts";
 import { type DomainError, domainError } from "./errors.ts";
 import type { FlowPolicy } from "./policy.ts";
 import { type NewTaskEvent, NO_PLANNING, type TaskView } from "./task-view.ts";
@@ -83,8 +84,14 @@ export function decide(
       }
       return [{ ...meta, type: "plan.retry_requested", payload: {} }];
     }
+    case "createWorkspace":
+    case "submitBuild":
+      return decideBuilding(view, cmd, meta);
     case "startSession": {
       if (cmd.actor.kind !== "system") return notAllowed("system");
+      if (view.state === "building" && cmd.session.role === "builder") {
+        return decideBuilding(view, cmd, meta);
+      }
       if (view.state !== "planning")
         return domainError("invalid_state", "solo se planifica en planning");
       if (cmd.session.role !== "planner") {
@@ -97,8 +104,10 @@ export function decide(
     }
     case "endSession": {
       if (cmd.actor.kind !== "system") return notAllowed("system");
-      if (!planning.activeSession) return domainError("no_active_session", "no hay sesión activa");
-      if (planning.activeSession !== cmd.session.sessionId) {
+      // La sesión activa es la del planificador o la del builder: nunca hay dos a la vez.
+      const active = planning.activeSession ?? view.building?.activeSession ?? null;
+      if (!active) return domainError("no_active_session", "no hay sesión activa");
+      if (active !== cmd.session.sessionId) {
         return domainError("not_session_actor", "no es la sesión activa");
       }
       const failureReason = cmd.session.failureReason ?? null;

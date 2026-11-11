@@ -73,6 +73,15 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
       return autoRetries === before ? view : { ...view, planning: { ...planning, autoRetries } };
     }
     case "session.started":
+      // La del builder cuenta en su ciclo; la del planificador, en la planificación.
+      if (event.payload.role === "builder") {
+        const sessionId = event.payload.sessionId;
+        return withBuilding(view, (b) => ({
+          ...b,
+          activeSession: sessionId,
+          attempts: (b.attempts ?? 0) + 1,
+        }));
+      }
       return view.exists
         ? {
             ...view,
@@ -81,8 +90,12 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
         : view;
     case "session.ended": {
       if (!view.exists) return view;
-      const planning = view.planning ?? NO_PLANNING;
       const lastFailure = event.payload.failureReason ?? null;
+      if (view.building?.activeSession === event.payload.sessionId) {
+        const lastOutcome = event.payload.outcome;
+        return withBuilding(view, (b) => ({ ...b, activeSession: null, lastOutcome, lastFailure }));
+      }
+      const planning = view.planning ?? NO_PLANNING;
       const failure = lastFailure === null && !planning.lastFailure ? {} : { lastFailure };
       return { ...view, planning: { ...planning, activeSession: null, ...failure } };
     }
@@ -119,12 +132,16 @@ export function evolve(view: TaskView, event: NewTaskEvent): TaskView {
     case "verification.completed": {
       if (event.payload.passed) return view.exists ? { ...view, state: "review" } : view;
       // Falló: vuelve a building con el ciclo siguiente. Si era el último, `task.failed` la cierra.
-      const next = withBuilding(view, (b) => ({
-        ...b,
-        cycle: b.cycle + 1,
-        headSha: null,
-        gates: {},
-      }));
+      // Las sesiones del builder se cuentan por ciclo: el siguiente empieza sin ellas.
+      const next = withBuilding(
+        view,
+        ({ activeSession, attempts, lastOutcome, lastFailure, ...b }) => ({
+          ...b,
+          cycle: b.cycle + 1,
+          headSha: null,
+          gates: {},
+        }),
+      );
       return next.exists ? { ...next, state: "building" } : next;
     }
     case "task.failed":

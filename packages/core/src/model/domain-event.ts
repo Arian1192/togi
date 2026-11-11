@@ -291,6 +291,13 @@ const PAYLOADS: Record<string, z.ZodType> = {
 /** Todos los tipos de evento que existen (de tareas, administración y catálogo). */
 export const EVENT_TYPES: readonly string[] = Object.keys(PAYLOADS);
 
+/** Por qué el esquema rechazaría este payload, o `null`: el decider nunca emite un evento ilegible. */
+export function payloadProblem(type: string, payload: unknown): string | null {
+  const checked = PAYLOADS[type]?.safeParse(payload);
+  if (checked === undefined) return `tipo desconocido "${type}"`;
+  return checked.success ? null : z.prettifyError(checked.error);
+}
+
 /** Versión vigente de cada tipo (ADR-004); el resto va en 1. Un cambio de forma sube la suya y añade su migración. */
 export const EVENT_SCHEMA_VERSIONS: Readonly<Record<string, number>> = { "session.ended": 2 };
 export const schemaVersionOf = (type: string): number => EVENT_SCHEMA_VERSIONS[type] ?? 1;

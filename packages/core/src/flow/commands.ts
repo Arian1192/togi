@@ -1,4 +1,5 @@
 import type { BlobRef } from "../model/blob.ts";
+import type { Workspace } from "../model/building.ts";
 import type { TaskEvent } from "../model/events.ts";
 import type { Actor } from "../model/ids.ts";
 import type { Plan, SessionEndedInput, SessionStarted } from "../model/planning.ts";
@@ -27,6 +28,8 @@ export type TaskCommand =
   | (Meta & { type: "reject"; reason: { category: ReasonCategory; text: BlobRef | null } })
   | (Meta & { type: "completeTask"; prNumber: number })
   | (Meta & { type: "requestPlanRetry" })
+  | (Meta & { type: "createWorkspace"; workspace: Workspace })
+  | (Meta & { type: "submitBuild"; cycle: number; headSha: string })
   | (Meta & { type: "startSession"; session: SessionStarted })
   | (Meta & { type: "endSession"; session: SessionEndedInput })
   | (Meta & { type: "proposePlan"; plan: Omit<Plan, "planVersion" | "sessionId"> })
