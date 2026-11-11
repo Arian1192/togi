@@ -1046,6 +1046,29 @@ body {
   cursor: pointer;
 }
 
+/* El chip de la Actividad de una tarea (ActivityPanel.ts): «#n ✕» vuelve a todas; al lado, el cuaderno. */
+.mc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.mc-back {
+  padding: 0 var(--space-2);
+  font: 500 12px / 20px var(--font-mono);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.mc-head .mesa-card-open {
+  margin: 0;
+}
+/* Fin del chip de Actividad */
+
 .mesa-tasks-more {
   margin: 10px 0 0;
   font: 400 11.5px / 16px var(--font-mono);

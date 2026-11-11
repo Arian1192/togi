@@ -1,4 +1,6 @@
 import { createElement, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { activityVersion, type ReadActivity, TaskActivity } from "./ActivityPanel.ts";
+import { readTaskActivity } from "./activityApi.ts";
 import { MesaCards } from "./MesaCards.ts";
 import { glyph } from "./MesaFlowNode.ts";
 import { MesaMap } from "./MesaMap.ts";
@@ -28,6 +30,10 @@ interface Props {
   onOpen?: (task: number) => void;
   /** El panel al abrir la mesa; si no llega, el que se guardó. Para los tests. */
   panel?: Panel;
+  /** La tarea elegida al abrir la mesa. Para los tests. */
+  selected?: number | null;
+  /** Cómo se lee la actividad de una tarea; si no llega, del daemon. Para los tests. */
+  readActivity?: ReadActivity;
 }
 
 /** Cada cuánto se rehace «hace 12 s». */
@@ -39,7 +45,8 @@ export function MesaScreen({ state, waiting, titles, panel: initial, ...props }:
   const given = useContext(MesaTasksContext);
   const tasks = props.tasks ?? given.tasks;
   const onOpen = props.onOpen ?? given.onOpen;
-  const [open, setOpen] = useState<number | null>(null);
+  const read = props.readActivity ?? readTaskActivity;
+  const [open, setOpen] = useState<number | null>(props.selected ?? null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), TICK_MS);
@@ -90,7 +97,19 @@ export function MesaScreen({ state, waiting, titles, panel: initial, ...props }:
         hidden: !panel.open,
       },
       createElement("h2", null, "Lo último que ha pasado por togi"),
-      tasks.length > 0 &&
+      // Con una tarea elegida, su Actividad; si no, las tarjetas y el registro de siempre.
+      open !== null &&
+        createElement(TaskActivity, {
+          key: open,
+          task: open,
+          version: activityVersion(state.log, open),
+          read,
+          now,
+          onClear: () => setOpen(null),
+          onOpen,
+        }),
+      open === null &&
+        tasks.length > 0 &&
         createElement(MesaCards, {
           cards,
           open,
@@ -98,29 +117,30 @@ export function MesaScreen({ state, waiting, titles, panel: initial, ...props }:
           onOpen,
           now,
         }),
-      log.length === 0
-        ? createElement("p", { className: "muted" }, "Todavía no ha pasado nada por togi.")
-        : createElement(
-            "details",
-            { className: "mesa-log-all" },
-            createElement("summary", null, `Registro completo · ${log.length}`),
-            createElement(
-              "ol",
-              null,
-              log.map((e) =>
-                createElement(
-                  "li",
-                  { key: e.seq },
-                  createElement("code", { className: "ident" }, e.name),
+      open === null &&
+        (log.length === 0
+          ? createElement("p", { className: "muted" }, "Todavía no ha pasado nada por togi.")
+          : createElement(
+              "details",
+              { className: "mesa-log-all" },
+              createElement("summary", null, `Registro completo · ${log.length}`),
+              createElement(
+                "ol",
+                null,
+                log.map((e) =>
                   createElement(
-                    "span",
-                    { className: "mesa-log-meta" },
-                    `${e.who} · #${e.number} · ${e.at.slice(11, 19)} · seq ${e.seq}`,
+                    "li",
+                    { key: e.seq },
+                    createElement("code", { className: "ident" }, e.name),
+                    createElement(
+                      "span",
+                      { className: "mesa-log-meta" },
+                      `${e.who} · #${e.number} · ${e.at.slice(11, 19)} · seq ${e.seq}`,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
+            )),
     ),
   );
 }
