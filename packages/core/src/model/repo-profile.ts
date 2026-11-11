@@ -74,6 +74,42 @@ export const RepoProfileSchema = z.strictObject({
 });
 export type RepoProfile = z.infer<typeof RepoProfileSchema>;
 
+/**
+ * Lo que el builder nunca toca, tenga el perfil lo que tenga (ADR-011 §5): lo que usaría para trucar
+ * la verificación. El perfil solo añade rutas a estas.
+ */
+export const PROTECTED_PATH_MINIMUMS = [
+  // Manifiestos y lockfiles.
+  "**/package.json",
+  "**/pnpm-lock.yaml",
+  "**/package-lock.json",
+  "**/npm-shrinkwrap.json",
+  "**/yarn.lock",
+  "**/bun.lock",
+  "**/bun.lockb",
+  // Configuración de los gates.
+  "**/tsconfig*.json",
+  "**/biome.json",
+  "**/biome.jsonc",
+  "**/.eslintrc*",
+  "**/eslint.config.*",
+  "**/vitest.config.*",
+  "**/vitest.workspace.*",
+  "**/jest.config.*",
+  "**/.mocharc*",
+  "**/playwright.config.*",
+  // CI y credenciales.
+  ".github/**",
+  "**/.env*",
+  "**/*.pem",
+  "**/*.key",
+] as const;
+
+/** Las rutas protegidas vigentes: los mínimos más las del perfil, sin duplicados. */
+export const protectedPathsOf = (profile: RepoProfile): string[] => [
+  ...new Set<string>([...PROTECTED_PATH_MINIMUMS, ...profile.protectedPaths]),
+];
+
 /** Los gates de comando que exige el perfil: los que tienen comando, en el orden de `PROFILE_CHECKS`. */
 export const profileChecks = (profile: RepoProfile): GateId[] =>
   PROFILE_CHECKS.filter((check) => profile.checks[check] !== null);
