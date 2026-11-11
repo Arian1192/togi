@@ -44,6 +44,7 @@ test("el frontend solo invoca los comandos del estado, las tareas, el plan, la t
       "list_tasks",
       "read_plan",
       "read_task",
+      "read_task_activity",
       "read_trajectory",
       "reject_plan",
       "request_plan_changes",
