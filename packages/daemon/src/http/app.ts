@@ -19,6 +19,7 @@ import { plannerRoutes } from "./planner.ts";
 import { planRoutes } from "./plans.ts";
 import { problem } from "./problem.ts";
 import { queryRoutes, type ReadDeps } from "./queries.ts";
+import { repoProfileRoutes } from "./repo-profiles.ts";
 import { repoRoutes } from "./repos.ts";
 import { taskRoutes } from "./tasks.ts";
 
@@ -72,6 +73,7 @@ export function createApp(
     .route("/", queryRoutes(db, reads, handle))
     .route("/", planRoutes(db, reads, handle))
     .route("/", repoRoutes(db, home))
+    .route("/", repoProfileRoutes(db, reads?.store))
     .route("/", eventRoutes(reads))
     .route("/", adminRoutes(reads))
     .route("/", credentialRoutes(credentials))

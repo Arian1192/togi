@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 const appendOnly = (table: string) => `
 CREATE TRIGGER ${table}_no_update BEFORE UPDATE ON ${table}
@@ -147,10 +147,19 @@ CREATE TABLE repos (
 );`,
   // Código del fallo de una sesión (session.ended v2). NULL en las que terminaron antes, o sin fallo.
   11: "ALTER TABLE sessions ADD COLUMN failure_reason TEXT;",
+  // Proyección del perfil vigente de cada repo (ADR-011 §5): el último `repo.profile_set` del stream.
+  12: `
+CREATE TABLE repo_profiles (
+  repo           TEXT PRIMARY KEY COLLATE NOCASE,
+  profile        TEXT NOT NULL,
+  stream_version INTEGER NOT NULL,
+  set_at         TEXT NOT NULL
+);`,
 };
 
 /**
  * Migraciones que dejan las proyecciones vacías o inválidas. Al abrir la base, si alguna de las
- * aplicadas está aquí, se reconstruyen desde el log dentro de la misma transacción.
+ * aplicadas está aquí, se reconstruyen desde el log dentro de la misma transacción. La 12 crea
+ * `repo_profiles` vacía: el log puede tener ya perfiles fijados.
  */
-export const REBUILD_PROJECTIONS: ReadonlySet<number> = new Set([7, 8, 9]);
+export const REBUILD_PROJECTIONS: ReadonlySet<number> = new Set([7, 8, 9, 12]);
