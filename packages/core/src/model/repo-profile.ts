@@ -24,6 +24,13 @@ const command = z
   .max(200)
   .regex(/^[\w@%+=:,./-]+( [\w@%+=:,./-]+)*$/, "un comando exacto, sin metacaracteres de shell");
 
+/** Los argumentos de un comando del perfil, partido por cada espacio y sin shell; lo revalida antes. */
+export function commandArgv(text: string): string[] {
+  const parsed = command.safeParse(text);
+  if (!parsed.success) throw new Error("no es un comando exacto del perfil");
+  return parsed.data.split(" ");
+}
+
 const hasControlChar = (text: string) =>
   [...text].some((ch) => ch.charCodeAt(0) < 0x20 || ch.charCodeAt(0) === 0x7f);
 

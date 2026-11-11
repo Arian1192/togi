@@ -4,15 +4,16 @@ import type { Readable, Writable } from "node:stream";
 import {
   encodeLine,
   FromWorker,
+  type InstallOrder,
   type Sandbox,
   type SandboxResult,
   type SessionOrder,
-  ToWorker,
+  WorkerInput,
 } from "@togi/core";
 import { SrtSandbox } from "./sandbox/srt-sandbox.ts";
 
 export interface WorkerDeps {
-  createSandbox(order: SessionOrder): Sandbox;
+  createSandbox(order: SessionOrder | InstallOrder): Sandbox;
   /** Donde srt lee la credencial. Por defecto, el entorno de este proceso. */
   env?: NodeJS.ProcessEnv;
   heartbeatMs?: number;
@@ -45,16 +46,18 @@ const CONTROL = /\p{Cc}/gu;
  * Las últimas líneas del stderr del agente, sin la credencial. El lanzador las limpia otra vez con
  * el detector de secretos; esto solo evita que el valor exacto salga de este proceso.
  */
-function stderrTail(stderr: string, secret: string | undefined): string {
+function stderrTail(stderr: string, secret: string | undefined, label = "agente"): string {
   const clean = secret ? stderr.split(secret).join("[credencial]") : stderr;
   const lines = clean.split("\n").filter((l) => l.trim() !== "");
   return lines
     .slice(-STDERR_LINES)
-    .map((l) => `agente: ${shorten(l.replace(CONTROL, ""))}\n`)
+    .map((l) => `${label}: ${shorten(l.replace(CONTROL, ""))}\n`)
     .join("");
 }
 
-export const srtSandbox = (order: SessionOrder): Sandbox =>
+type Order = SessionOrder | InstallOrder;
+
+export const srtSandbox = (order: Order): Sandbox =>
   new SrtSandbox({
     togiHome: dirname(order.workspacesRoot),
     runtimePaths: order.runtimePaths,
@@ -101,31 +104,38 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
   const send = (message: FromWorker) => output.write(encodeLine(message));
   let running: { abort: AbortController; done: Promise<void> } | undefined;
 
-  async function session(order: SessionOrder, signal: AbortSignal): Promise<void> {
+  async function session(order: Order, signal: AbortSignal): Promise<void> {
     const started = Date.now();
     const beat = setInterval(() => send({ type: "heartbeat" }), deps.heartbeatMs ?? 5000);
     let outcome: "completed" | "failed" | "timeout" | "cancelled" = "failed";
     let exitCode: number | null = null;
     let failureReason: string | undefined;
+    // La instalación no tiene agente: ni credencial ni entrada, y su stdout no son eventos.
+    const agent = order.type === "session" ? order : undefined;
+    const credential = agent?.credential ?? undefined;
     try {
-      if (order.credential) env[order.credential.name] = order.credential.secret;
+      if (credential) env[credential.name] = credential.secret;
       const result: SandboxResult = await deps
         .createSandbox(order)
-        .run(order.spec, order.argv, order.input, signal);
-      for (const event of events(order.sessionId, result.stdout)) send(event);
+        .run(order.spec, order.argv, agent?.input, signal);
+      if (agent) for (const event of events(order.sessionId, result.stdout)) send(event);
       if (result.exitCode !== 0 || result.timedOut) {
-        (deps.stderr ?? process.stderr).write(stderrTail(result.stderr, order.credential?.secret));
+        (deps.stderr ?? process.stderr).write(
+          agent
+            ? stderrTail(result.stderr, credential?.secret)
+            : stderrTail(`${result.stdout}\n${result.stderr}`, undefined, "instalación"),
+        );
       }
       exitCode = result.exitCode;
       outcome = result.timedOut ? "timeout" : result.exitCode === 0 ? "completed" : "failed";
-      if (outcome === "failed") failureReason = stopReason(order.sessionId, result.stdout);
+      if (outcome === "failed" && agent) failureReason = stopReason(order.sessionId, result.stdout);
     } catch {
       // Un agente que falla devuelve un código de salida; lo que lanza es el sandbox, que no pudo
       // arrancar (plataforma no soportada, especificación rechazada). Nunca se ejecuta sin él.
       failureReason = "sandbox_unavailable";
     } finally {
       // sin detalle: el mensaje de un error puede llevar la credencial
-      if (order.credential) delete env[order.credential.name];
+      if (credential) delete env[credential.name];
       clearInterval(beat);
     }
     if (signal.aborted) outcome = "cancelled";
@@ -140,7 +150,7 @@ export async function serve(input: Readable, output: Writable, deps: WorkerDeps)
   }
 
   for await (const line of createInterface({ input })) {
-    const parsed = ToWorker.safeParse(safeJson(line));
+    const parsed = WorkerInput.safeParse(safeJson(line));
     if (!parsed.success) {
       send({ type: "error", code: "invalid_message" });
     } else if (parsed.data.type === "cancel") {
