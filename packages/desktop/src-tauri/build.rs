@@ -11,6 +11,7 @@ fn main() {
         "request_plan_changes",
         "reject_plan",
         "read_trajectory",
+        "read_task_activity",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest))
         .expect("no se pudo preparar la app de Tauri");
