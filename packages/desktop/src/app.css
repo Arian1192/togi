@@ -727,6 +727,56 @@ body {
   border-left: 1px solid var(--border);
 }
 
+/* El panel derecho (ADR-010 §3): el lateral, con el ancho de su borde; por defecto, 320 px. */
+.mesa-screen > .mesa-log {
+  flex-basis: var(--mesa-panel-width, 320px);
+}
+
+/* Su borde se arrastra y su botón lo pliega; plegado, queda un riel para volver a abrirlo. */
+.mesa-edge {
+  position: relative;
+  flex: none;
+  width: 0;
+}
+
+.mesa-edge.is-closed {
+  width: 20px;
+  border-left: 1px solid var(--border);
+}
+
+.mesa-edge-grip {
+  position: absolute;
+  inset: 0 -4px;
+  z-index: 2;
+  cursor: col-resize;
+}
+
+.mesa-edge-grip:hover,
+.mesa-edge-grip:focus-visible {
+  outline: none;
+  background: linear-gradient(var(--agent), var(--agent)) center / 2px 100% no-repeat;
+}
+
+.mesa-edge-toggle {
+  position: absolute;
+  top: 12px;
+  left: -10px;
+  z-index: 3;
+  width: 20px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font: 500 13px / 20px var(--font-sans);
+  cursor: pointer;
+}
+
+.mesa-edge.is-closed .mesa-edge-toggle {
+  left: 0;
+}
+
 .mesa-log h2 {
   margin: 0 0 var(--space-3);
   font: 500 12px / 16px var(--font-sans);
