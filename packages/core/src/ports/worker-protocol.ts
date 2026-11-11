@@ -31,10 +31,26 @@ const session = z.strictObject({
   credential: z.strictObject({ name: z.string(), secret: z.string().min(1) }).nullable(),
 });
 
-export const ToWorker = z.discriminatedUnion("type", [
-  session,
-  z.strictObject({ type: z.literal("cancel") }),
-]);
+const cancel = z.strictObject({ type: z.literal("cancel") });
+
+/** Lo que manda el lanzador de sesiones del agente. */
+export const ToWorker = z.discriminatedUnion("type", [session, cancel]);
+
+/**
+ * La instalación de dependencias (ADR-011 §4): una ejecución sin agente, sin credencial ni entrada.
+ * Su salida es código del repo: el trabajador nunca la lee como eventos.
+ */
+const install = z.strictObject({
+  type: z.literal("install"),
+  sessionId: z.string().min(1),
+  spec: spec.extend({ credentials: z.tuple([]) }),
+  workspacesRoot: z.string(),
+  runtimePaths: z.array(z.string()),
+  argv: z.array(z.string()).min(1),
+});
+
+/** Todo lo que acepta el trabajador: la sesión del agente, la instalación y la cancelación. */
+export const WorkerInput = z.discriminatedUnion("type", [session, install, cancel]);
 
 export const FromWorker = z.discriminatedUnion("type", [
   z.strictObject({
@@ -63,6 +79,8 @@ export const FromWorker = z.discriminatedUnion("type", [
 export type ToWorker = z.infer<typeof ToWorker>;
 export type SessionOrder = Extract<ToWorker, { type: "session" }>;
 export type FromWorker = z.infer<typeof FromWorker>;
+export type WorkerInput = z.infer<typeof WorkerInput>;
+export type InstallOrder = Extract<WorkerInput, { type: "install" }>;
 
-export const encodeLine = (message: ToWorker | FromWorker): string =>
+export const encodeLine = (message: WorkerInput | FromWorker): string =>
   `${JSON.stringify(message)}\n`;
