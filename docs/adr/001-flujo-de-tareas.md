@@ -6,6 +6,12 @@
 
 **Estado:** aprobado el 10 de noviembre de 2026, junto con el ADR-011, que construye `building`, `verifying`, `review` y `failed`. La integración de `dev` cuando avanza y la merge queue pasan a la rebanada 4.
 
+**Enmienda del 11 de noviembre de 2026: rehacer una tarea fallida.** `failed` sigue siendo final: la tarea no se reabre ni vuelve a `planning`, y su historial se queda tal cual para aprender de él. Como en una planta, la pieza defectuosa va a descarte y se fabrica otra:
+
+- **Lo pide un humano, nunca togi solo.** Tres fallos casi siempre indican una tarea mal escrita, y repetirla sin cambios gasta sesiones en el mismo error. Solo se rehace una tarea `failed` cuyo fallo ya está clasificado (`failure.classified`, ADR-004), y cada una como mucho una vez: si la nueva también falla, se rehace la nueva.
+- **togi crea una tarea nueva en `draft`, enlazada a la fallida.** Copia el título, la descripción, el criterio de aceptación, el riesgo, el repo y la rama base; el humano puede editarlos antes de enviarla. Pasa por el gate 1 como cualquier otra y tiene sus propios 3 ciclos.
+- **El planificador de la nueva sabe qué salió mal.** Recibe como contexto los gates que fallaron en el último ciclo de la original y la clasificación del humano.
+
 Cada tarea de togi recorre siete estados con dos gates humanos: la aprobación del plan y la revisión del PR. El objetivo es imponer el flujo que siguen los equipos que usan agentes con éxito (Stripe, Spotify, Dropbox, `dotnet/runtime`): tareas pequeñas, plan aprobado antes del código, verificación independiente del agente y PRs revisables.
 
 La primera foto de la línea base de `promos` (61 PRs a `main` desde el 1 de octubre de 2026) muestra lo contrario:
@@ -66,6 +72,8 @@ El camino feliz va de `draft` a `merged`; las dos vueltas atrás (pedir cambios 
 
    > **Nota (rebanada 2):** desde la rebanada 2, el límite del gate 1 sigue el ADR-007: 200 líneas de producción y 500 en total, con la estimación del plan separada en `{ production, tests }`. Sustituye a las 300 líneas de esta regla; `FlowPolicy.maxLines` pasa a `maxProductionLines` y `maxTotalLines`.
 4. **Máximo de 3 ciclos `building` → `verifying`.** Al tercer fallo la tarea pasa a `failed` y vuelve al humano: casi siempre indica una tarea mal escrita o demasiado grande.
+
+   > **Nota (11 de noviembre de 2026):** el humano puede rehacerla como una tarea nueva; ver la enmienda del estado.
 5. **El agente no se autoevalúa.** Su bucle interno en `building` es una ayuda; la única verificación que cuenta es la de `verifying`, ejecutada por togi en un entorno que el agente no controla.
 6. **Todo es un evento.** Cada cambio de estado, acción del agente, resultado de gate y decisión humana se registra en un log append-only. El estado de la tarea es una proyección de ese log.
 7. **Atribución.** Todo commit del agente lleva el trailer `Assisted-by: <agente>/<modelo>`.

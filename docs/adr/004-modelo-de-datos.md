@@ -8,6 +8,18 @@
 
 **Enmienda del 10 de noviembre de 2026 (ADR-011):** `Workspace.kind` pasa de `"worktree"` a `"clone"`: un clon propio de togi, con el directorio de git fuera del árbol que ve el sandbox. El ADR-008 ya descartaba `git worktree`.
 
+**Enmienda del 11 de noviembre de 2026 (ADR-001, rehacer una tarea fallida):**
+
+- **Un origen nuevo,** `{ kind: "rework"; from: TaskId }`. La tarea nueva es otro stream con su propio `task.created`; la fallida no recibe ningún evento, porque es final.
+- **Los textos se copian como blobs nuevos de la tarea nueva,** no como referencias a los de la original. Así, borrar los datos de una no borra los de la otra.
+- **El contexto del planificador se lee de la original al planificar:** los `GateRun` fallidos de su `task.failed` y su `failure.classified`. Si sus datos se han borrado, el planificador no los recibe.
+- **«Como mucho una vez»** lo comprueba una proyección que guarda qué tarea rehace a cuál, no el decider de la fallida.
+
+**Enmienda del 11 de noviembre de 2026: la sesión del builder que no entrega.** Precisa la regla 1 de «Reglas del flujo en core»:
+
+- **Termina con normalidad o agota el tiempo:** togi hace commit de lo que haya en la copia y lo entrega con `build.submitted`; si no hay cambios, entrega el commit base. Los gates deciden: si no hizo lo del plan, `plan_contract` da `fail` y el ciclo cuenta.
+- **Se cae por un fallo pasajero** (los mismos `TRANSIENT_FAILURE_REASONS` del planificador): togi abre otra sesión en el mismo ciclo, una sola vez. Si vuelve a caer, o cae por otro motivo de infraestructura, la tarea se queda en `building` en pausa, a la espera del humano, que pide otra sesión o la rechaza. Nada de esto gasta ciclo.
+
 El ADR-001 fija que todo es un evento (regla 6): el estado de una tarea es una proyección de un log append-only. Este ADR define ese log, las entidades que se derivan de él y cómo se guardan. Debe cumplir:
 
 - Las entidades mínimas del ADR-001: tarea, plan versionado, sesión de agente, workspace, ejecución de gate, decisión humana o delegada y evento.
@@ -84,7 +96,8 @@ export interface Reason { category: ReasonCategory; text: BlobRef }  // texto li
 export type TaskSource =
   | { kind: "cli" }
   | { kind: "github_issue"; repo: string; number: number; url: string;
-      untrustedBody: BlobRef };  // entrada no fiable: nunca se mezcla con instrucciones
+      untrustedBody: BlobRef }   // entrada no fiable: nunca se mezcla con instrucciones
+  | { kind: "rework"; from: TaskId };  // enmienda del 11 de noviembre: rehace una tarea `failed`
 
 export type TaskEvent =
   | E<"task.created", { title: BlobRef; description: BlobRef | null; acceptanceCriteria: BlobRef | null;
