@@ -1,4 +1,5 @@
 export * from "./api/schemas.ts";
+export * from "./catalog/generic-builder.ts";
 export * from "./catalog/generic-planner.ts";
 export * from "./catalog/generic-planner-v2.ts";
 export * from "./flow/index.ts";
