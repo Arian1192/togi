@@ -730,6 +730,34 @@ body {
 /* El panel derecho (ADR-010 §3): el lateral, con el ancho de su borde; por defecto, 320 px. */
 .mesa-screen > .mesa-log {
   flex-basis: var(--mesa-panel-width, 320px);
+  transition:
+    flex-basis 200ms ease,
+    padding 200ms ease,
+    opacity 160ms ease,
+    display 200ms allow-discrete;
+}
+
+/* Plegado, el panel se cierra hacia la derecha empujando la mesa, y se abre igual: el ancho y el
+   relleno van a cero antes de ocultarse, y al mostrarse parten de cero (@starting-style). */
+.mesa-screen > .mesa-log[hidden] {
+  display: none;
+  flex-basis: 0;
+  padding-inline: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+
+@starting-style {
+  .mesa-screen > .mesa-log:not([hidden]) {
+    flex-basis: 0;
+    padding-inline: 0;
+    opacity: 0;
+  }
+}
+
+/* Al arrastrar el borde, el ancho sigue al puntero sin transición. */
+.mesa-screen:has(.mesa-edge-grip:active) > .mesa-log {
+  transition: none;
 }
 
 /* Su borde se arrastra y su botón lo pliega; plegado, queda un riel para volver a abrirlo. */
@@ -1480,7 +1508,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .project-col,
-  .project-col * {
+  .project-col *,
+  .mesa-screen > .mesa-log {
     transition: none;
   }
 }
