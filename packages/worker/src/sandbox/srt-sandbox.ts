@@ -128,7 +128,7 @@ async function execute(
     const [cmd, ...args] = argv;
     // Grupo de procesos propio: al terminar se mata el grupo entero, nietos incluidos.
     const child = spawn(cmd as string, args, {
-      cwd: spec.writeDir,
+      cwd: spec.workTree ?? spec.writeDir, // HOME y TMPDIR siguen en writeDir, fuera del árbol
       env,
       detached: true,
       stdio: ["pipe", "pipe", "pipe", reaper.fd], // el cuarto es la marca que hereda el agente
