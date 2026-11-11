@@ -51,6 +51,12 @@ function workspaceDir(home: string, id: string): string {
   return dir;
 }
 
+/** El árbol y el directorio de git del clon, sacados del id validado. */
+export function clonePaths(home: string, workspaceId: WorkspaceId): ClonePaths {
+  const dir = workspaceDir(home, workspaceId);
+  return { tree: join(dir, "tree"), gitDir: join(dir, "git") };
+}
+
 /**
  * Todo `git` sobre el clon: sin la configuración del usuario ni la del sistema, sin hooks y con el
  * directorio de git y el árbol explícitos, sin fiarse del fichero `.git` del árbol (ADR-011 §3). El

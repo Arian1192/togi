@@ -20,6 +20,8 @@ import {
   type TaskSource,
   type TaskView,
   toDomainEvent,
+  type Workspace,
+  type WorkspaceId,
 } from "@togi/core";
 import type Database from "better-sqlite3";
 import { applyProjections } from "../projections/index.ts";
@@ -109,8 +111,23 @@ export interface PlanReasonInput {
   text: string;
 }
 
+/** La copia de trabajo de la tarea (ADR-011 §3): la registra y la libera togi, sin blobs. */
+export interface CreateWorkspaceInput {
+  type: "createWorkspace";
+  number: number;
+  workspace: Workspace;
+}
+
+export interface ReleaseWorkspaceInput {
+  type: "releaseWorkspace";
+  number: number;
+  workspaceId: WorkspaceId;
+}
+
 export type CommandInput =
   | CreateTaskInput
+  | CreateWorkspaceInput
+  | ReleaseWorkspaceInput
   | EditTaskInput
   | SubmitTaskInput
   | CompleteTaskInput
@@ -244,6 +261,10 @@ export function createHandler(deps: HandlerDeps) {
           return { type: "requestPlanRetry", actor, at };
         case "completeTask":
           return { type: "completeTask", actor, at, prNumber: cmd.prNumber };
+        case "createWorkspace":
+          return { type: "createWorkspace", actor, at, workspace: cmd.workspace };
+        case "releaseWorkspace":
+          return { type: "releaseWorkspace", actor, at, workspaceId: cmd.workspaceId };
         case "reject": {
           const reason = { category: cmd.category, text: await blob(cmd.text) };
           return { type: "reject", actor, at, reason };
