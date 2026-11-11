@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
 import { MesaPane } from "./MesaPane.tsx";
 import { MesaTasksContext } from "./mesaContext.ts";
+import { PanelContext, usePanel } from "./PanelEdge.ts";
 import { ProjectColumn } from "./ProjectColumn.ts";
 import { ProjectSummary } from "./ProjectSummary.ts";
 import { buildProjects } from "./projects.ts";
@@ -181,6 +182,11 @@ export function App() {
       : undefined;
   const shown =
     view.kind === "project" ? projects?.projects.find((p) => p.repo === view.repo) : undefined;
+  // El panel derecho de la mesa vive aquí, como la columna: su control va en la barra de título.
+  const onMesa = view.kind === "mesa" && list?.status === "ok";
+  const panelState = usePanel(undefined, onMesa);
+  const [panel, setPanel] = panelState;
+  const togglePanel = () => setPanel((prev) => ({ ...prev, open: !prev.open }));
   return (
     <div className="workbench">
       <TitleBar
@@ -189,6 +195,7 @@ export function App() {
         fullscreen={fullscreen}
         mesa={view.kind === "mesa"}
         onMesa={(open) => setView(open ? { kind: "mesa" } : PENDING)}
+        {...(onMesa ? { panel: { open: panel.open, onToggle: togglePanel } } : {})}
       />
       {/* Siempre montada: si el daemon deja de responder no hay lista, pero el estado se sigue viendo. */}
       <ProjectColumn
@@ -216,11 +223,13 @@ export function App() {
                 onOpen: (number) => setView({ kind: "task", number }),
               }}
             >
-              <MesaPane
-                planning={list.tasks.filter((t) => t.state === "planning").map((t) => t.number)}
-                waiting={projects?.pending.length ?? 0}
-                titles={titles}
-              />
+              <PanelContext.Provider value={panelState}>
+                <MesaPane
+                  planning={list.tasks.filter((t) => t.state === "planning").map((t) => t.number)}
+                  waiting={projects?.pending.length ?? 0}
+                  titles={titles}
+                />
+              </PanelContext.Provider>
             </MesaTasksContext.Provider>
           ) : shown !== undefined ? (
             <ProjectSummary project={shown} partial={list.truncated} />

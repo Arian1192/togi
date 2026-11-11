@@ -12,6 +12,8 @@ interface Props {
   /** Si está la mesa en vivo en pantalla; con `onMesa`, la barra lleva «Tareas ⌘1» y «Mesa ⌘2». */
   mesa?: boolean;
   onMesa?: (open: boolean) => void;
+  /** El panel derecho de la mesa: con él, la barra termina con su control. Solo en la mesa. */
+  panel?: { open: boolean; onToggle: () => void };
 }
 
 const navButton = (label: string, key: string, pressed: boolean, onClick: () => void) =>
@@ -32,9 +34,41 @@ const navButton = (label: string, key: string, pressed: boolean, onClick: () => 
 const SHORTCUT = "⌘\\";
 
 // Icono de Lucide (https://lucide.dev, licencia ISC): panel-left, con el trazo de 1,5 px de la marca.
-const PANEL_LEFT = { rect: { x: 3, y: 3, width: 18, height: 18, rx: 2 }, line: "M9 3v18" } as const;
+// panel-right es el mismo en espejo: la línea a la derecha.
+const RECT = { x: 3, y: 3, width: 18, height: 18, rx: 2 } as const;
+const PANEL_LEFT = { rect: RECT, line: "M9 3v18" } as const;
+const PANEL_RIGHT = "M15 3v18";
 
-export function TitleBar({ collapsed, onCollapse, fullscreen, mesa, onMesa }: Props): ReactNode {
+/** El control del panel derecho, en espejo del de la columna, con su atajo ⌘⌥\. */
+const panelToggle = ({ open, onToggle }: NonNullable<Props["panel"]>) => {
+  const label = open ? "Plegar el panel" : "Desplegar el panel";
+  return createElement(
+    "button",
+    {
+      type: "button",
+      className: "titlebar-toggle titlebar-panel",
+      "aria-label": label,
+      "aria-expanded": open,
+      title: `${label} (⌘⌥\\)`,
+      onClick: onToggle,
+    },
+    createElement(
+      "svg",
+      { viewBox: "0 0 24 24", width: 16, height: 16, fill: "none", "aria-hidden": true },
+      createElement("rect", { ...RECT, stroke: "currentColor", strokeWidth: 1.5 }),
+      createElement("path", { d: PANEL_RIGHT, stroke: "currentColor", strokeWidth: 1.5 }),
+    ),
+  );
+};
+
+export function TitleBar({
+  collapsed,
+  onCollapse,
+  fullscreen,
+  mesa,
+  onMesa,
+  panel,
+}: Props): ReactNode {
   const label = collapsed ? "Desplegar la columna" : "Plegar la columna";
   return createElement(
     "header",
@@ -68,5 +102,6 @@ export function TitleBar({ collapsed, onCollapse, fullscreen, mesa, onMesa }: Pr
         navButton("Tareas", "1", mesa !== true, () => onMesa(false)),
         navButton("Mesa en vivo", "2", mesa === true, () => onMesa(true)),
       ),
+    panel && panelToggle(panel),
   );
 }

@@ -43,7 +43,8 @@ test("abierto, el panel es el lateral de siempre, con su borde delante y su anch
     out,
     /<div class="mesa-edge"><div class="mesa-edge-grip" role="separator"[^>]*aria-valuenow="400"/,
   );
-  assert.match(out, /aria-expanded="true"[^>]*>›<\/button><\/div><aside class="mesa-log"/);
+  assert.match(out, /aria-valuemax="640" tabindex="0"><\/div><\/div><aside class="mesa-log"/);
+  assert.doesNotMatch(out, /mesa-edge-toggle|<button[^>]*aria-label="Plegar el panel/);
 });
 
 test("plegado, el lateral se oculta: queda el riel con el botón para desplegarlo", () => {
@@ -51,9 +52,10 @@ test("plegado, el lateral se oculta: queda el riel con el botón para desplegarl
   assert.match(out, /<aside class="mesa-log" aria-label="[^"]*" hidden="">/);
   assert.doesNotMatch(screen(true), /<aside[^>]*hidden/);
   assert.doesNotMatch(out, /mesa-edge-grip/);
+  assert.doesNotMatch(out, /is-closed|<div class="mesa-edge|aria-label="Desplegar el panel/);
   assert.match(
-    out,
-    /<div class="mesa-edge is-closed"><button[^>]*aria-label="Desplegar el panel \(⌘⌥\\\)"[^>]*aria-expanded="false"/,
+    readFileSync(join(import.meta.dirname, "TitleBar.ts"), "utf8"),
+    /"Desplegar el panel"/,
   );
 });
 
