@@ -21,6 +21,12 @@ export const DOMAIN_ERROR_CODES = [
   "workspace_already_exists",
   "workspace_mismatch",
   "stale_cycle",
+  "head_mismatch",
+  "gate_already_recorded",
+  "missing_gates",
+  "gate_errors",
+  "failure_already_classified",
+  "workspace_already_released",
 ] as const;
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number];
 

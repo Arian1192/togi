@@ -3,6 +3,7 @@ import { isTransientFailure, MAX_AUTO_RETRIES } from "../model/planning.ts";
 import { REASON_CATEGORIES, type TaskState } from "../model/task.ts";
 import type { TaskCommand } from "./commands.ts";
 import { decideBuilding } from "./decide-building.ts";
+import { decideVerification } from "./decide-verification.ts";
 import { type DomainError, domainError } from "./errors.ts";
 import type { FlowPolicy } from "./policy.ts";
 import { type NewTaskEvent, NO_PLANNING, type TaskView } from "./task-view.ts";
@@ -27,6 +28,10 @@ export function decide(
   }
 
   if (!view.exists) return domainError("task_not_found", "la tarea no existe");
+  // Lo único que se admite tras un estado final: clasificar el fallo y liberar la copia (ADR-004).
+  if (cmd.type === "classifyFailure" || cmd.type === "releaseWorkspace") {
+    return decideVerification(view, cmd, meta, policy);
+  }
   if (FINAL_STATES.includes(view.state)) {
     return domainError("task_final", `la tarea está en ${view.state}, estado final`);
   }
@@ -87,6 +92,9 @@ export function decide(
     case "createWorkspace":
     case "submitBuild":
       return decideBuilding(view, cmd, meta);
+    case "recordGate":
+    case "completeVerification":
+      return decideVerification(view, cmd, meta, policy);
     case "startSession": {
       if (cmd.actor.kind !== "system") return notAllowed("system");
       if (view.state === "building" && cmd.session.role === "builder") {
