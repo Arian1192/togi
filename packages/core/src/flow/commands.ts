@@ -1,7 +1,7 @@
 import type { BlobRef } from "../model/blob.ts";
-import type { Workspace } from "../model/building.ts";
+import type { GateId, GateRun, Workspace } from "../model/building.ts";
 import type { TaskEvent } from "../model/events.ts";
-import type { Actor } from "../model/ids.ts";
+import type { Actor, WorkspaceId } from "../model/ids.ts";
 import type { Plan, SessionEndedInput, SessionStarted } from "../model/planning.ts";
 import type { ReasonCategory, RiskLevel, TaskSource } from "../model/task.ts";
 
@@ -30,6 +30,11 @@ export type TaskCommand =
   | (Meta & { type: "requestPlanRetry" })
   | (Meta & { type: "createWorkspace"; workspace: Workspace })
   | (Meta & { type: "submitBuild"; cycle: number; headSha: string })
+  | (Meta & { type: "recordGate"; run: GateRun })
+  /** `checks`: los gates que exige el perfil del repo, además de los del contrato. */
+  | (Meta & { type: "completeVerification"; cycle: number; checks: readonly GateId[] })
+  | (Meta & { type: "classifyFailure"; reason: { category: ReasonCategory; text: BlobRef | null } })
+  | (Meta & { type: "releaseWorkspace"; workspaceId: WorkspaceId })
   | (Meta & { type: "startSession"; session: SessionStarted })
   | (Meta & { type: "endSession"; session: SessionEndedInput })
   | (Meta & { type: "proposePlan"; plan: Omit<Plan, "planVersion" | "sessionId"> })

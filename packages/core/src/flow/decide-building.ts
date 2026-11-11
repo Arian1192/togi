@@ -27,7 +27,7 @@ const mayDeliver = (b: BuildingView): boolean =>
   b.lastOutcome === "completed" || b.lastOutcome === "timeout" || b.lastFailure === "timeout";
 
 /** El store no valida al escribir: un evento que el esquema rechace no se emite. */
-const checked = (event: NewTaskEvent): NewTaskEvent[] | DomainError => {
+export const checked = (event: NewTaskEvent): NewTaskEvent[] | DomainError => {
   const problem = payloadProblem(event.type, event.payload);
   return problem ? domainError("invalid_payload", problem) : [event];
 };
