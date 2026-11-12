@@ -4,6 +4,7 @@ export * from "./blob.ts";
 export * from "./building.ts";
 export * from "./domain-event.ts";
 export type * from "./events.ts";
+export * from "./glob.ts";
 export * from "./ids.ts";
 export * from "./planning.ts";
 export * from "./repo-profile.ts";
