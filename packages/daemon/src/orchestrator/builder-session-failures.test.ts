@@ -58,3 +58,38 @@ test("si el decider rechaza startSession (stale_cycle) devuelve not_started sin 
   assert.deepEqual(await types(), []);
   assert.deepEqual(result, { kind: "not_started", code: "stale_cycle" });
 });
+
+for (const reason of ["worker_died", "trajectory_write_failed"] as const) {
+  test(`${reason} y después completed: dos sesiones en el mismo ciclo y una entrega`, async (t) => {
+    t.mock.method(console, "error", () => {});
+    const launcher = fakeLauncher([{ outcome: "failed", failureReason: reason }, {}]);
+    const result = await runBuildSession(f.deps(launcher), f.input);
+    assert.equal(launcher.orders.length, 2);
+    assert.deepEqual(await types(), [
+      "session.started",
+      "session.ended",
+      "session.started",
+      "session.ended",
+      "build.submitted",
+    ]);
+    assert.deepEqual(await failures(), [reason, null]);
+    const headSha = await head();
+    assert.notEqual(headSha, f.input.workspace.baseSha);
+    assert.deepEqual(result, { kind: "submitted", headSha });
+  });
+}
+
+test("worker_died dos veces: ni tercera sesión, ni commit, ni entrega, y la tarea sigue en building", async (t) => {
+  t.mock.method(console, "error", () => {});
+  const died = { outcome: "failed", failureReason: "worker_died" } as const;
+  const launcher = fakeLauncher([died, died, {}]);
+  const result = await runBuildSession(f.deps(launcher), f.input);
+  assert.equal(launcher.orders.length, 2);
+  const sessions = ["session.started", "session.ended", "session.started", "session.ended"];
+  assert.deepEqual(await types(), sessions);
+  assert.deepEqual(await failures(), ["worker_died", "worker_died"]);
+  assert.equal(await head(), f.input.workspace.baseSha);
+  assert.deepEqual(result, { kind: "paused", reason: "worker_died" });
+  const task = f.db.prepare("SELECT state FROM tasks WHERE number = 1").get();
+  assert.deepEqual(task, { state: "building" });
+});

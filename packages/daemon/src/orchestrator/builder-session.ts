@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   type Actor,
   type FailureReason,
+  isTransientFailure,
   type RepoProfile,
   type Specialist,
   specialistHash,
@@ -183,14 +184,17 @@ async function deliver(
 
 /**
  * La sesión de `building` de un ciclo (ADR-011): tras `completed` o `timeout`, commit y entrega;
- * cualquier otro fallo deja la tarea en `building`, en pausa, sin gastar ciclo. El reintento tras una
- * caída pasajera (enmienda del ADR-004 del 11 de noviembre) llega en el PR siguiente.
+ * cualquier otro fallo deja la tarea en `building`, en pausa, sin gastar ciclo. Tras una caída
+ * pasajera se abre una segunda sesión en el mismo ciclo, una sola vez (enmienda del ADR-004 del 11 de
+ * noviembre); parte del clon tal como lo dejó la primera.
  */
 export async function runBuildSession(
   deps: BuildSessionDeps,
   input: BuildSessionInput,
 ): Promise<BuildSessionResult> {
-  const attempt = await runOnce(deps, input);
+  let attempt = await runOnce(deps, input);
+  if (attempt.kind === "ended" && isTransientFailure(attempt.failure))
+    attempt = await runOnce(deps, input);
   if (attempt.kind !== "ended") return attempt;
   if (attempt.failure === null || attempt.failure === "timeout") return deliver(deps, input);
   return { kind: "paused", reason: attempt.failure };
