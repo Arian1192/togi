@@ -124,10 +124,19 @@ export interface ReleaseWorkspaceInput {
   workspaceId: WorkspaceId;
 }
 
+/** La entrega del ciclo (ADR-011 §3): el commit que dejó togi en la rama de la tarea, sin blobs. */
+export interface SubmitBuildInput {
+  type: "submitBuild";
+  number: number;
+  cycle: number;
+  headSha: string;
+}
+
 export type CommandInput =
   | CreateTaskInput
   | CreateWorkspaceInput
   | ReleaseWorkspaceInput
+  | SubmitBuildInput
   | EditTaskInput
   | SubmitTaskInput
   | CompleteTaskInput
@@ -265,6 +274,8 @@ export function createHandler(deps: HandlerDeps) {
           return { type: "createWorkspace", actor, at, workspace: cmd.workspace };
         case "releaseWorkspace":
           return { type: "releaseWorkspace", actor, at, workspaceId: cmd.workspaceId };
+        case "submitBuild":
+          return { type: "submitBuild", actor, at, cycle: cmd.cycle, headSha: cmd.headSha };
         case "reject": {
           const reason = { category: cmd.category, text: await blob(cmd.text) };
           return { type: "reject", actor, at, reason };
