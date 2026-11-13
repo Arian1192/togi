@@ -331,11 +331,17 @@ export function createOrchestrator({
      * tareas en planning sin sesión activa. Lo primero se hace siempre; lo segundo, solo con Planner.
      */
     async recover() {
+      // Cada sesión se cierra con su trayectoria real: verify-log cruza el recuento con agent_events.
+      // Al arrancar no hay workers vivos, así que nadie escribe eventos entre el recuento y el cierre.
       const open = db
-        .prepare("SELECT session_id, task_number FROM sessions WHERE state = 'active'")
-        .all() as { session_id: SessionId; task_number: number }[];
+        .prepare(
+          `SELECT s.session_id, s.task_number,
+                  (SELECT COUNT(*) FROM agent_events a WHERE a.session_id = s.session_id) AS events
+           FROM sessions s WHERE s.state = 'active'`,
+        )
+        .all() as { session_id: SessionId; task_number: number; events: number }[];
       for (const row of open)
-        await endSession(row.task_number, row.session_id, "daemon_restarted", NO_USAGE);
+        await endSession(row.task_number, row.session_id, "daemon_restarted", NO_USAGE, row.events);
       // Solo las tareas sin sesión, con la última completada (petición de cambios) o cortada por el
       // reinicio. Una que falló se reintenta a mano (`togi plan retry`): relanzar un agente real en
       // cada arranque costaría dinero sin que nadie lo pida. La excepción es una petición de reintento
